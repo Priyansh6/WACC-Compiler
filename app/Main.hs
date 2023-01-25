@@ -1,6 +1,16 @@
 module Main (main) where
 
-import Lib
+import Text.Megaparsec
+import Text.Megaparsec.Char
+
+import Data.Void
+
+import System.Environment
+
+type Parser = Parsec Void String
 
 main :: IO ()
-main = someFunc
+main = do 
+  (fname:_) <- getArgs
+  contents <- readFile fname
+  parseTest (char 'a' :: Parser Char) contents
