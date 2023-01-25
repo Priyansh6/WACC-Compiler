@@ -46,6 +46,7 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - WACC40
+    - megaparsec
 
 tests:
   WACC40-test:
