@@ -1,6 +1,7 @@
 build-job:
   stage: build
   script:
+    - source /home/gitlab-runner/.ghcup/env
     - stack build
 
 integration-test-job:
