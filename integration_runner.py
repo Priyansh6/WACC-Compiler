@@ -21,7 +21,7 @@ total = 0
 
 for test_entry in tests:
   for fname in glob.glob(base + test_entry):
-    proc = subprocess.run(["compile", fname], stdout=subprocess.DEVNULL)
+    proc = subprocess.run(["sh", "compile", fname], stdout=subprocess.DEVNULL)
 
     # Return code check
     actual = proc.returncode
