@@ -7,4 +7,5 @@ build-job:
 integration-test-job:
   stage: test
   script:
+    - stack build
     - python3 integration_runner.py
