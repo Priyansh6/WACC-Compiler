@@ -6,6 +6,8 @@ tests = ["valid/basic/skip/comment.wacc",
          "invalid/syntaxErr/basic/badComment.wacc",
          "invalid/syntaxErr/if/*"]
 
+base = "test/integration/"
+
 def get_return_code(fname):
   with open(fname) as f:
     lines = f.readlines()
@@ -18,7 +20,7 @@ passing = 0
 total = 0
 
 for test_entry in tests:
-  for fname in glob.glob(test_entry):
+  for fname in glob.glob(base + test_entry):
     proc = subprocess.run(["../../compile", fname], stdout=subprocess.DEVNULL)
 
     # Return code check

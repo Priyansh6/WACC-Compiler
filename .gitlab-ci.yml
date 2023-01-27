@@ -7,4 +7,4 @@ build-job:
 integration-test-job:
   stage: test
   script:
-    - python3 test/integration/integration_runner.py
+    - python3 integration_runner.py
