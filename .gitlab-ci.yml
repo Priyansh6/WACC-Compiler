@@ -1,0 +1,9 @@
+build-job:
+  stage: build
+  script:
+    - stack build
+
+integration-test-job:
+  stage: test
+  script:
+    - python3 test/integration/integration_runner.py
