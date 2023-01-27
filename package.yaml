@@ -47,6 +47,7 @@ executables:
     dependencies:
     - WACC40
     - megaparsec
+    - text
 
 tests:
   WACC40-test:
