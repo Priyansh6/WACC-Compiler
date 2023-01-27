@@ -1,5 +1,9 @@
 build-job:
   stage: build
+  artifacts: 
+    paths: 
+      - .stack-work/
+    expire_in: 5 mins
   script:
     - source /home/gitlab-runner/.ghcup/env
     - stack build
@@ -7,5 +11,4 @@ build-job:
 integration-test-job:
   stage: test
   script:
-    - stack build
     - python3 integration_runner.py
