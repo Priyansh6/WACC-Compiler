@@ -1,0 +1,5 @@
+#!/bin/bash
+
+stack exec -- WACC40-exe $@
+
+exit $?
