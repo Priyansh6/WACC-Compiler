@@ -21,6 +21,7 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
 - base >= 4.7 && < 5
+- text
 
 ghc-options:
 - -Wall
@@ -47,7 +48,6 @@ executables:
     dependencies:
     - WACC40
     - megaparsec
-    - text
 
 tests:
   WACC40-test:

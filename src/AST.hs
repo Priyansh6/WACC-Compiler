@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-import Data.Text (Text)
+module AST where
+
+import qualified Data.Text as T 
 
 -- data Program = Program Func Stat
 -- data Func = Func Type Ident ParamList Stat
@@ -22,4 +24,4 @@ data BinOp
   | (:&&:)
   | (:||:)
 
-newtype Ident = Text
+type Ident = T.Text
