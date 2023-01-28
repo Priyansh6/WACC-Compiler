@@ -13,10 +13,12 @@ data Expr
   | CharLiter Char
   | StrLiter T.Text
   | PairLiter 
-  | Ident T.Text
+  | IdentExpr Ident 
   | ArrayElem Ident [Expr]
   | UnaryOp Expr
   | BinOp Expr Expr
+
+data Ident = Ident T.Text
 
 data UnaryOp = (:!:) | Neg | Len | Ord | Chr
 
