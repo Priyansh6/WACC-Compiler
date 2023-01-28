@@ -7,8 +7,14 @@ build-job:
   script:
     - source /home/gitlab-runner/.ghcup/env
     - stack build
+  only:
+    refs:
+      - master
 
 integration-test-job:
   stage: test
   script:
     - python3 integration_runner.py
+  only:
+    refs:
+      - master
