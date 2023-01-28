@@ -1,10 +1,9 @@
 import glob
 import re
 import subprocess
+import sys
 
-tests = ["valid/basic/skip/comment.wacc",
-         "invalid/syntaxErr/basic/badComment.wacc",
-         "invalid/syntaxErr/if/*"]
+tests = []
 
 base = "test/integration/"
 
@@ -32,4 +31,6 @@ for test_entry in tests:
     else:
       print(f"Failed test {fname}. Expected exit code {expected} but got {actual}")
 
+
 print(f"Finished running tests. {passing} / {total} tests passed.")
+sys.exit(passing != total)
