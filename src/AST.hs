@@ -24,4 +24,4 @@ data BinOp
   | (:&&:)
   | (:||:)
 
-type Ident = T.Text
+data Ident = Ident T.Text
