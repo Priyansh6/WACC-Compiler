@@ -25,6 +25,7 @@ source-repository head
 
 library
   exposed-modules:
+      AST
       Lib
   other-modules:
       Paths_WACC40
@@ -33,6 +34,7 @@ library
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
       base >=4.7 && <5
+    , text
   default-language: Haskell2010
 
 executable WACC40-exe
@@ -46,6 +48,7 @@ executable WACC40-exe
       WACC40
     , base >=4.7 && <5
     , megaparsec
+    , text
   default-language: Haskell2010
 
 test-suite WACC40-test
@@ -59,4 +62,5 @@ test-suite WACC40-test
   build-depends:
       WACC40
     , base >=4.7 && <5
+    , text
   default-language: Haskell2010
