@@ -4,8 +4,8 @@ module AST where
 
 import qualified Data.Text as T 
 
--- data Program = Program Func Stat
--- data Func = Func Type Ident ParamList Stat
+data Program = Program [Func] Stat
+data Func = Func WType Ident [(WType, Ident)] Stat
 
 data Stat
   = Skip
