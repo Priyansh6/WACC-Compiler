@@ -18,3 +18,11 @@ integration-test-job:
   only:
     refs:
       - master
+
+unit-test-job:
+  stage: test
+  script:
+    - stack test
+  only:
+    refs:
+      - master
