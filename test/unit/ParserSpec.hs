@@ -22,3 +22,6 @@ spec = do
 
   it "can't parse non-bools to BoolLiter" $
     parseMaybe Parser.pBool "eobtih21" `shouldBe` Nothing
+
+  it "parses bools with trailing whitespace" $
+    parseMaybe Parser.pBool "true " `shouldBe` (Just (AST.BoolLiter True))
