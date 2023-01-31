@@ -6,6 +6,7 @@ module Parser
     pBool,
     pChar,
     pString,
+    pPairLit,
   )
 where
 
@@ -46,3 +47,6 @@ pString :: Parser AST.Expr
 pString = do
   s <- lexeme (char '\"' *> manyTill L.charLiteral (char '\"'))
   return (AST.StrLiter (T.pack s))
+
+pPairLit :: Parser AST.Expr
+pPairLit = AST.PairLiter <$ lexeme (string "null")

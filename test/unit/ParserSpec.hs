@@ -6,6 +6,7 @@ import qualified AST
 import qualified Parser
 import Test.Hspec
 import Text.Megaparsec
+import qualified Parser
 
 spec :: Spec
 spec = do
@@ -66,3 +67,10 @@ spec = do
 
   it "can't parse nothing" $
     parseMaybe Parser.pString "" `shouldBe` Nothing
+
+  -- pair-liter
+  it "parses a pair literal" $
+    parseMaybe Parser.pPairLit "null" `shouldBe` Just AST.PairLiter
+
+  it "can't the empty string" $
+    parseMaybe Parser.pPairLit "" `shouldBe` Nothing
