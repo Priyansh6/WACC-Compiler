@@ -24,6 +24,7 @@ dependencies:
 - text
 - megaparsec
 - parser-combinators
+- hspec
 
 ghc-options:
 - -Wall
@@ -53,7 +54,7 @@ executables:
 tests:
   WACC40-test:
     main:                Spec.hs
-    source-dirs:         test
+    source-dirs:         test/unit
     ghc-options:
     - -threaded
     - -rtsopts

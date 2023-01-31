@@ -1,12 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Parser where
+module Parser (Parser, pBool) where
 
 import Data.Void
 import Text.Megaparsec
 import Text.Megaparsec.Char
 
-import qualified AST as AST
+import qualified AST 
 import qualified Data.Text as T 
 
 type Parser = Parsec Void T.Text
