@@ -2,8 +2,8 @@ module AST where
 
 import qualified Data.Text as T 
 
-data Program = Program [Func] Stat
-data Func = Func WType Ident [(WType, Ident)] Stat
+data Program = Program [Func] Stat deriving (Show, Eq)
+data Func = Func WType Ident [(WType, Ident)] Stat deriving (Show, Eq)
 
 data Stat
   = Skip
@@ -19,6 +19,7 @@ data Stat
   | While Expr Stat
   | Begin Stat
   | Seq Stat Stat
+  deriving (Show, Eq)
 
 -- An AST node representing all possible WACC types
 -- N.B. WUnit is used to allow type erasure within pairs
@@ -30,11 +31,13 @@ data WType
   | WStr
   | WArr WType
   | WPair WType WType
+  deriving (Show, Eq)
 
 data LVal
   = LIdent Ident
   | LArray ArrayElem
   | LPair PairElem
+  deriving (Show, Eq)
 
 data RVal
   = RExpr Expr
@@ -42,6 +45,7 @@ data RVal
   | NewPair Expr Expr
   | RPair PairElem
   | Call Ident [Expr]
+  deriving (Show, Eq)
 
 data Expr
   = IntLiter Int
@@ -53,14 +57,17 @@ data Expr
   | ArrayExpr ArrayElem
   | UnaryOp Expr
   | BinOp Expr Expr
+  deriving (Show, Eq)
 
-data Ident = Ident T.Text
-data ArrayElem = ArrayElem Ident [Expr]
+data Ident = Ident T.Text deriving (Show, Eq)
+data ArrayElem = ArrayElem Ident [Expr] deriving (Show, Eq)
 data PairElem
   = Fst LVal
   | Snd LVal
+  deriving (Show, Eq)
 
 data UnaryOp = (:!:) | Neg | Len | Ord | Chr
+               deriving (Show, Eq)
 
 data BinOp
   = (:*:)
@@ -76,3 +83,4 @@ data BinOp
   | (:!=:)
   | (:&&:)
   | (:||:)
+  deriving (Show, Eq)
