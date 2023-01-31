@@ -1,14 +1,20 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Parser (Parser, pBool) where
+module Parser
+  ( Parser,
+    pInt,
+    pBool,
+    pChar,
+    pString,
+  )
+where
 
+import qualified AST 
+import qualified Data.Text as T
 import Data.Void
 import Text.Megaparsec
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
-
-import qualified AST 
-import qualified Data.Text as T 
 
 type Parser = Parsec Void T.Text
 
@@ -22,6 +28,21 @@ symbol :: T.Text -> Parser T.Text
 symbol = L.symbol sc
 
 pBool :: Parser AST.Expr
-pBool = choice 
-  [ AST.BoolLiter True <$ lexeme (string "true"),
-    AST.BoolLiter False <$ lexeme (string "false") ]
+pBool =
+  choice
+    [ AST.BoolLiter True <$ lexeme (string "true"),
+      AST.BoolLiter False <$ lexeme (string "false")
+    ]
+
+pInt :: Parser AST.Expr
+pInt = AST.IntLiter <$> L.signed (return ()) integer
+  where
+    integer = lexeme L.decimal
+
+pChar :: Parser AST.Expr
+pChar = AST.CharLiter <$> between (char '\'') (lexeme (char '\'')) L.charLiteral
+
+pString :: Parser AST.Expr
+pString = do
+  s <- lexeme (char '\"' *> manyTill L.charLiteral (char '\"'))
+  return (AST.StrLiter (T.pack s))
