@@ -74,3 +74,22 @@ spec = do
 
   it "can't the empty string" $
     parseMaybe Parser.pPairLit "" `shouldBe` Nothing
+
+  -- ident
+  it "parses an identifier" $
+    parseMaybe Parser.pIdent "hello" `shouldBe` Just (AST.Ident "hello")
+
+  it "parses an single letter identifier" $
+    parseMaybe Parser.pIdent "a" `shouldBe` Just (AST.Ident "a")
+     
+  it "parses an underscore identifier" $
+    parseMaybe Parser.pIdent "_" `shouldBe` Just (AST.Ident "_")
+ 
+  it "parses an underscore prefixed identifier" $
+    parseMaybe Parser.pIdent "_a" `shouldBe` Just (AST.Ident "_a")
+
+  it "parses an identifier" $
+    parseMaybe Parser.pIdent "aB1_" `shouldBe` Just (AST.Ident "aB1_")
+
+  it "can't parse an invalid identifier" $
+    parseMaybe Parser.pIdent "1" `shouldBe` Nothing

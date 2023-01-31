@@ -7,6 +7,7 @@ module Parser
     pChar,
     pString,
     pPairLit,
+    pIdent,
   )
 where
 
@@ -44,9 +45,15 @@ pChar :: Parser AST.Expr
 pChar = AST.CharLiter <$> between (char '\'') (lexeme (char '\'')) L.charLiteral
 
 pString :: Parser AST.Expr
-pString = do
+pString = try $ do
   s <- lexeme (char '\"' *> manyTill L.charLiteral (char '\"'))
   return (AST.StrLiter (T.pack s))
 
 pPairLit :: Parser AST.Expr
 pPairLit = AST.PairLiter <$ lexeme (string "null")
+
+pIdent :: Parser AST.Ident
+pIdent = try $ do 
+  c <- char '_' <|> letterChar
+  cs <- lexeme (many (char '_' <|> alphaNumChar))
+  return (AST.Ident (T.pack (c:cs)))
