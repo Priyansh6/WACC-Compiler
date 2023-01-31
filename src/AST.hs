@@ -48,7 +48,7 @@ data RVal
   deriving (Show, Eq)
 
 data Expr
-  = IntLiter Int
+  = IntLiter Integer
   | BoolLiter Bool
   | CharLiter Char
   | StrLiter T.Text
