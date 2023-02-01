@@ -29,31 +29,26 @@ lexeme = L.lexeme sc
 symbol :: T.Text -> Parser T.Text
 symbol = L.symbol sc
 
+pToken :: Parser a -> Parser a
+pToken = lexeme . try
+
 pBool :: Parser AST.Expr
-pBool =
-  choice
-    [ AST.BoolLiter True <$ lexeme (string "true"),
-      AST.BoolLiter False <$ lexeme (string "false")
-    ]
+pBool = pToken $ AST.BoolLiter <$> ((True <$ string "true") <|> (False <$ string "false"))
 
 pInt :: Parser AST.Expr
-pInt = AST.IntLiter <$> L.signed (return ()) integer
-  where
-    integer = lexeme L.decimal
+pInt = pToken $ AST.IntLiter <$> L.signed (return ()) L.decimal
 
 pChar :: Parser AST.Expr
-pChar = AST.CharLiter <$> between (char '\'') (lexeme (char '\'')) L.charLiteral
+pChar = pToken $ AST.CharLiter <$> between (char '\'') (lexeme (char '\'')) L.charLiteral
 
 pString :: Parser AST.Expr
-pString = try $ do
-  s <- lexeme (char '\"' *> manyTill L.charLiteral (char '\"'))
-  return (AST.StrLiter (T.pack s))
+pString = pToken $ AST.StrLiter . T.pack <$> (char '\"' *> manyTill L.charLiteral (char '\"'))
 
 pPairLit :: Parser AST.Expr
-pPairLit = AST.PairLiter <$ lexeme (string "null")
+pPairLit = pToken $ AST.PairLiter <$ string "null"
 
 pIdent :: Parser AST.Ident
-pIdent = try $ do 
+pIdent = pToken $ do 
   c <- char '_' <|> letterChar
-  cs <- lexeme (many (char '_' <|> alphaNumChar))
+  cs <- many (char '_' <|> alphaNumChar)
   return (AST.Ident (T.pack (c:cs)))
