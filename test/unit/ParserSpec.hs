@@ -7,6 +7,8 @@ import qualified Parser
 import Test.Hspec
 import Text.Megaparsec
 import qualified Parser
+import qualified Parser
+import qualified Parser
 
 spec :: Spec
 spec = do
@@ -93,3 +95,35 @@ spec = do
 
   it "can't parse an invalid identifier" $
     parseMaybe Parser.pIdent "1" `shouldBe` Nothing
+
+  -- array elem
+  it "parses an array elem indexed once by an int literal" $
+    parseMaybe Parser.pArrayElem "arr[1]" `shouldBe` Just (AST.ArrayElem (AST.Ident "arr") [AST.IntLiter 1])
+
+  -- expr
+  it "parses multiplication of two ints" $
+    parseMaybe Parser.pExpr "1 * 2" `shouldBe` Just (AST.IntLiter 1 AST.:*: AST.IntLiter 2)
+
+  it "parses division of two ints" $
+    parseMaybe Parser.pExpr "1 / 2" `shouldBe` Just (AST.IntLiter 1 AST.:/: AST.IntLiter 2)
+
+  it "parses modulo of two ints" $
+    parseMaybe Parser.pExpr "1 % 2" `shouldBe` Just (AST.IntLiter 1 AST.:%: AST.IntLiter 2)
+
+  it "parses addition of two ints" $
+    parseMaybe Parser.pExpr "1 + 2" `shouldBe` Just (AST.IntLiter 1 AST.:+: AST.IntLiter 2)
+
+  it "parses subtraction of two ints" $
+    parseMaybe Parser.pExpr "1 - 2" `shouldBe` Just (AST.IntLiter 1 AST.:-: AST.IntLiter 2)
+
+  it "parses binary operation on two ints with no whitespace" $
+    parseMaybe Parser.pExpr "1-2" `shouldBe` Just (AST.IntLiter 1 AST.:-: AST.IntLiter 2)
+
+  it "parses binary operations where one has higher precedence than another" $
+    parseMaybe Parser.pExpr "1 + 2 * 3" `shouldBe` Just (AST.IntLiter 1 AST.:+: (AST.IntLiter 2 AST.:*: AST.IntLiter 3))
+
+  it "parses binary operations of the same precedence with parentheses" $
+    parseMaybe Parser.pExpr "(1 * 2) * 3" `shouldBe` Just ((AST.IntLiter 1 AST.:*: AST.IntLiter 2) AST.:*: AST.IntLiter 3)
+
+  it "parses binary operations of different precedence with parentheses" $
+    parseMaybe Parser.pExpr "(1 + 2) * 3" `shouldBe` Just ((AST.IntLiter 1 AST.:+: AST.IntLiter 2) AST.:*: AST.IntLiter 3)
