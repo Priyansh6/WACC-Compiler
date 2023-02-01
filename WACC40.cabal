@@ -28,6 +28,7 @@ library
       AST
       Lib
       Parser
+      SemanticAnalyser
   other-modules:
       Paths_WACC40
   hs-source-dirs:
@@ -35,6 +36,7 @@ library
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
       base >=4.7 && <5
+    , containers
     , hspec
     , megaparsec
     , parser-combinators
@@ -51,6 +53,7 @@ executable WACC40-exe
   build-depends:
       WACC40
     , base >=4.7 && <5
+    , containers
     , hspec
     , megaparsec
     , parser-combinators
@@ -69,6 +72,7 @@ test-suite WACC40-test
   build-depends:
       WACC40
     , base >=4.7 && <5
+    , containers
     , hspec
     , megaparsec
     , parser-combinators

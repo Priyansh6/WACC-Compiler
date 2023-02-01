@@ -59,7 +59,7 @@ data Expr
   | BinOp Expr Expr
   deriving (Show, Eq)
 
-data Ident = Ident T.Text deriving (Show, Eq)
+data Ident = Ident T.Text deriving (Show, Eq, Ord)
 data ArrayElem = ArrayElem Ident [Expr] deriving (Show, Eq)
 data PairElem
   = Fst LVal
