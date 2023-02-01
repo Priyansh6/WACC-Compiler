@@ -80,7 +80,6 @@ data Expr
   deriving (Show, Eq)
 
 data Ident = Ident T.Text Position deriving (Show, Eq)
-
 data ArrayElem = ArrayElem Ident [Expr] Position deriving (Show, Eq)
 
 data PairElem
