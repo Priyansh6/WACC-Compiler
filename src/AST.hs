@@ -48,15 +48,31 @@ data RVal
   deriving (Show, Eq)
 
 data Expr
-  = IntLiter Int
+  = IntLiter Integer
   | BoolLiter Bool
   | CharLiter Char
   | StrLiter T.Text
   | PairLiter 
   | IdentExpr Ident 
   | ArrayExpr ArrayElem
-  | UnaryOp Expr
-  | BinOp Expr Expr
+  | Not Expr
+  | Neg Expr
+  | Len Expr
+  | Ord Expr
+  | Chr Expr
+  | Expr :*: Expr
+  | Expr :/: Expr
+  | Expr :%: Expr
+  | Expr :+: Expr
+  | Expr :-: Expr
+  | Expr :>: Expr
+  | Expr :>=: Expr
+  | Expr :<: Expr
+  | Expr :<=: Expr
+  | Expr :==: Expr
+  | Expr :!=: Expr
+  | Expr :&&: Expr
+  | Expr :||: Expr
   deriving (Show, Eq)
 
 data Ident = Ident T.Text deriving (Show, Eq)
@@ -64,23 +80,4 @@ data ArrayElem = ArrayElem Ident [Expr] deriving (Show, Eq)
 data PairElem
   = Fst LVal
   | Snd LVal
-  deriving (Show, Eq)
-
-data UnaryOp = (:!:) | Neg | Len | Ord | Chr
-               deriving (Show, Eq)
-
-data BinOp
-  = (:*:)
-  | (:/:)
-  | (:%:)
-  | (:+:)
-  | (:-:)
-  | (:>:)
-  | (:>=:)
-  | (:<:)
-  | (:<=:)
-  | (:==:)
-  | (:!=:)
-  | (:&&:)
-  | (:||:)
   deriving (Show, Eq)
