@@ -2,28 +2,28 @@
 
 module Parsers.IdentifierSpec (spec) where
 
-import qualified AST
-import qualified Parser
+import AST
+import Parser
+import Parsers.Test
 import Test.Hspec
 import Test.Hspec.Megaparsec
-import Text.Megaparsec
 
 spec :: Spec
 spec = do
   it "multi character" $
-    parse Parser.pIdent "" "hello" `shouldParse` AST.Ident "hello"
+    test pIdent "hello" `shouldParse` Ident "hello"
 
   it "single char" $
-    parse Parser.pIdent "" "a" `shouldParse` AST.Ident "a"
+    test pIdent "a" `shouldParse` Ident "a"
 
   it "underscore" $
-    parse Parser.pIdent "" "_" `shouldParse` AST.Ident "_"
+    test pIdent "_" `shouldParse` Ident "_"
 
   it "underscore prefixed identifier" $
-    parse Parser.pIdent "" "_a" `shouldParse` AST.Ident "_a"
+    test pIdent "_a" `shouldParse` Ident "_a"
 
   it "alphanumerical identifier" $
-    parse Parser.pIdent "" "aB1_" `shouldParse` AST.Ident "aB1_"
+    test pIdent "aB1_" `shouldParse` Ident "aB1_"
 
   it "fails invalid identifier" $
-    parse Parser.pIdent "" `shouldFailOn` "1"
+    test pIdent `shouldFailOn` "1"

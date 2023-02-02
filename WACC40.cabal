@@ -69,6 +69,7 @@ test-suite WACC40-test
       Parsers.ExpressionSpec
       Parsers.IdentifierSpec
       Parsers.LiteralsSpec
+      Parsers.Test
       Paths_WACC40
   hs-source-dirs:
       test/unit
