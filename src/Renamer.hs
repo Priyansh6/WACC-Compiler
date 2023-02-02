@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Renamer where
 
 import AST
@@ -10,7 +12,7 @@ type VarMap = M.Map Ident Ident
 
 data ScopeAccum = ScopeAccum { vars :: VarMap, 
                                scopeStack :: [Int], 
-                               scopeCounter :: Int } deriving (Show)
+                               scopeCounter :: Int } deriving (Show, Eq)
 
 rename :: Program -> (VarMap, Program)
 rename prog
@@ -36,13 +38,47 @@ renameFunc scopeAccum (Func t ident params stat)
     (scopeAccum'', renamedStat) = renameStat scopeAccum' stat
 
 renameStat :: ScopeAccum -> Stat -> (ScopeAccum, Stat)
-renameStat scopeAccum stat = (scopeAccum, stat)
+renameStat scopeAccum Skip = (scopeAccum, Skip)
+renameStat scopeAccum (DecAssign type ident rVal)
+  = (scopeAccum'', Decassign type ident' rVal')
+  where
+    (scopeAccum', rVal') = renameRVal scopeAccum rVal
+    (scopeAccum'', ident') = renameUndeclaredIdent scopeAccum' ident
+renameStat scopeAccum (Assign lVal rVal)
+  = (scopeAccum'', Assign lVal' rVal')
+  where
+    (scopeAccum', rVal') = renameRVal scopeAccum rVal
+    (scopeAccum'', lVal') = renameLVal scopeAccum' lVal
+renameStat scopeAccum (Read lVal)
+  = (scopeAccum', Read lVal')
+  where
+    (scopeAccum', lVal') = renameLVal scopeAccum lVal
+renameStat scopeAccum (Free expr)
+  = (scopeAccum', Free expr')
+  where
+    (scopeAccum', expr') = renameExpr scopeAccum expr
+renameStat scopeAccum (Return expr)
+  = (scopeAccum', Return expr')
+  where
+    (scopeAccum', expr') = renameExpr scopeAccum expr
+renameStat scopeAccum (Exit expr)
+  = (scopeAccum', Exit expr')
+  where
+    (scopeAccum', expr') = renameExpr scopeAccum expr
+renameStat scopeAccum (Print expr)
+  = (scopeAccum', Print expr')
+  where
+    (scopeAccum', expr') = renameExpr scopeAccum expr
+renameStat scopeAccum (Println expr)
+  = (scopeAccum', Println expr')
+  where
+    (scopeAccum', expr') = renameExpr scopeAccum expr
 
 renameUndeclaredIdent :: ScopeAccum -> Ident -> (ScopeAccum, Ident)
 renameUndeclaredIdent scopeAccum name@(Ident i)
   | member name' (vars scopeAccum) = error(msg)
   | otherwise                      = (scopeAccum', name')
   where
-    msg = "Error: Variable " ++ T.unpack i ++ " already defined."
+    msg = "Error: Variable " ++ i ++ " already defined."
     scopeAccum' = scopeAccum { vars = M.insert name' name (vars scopeAccum) }
-    name' = Ident ((append i . pack . show . scopeCounter) scopeAccum)
+    name' = Ident ((append i . show . scopeCounter) scopeAccum)
