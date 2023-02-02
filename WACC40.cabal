@@ -28,6 +28,7 @@ library
       AST
       Lib
       Parser
+      Renamer
       SemanticAnalyser
   other-modules:
       Paths_WACC40
