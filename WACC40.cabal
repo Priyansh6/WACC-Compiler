@@ -27,11 +27,13 @@ library
   exposed-modules:
       AST
       Lib
+      Expressions
       Parser
   other-modules:
       Paths_WACC40
   hs-source-dirs:
       src
+      src/parse
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
       base >=4.7 && <5
