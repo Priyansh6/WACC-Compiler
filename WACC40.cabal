@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.35.0.
+-- This file has been generated from package.yaml by hpack version 0.35.1.
 --
 -- see: https://github.com/sol/hpack
 
@@ -27,6 +27,7 @@ library
   exposed-modules:
       AST
       Lib
+      Expressions
       Parser
       Renamer
       SemanticAnalyser
@@ -34,11 +35,13 @@ library
       Paths_WACC40
   hs-source-dirs:
       src
+      src/parse
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
       base >=4.7 && <5
     , containers
     , hspec
+    , hspec-megaparsec
     , megaparsec
     , parser-combinators
     , text
@@ -56,6 +59,7 @@ executable WACC40-exe
     , base >=4.7 && <5
     , containers
     , hspec
+    , hspec-megaparsec
     , megaparsec
     , parser-combinators
     , text
@@ -65,7 +69,11 @@ test-suite WACC40-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
-      ParserSpec
+      Parsers.ArrayElemSpec
+      Parsers.ExpressionSpec
+      Parsers.IdentifierSpec
+      Parsers.LiteralsSpec
+      Parsers.Test
       Paths_WACC40
   hs-source-dirs:
       test/unit
@@ -75,6 +83,7 @@ test-suite WACC40-test
     , base >=4.7 && <5
     , containers
     , hspec
+    , hspec-megaparsec
     , megaparsec
     , parser-combinators
     , text

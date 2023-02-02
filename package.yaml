@@ -24,6 +24,7 @@ dependencies:
 - text
 - containers
 - megaparsec
+- hspec-megaparsec
 - parser-combinators
 - hspec
 
@@ -39,7 +40,9 @@ ghc-options:
 - -Wredundant-constraints
 
 library:
-  source-dirs: src
+  source-dirs: 
+  - src
+  - src/parse
 
 executables:
   WACC40-exe:
