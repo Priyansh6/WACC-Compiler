@@ -1,7 +1,8 @@
-import Test.Hspec
+{-# OPTIONS_GHC -F -pgmF hspec-discover #-}
 
-import qualified ParserSpec
+module Main (test) where
 
-main :: IO ()
-main = hspec $ do
-  describe "Parser.hs" ParserSpec.spec
+import Text.Megaparsec (parse)
+
+test :: Parsec e s a -> s -> Either (ParseErrorBundle s e) a
+test parser = parse parser ""
