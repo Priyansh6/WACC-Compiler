@@ -44,8 +44,8 @@ brackets = between (symbol "[") (symbol "]")
 parens :: Parser a -> Parser a
 parens = between (symbol "(") (symbol ")")
 
-keyword :: String -> Parser ()
-keyword k = token (string k *> notFollowedBy alphaNumChar)
+-- keyword :: String -> Parser ()
+-- keyword k = token (string k *> notFollowedBy alphaNumChar)
 
 keywords = ["begin", "end", "is", "end", "skip", "read",
             "free", "return", "exit", "print", "println",
