@@ -56,7 +56,10 @@ pExpr = makeExprParser pTerm operatorTable
 
 operatorTable :: [[Operator Parser AST.Expr]]
 operatorTable = 
-  [ [ prefix "-" AST.Neg ]
+  [ [ prefix "-" AST.Neg 
+    , prefix "len" AST.Len
+    , prefix "ord" AST.Ord
+    , prefix "chr" AST.Chr ]
   , [ binary "*" (AST.:*:)
     , binary "/" (AST.:/:)
     , binary "%" (AST.:%:) ]
