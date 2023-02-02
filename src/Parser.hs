@@ -65,7 +65,7 @@ parens = between (symbol "(") (symbol ")")
 pArrayElem :: Parser AST.ArrayElem
 pArrayElem = pToken $ do
   ident <- pIdent
-  exprs <- many (brackets pExpr)
+  exprs <- some (brackets pExpr)
   return (AST.ArrayElem ident exprs)
 
 pTerm :: Parser AST.Expr
@@ -75,8 +75,8 @@ pTerm = choice
     pChar,
     pString,
     pPairLit,
-    AST.IdentExpr <$> pIdent,
     AST.ArrayExpr <$> pArrayElem,
+    AST.IdentExpr <$> pIdent,
     parens pExpr ]
 
 pExpr :: Parser AST.Expr
