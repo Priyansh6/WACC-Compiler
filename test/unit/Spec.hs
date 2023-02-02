@@ -1,7 +1,9 @@
-import Test.Hspec
+{-# OPTIONS_GHC -F -pgmF hspec-discover #-}
 
-import qualified ParserSpec
+-- import Test.Hspec
 
-main :: IO ()
-main = hspec $ do
-  describe "Parser.hs" ParserSpec.spec
+-- import qualified ParserSpec
+
+-- main :: IO ()
+-- main = hspec $ do
+--   describe "Parser.hs" ParserSpec.spec
