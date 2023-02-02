@@ -1,9 +1,13 @@
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use newtype instead of data" #-}
 module AST where
 
 import qualified Data.Text as T 
 
-data Program = Program [Func] Stat deriving (Show, Eq)
-data Func = Func WType Ident [(WType, Ident)] Stat deriving (Show, Eq)
+data Program = Program [Func] Stats deriving (Show, Eq)
+data Func = Func WType Ident [(WType, Ident)] Stats deriving (Show, Eq)
+
+type Stats = [Stat]
 
 data Stat
   = Skip
@@ -15,10 +19,9 @@ data Stat
   | Exit Expr
   | Print Expr
   | Println Expr
-  | If Expr Stat Stat
-  | While Expr Stat
-  | Begin Stat
-  | Seq Stat Stat
+  | If Expr Stats Stats
+  | While Expr Stats
+  | Begin Stats
   deriving (Show, Eq)
 
 -- An AST node representing all possible WACC types
