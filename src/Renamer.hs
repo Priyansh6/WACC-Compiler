@@ -3,40 +3,46 @@ module Renamer where
 import AST
 
 import Data.Map as M
+import Data.List as L
+import Data.Text as T
 
-type VarMap M.Map Ident Ident
+type VarMap = M.Map Ident Ident
 
-renameProg :: Program -> (Program, VarMap)
-renameProg (Program funcs stat)
-  = Program (renamedFuncs renamedStats)
+data ScopeAccum = ScopeAccum { vars :: VarMap, 
+                               scopeStack :: [Int], 
+                               scopeCounter :: Int } deriving (Show)
+
+rename :: Program -> (VarMap, Program)
+rename prog
+  = (vars scopeAccum', prog')
+  where 
+    (scopeAccum', prog') = renameProg scopeAccum prog
+    scopeAccum = ScopeAccum { vars = M.empty, scopeStack = [],  scopeCounter = 0}
+
+renameProg :: ScopeAccum -> Program -> (ScopeAccum, Program)
+renameProg scopeAccum (Program funcs stat)
+  = undefined
     where 
-      (renamedFuncs, VarMap) = renameFunc M.empty 
+      (scopeAccum', renamedFuncs) = L.mapAccumL renameFunc scopeAccum funcs
 
 
-renameFuncs :: [Func] -> VarMap -> Int -> ([Func], VarMap, Int)
-renameFuncs [] vars i
-  = ([], vars, i)
-renameFuncs ((Func _ _ params stat ): funcs) vars i
-  = 
+renameFunc :: ScopeAccum -> Func -> (ScopeAccum, Func)
+renameFunc scopeAccum (Func t ident params stat)
+  = (scopeAccum'', Func t ident renamedParams renamedStat)
   where
-    renamedParams = foldl renameParam (vars, [], i)
+    (types, idents) = L.unzip params
+    (scopeAccum', renamedIdents) = L.mapAccumL renameUndeclaredIdent scopeAccum idents
+    renamedParams = L.zip types renamedIdents
+    (scopeAccum'', renamedStat) = renameStat scopeAccum' stat
 
-    -- renameParams :: VarMap -> [(WType, Ident)] -> (VarMap, [(WType, Ident)])
-    -- renameParams varMap [] = (varMap, [])
-    -- renameParams varMap [param : params] 
-    --   = (varMap'', params)
-    --   where
-    --     (varMap', param') = renameParam varMap param
-    --     (varMap'', params') = renameParams varMap' params
-    
-    renameParams :: VarMap -> [(WType, Ident)] -> (VarMap, [(WType, Ident)])
-    renameParams = scanl renameParam vars 
+renameStat :: ScopeAccum -> Stat -> (ScopeAccum, Stat)
+renameStat scopeAccum stat = (scopeAccum, stat)
 
-    renameParam :: (VarMap, [(WType, Ident)], Int, (WType, Ident)) -> (VarMap, (WType, Ident))
-    renameParam varMap (t, name@(Ident id))
-      | member name' varMap = error(msg)
-      | otherwise           = (varMap', (t, name'))
-      where
-        msg = "Error: Variable " ++ unpack id ++ " already defined."
-        varMap' = insert name' name varMap
-        name' = Ident (append id i)
+renameUndeclaredIdent :: ScopeAccum -> Ident -> (ScopeAccum, Ident)
+renameUndeclaredIdent scopeAccum name@(Ident i)
+  | member name' (vars scopeAccum) = error(msg)
+  | otherwise                      = (scopeAccum', name')
+  where
+    msg = "Error: Variable " ++ T.unpack i ++ " already defined."
+    scopeAccum' = scopeAccum { vars = M.insert name' name (vars scopeAccum) }
+    name' = Ident ((append i . pack . show . scopeCounter) scopeAccum)
