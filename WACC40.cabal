@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.35.0.
+-- This file has been generated from package.yaml by hpack version 0.35.1.
 --
 -- see: https://github.com/sol/hpack
 
@@ -38,6 +38,7 @@ library
   build-depends:
       base >=4.7 && <5
     , hspec
+    , hspec-megaparsec
     , megaparsec
     , parser-combinators
     , text
@@ -54,6 +55,7 @@ executable WACC40-exe
       WACC40
     , base >=4.7 && <5
     , hspec
+    , hspec-megaparsec
     , megaparsec
     , parser-combinators
     , text
@@ -63,6 +65,9 @@ test-suite WACC40-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      Parsers.ArrayElemSpec
+      Parsers.ExpressionSpec
+      Parsers.IdentifierSpec
       Parsers.LiteralsSpec
       Paths_WACC40
   hs-source-dirs:
@@ -72,6 +77,7 @@ test-suite WACC40-test
       WACC40
     , base >=4.7 && <5
     , hspec
+    , hspec-megaparsec
     , megaparsec
     , parser-combinators
     , text

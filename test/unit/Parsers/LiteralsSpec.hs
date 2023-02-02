@@ -5,71 +5,72 @@ module Parsers.LiteralsSpec (spec) where
 import qualified AST
 import qualified Expressions
 import Test.Hspec
+import Test.Hspec.Megaparsec
 import Text.Megaparsec
 
 spec :: Spec
 spec = do
   describe "Boolean" $ do
-    it "parses true" $ do
-      parseMaybe Expressions.pBool "true" `shouldBe` Just (AST.BoolLiter True)
+    it "true" $ do
+      parse Expressions.pBool "" "true" `shouldParse` AST.BoolLiter True
 
-    it "parses false" $
-      parseMaybe Expressions.pBool "false" `shouldBe` Just (AST.BoolLiter False)
+    it "false" $
+      parse Expressions.pBool "" "false" `shouldParse` AST.BoolLiter False
 
-    it "can't parse strings prefixed with a bool" $
-      parseMaybe Expressions.pBool "truetrue" `shouldBe` Nothing
+    it "fails bool appended with anything" $
+      parse Expressions.pBool "" `shouldFailOn` "truetrue"
 
-    it "can't parse non-bools" $
-      parseMaybe Expressions.pBool "e" `shouldBe` Nothing
+    it "fails non-bools" $
+      parse Expressions.pBool "" `shouldFailOn` "e"
 
-    it "parses bools with trailing whitespace" $
-      parseMaybe Expressions.pBool "true " `shouldBe` Just (AST.BoolLiter True)
+    it "trailing whitespace" $
+      parse Expressions.pBool "" "true " `shouldParse` AST.BoolLiter True
 
   describe "Integer" $ do
-    it "parses unsigned integer literal" $
-      parseMaybe Expressions.pInt "123" `shouldBe` Just (AST.IntLiter 123)
+    it "unsigned int" $
+      parse Expressions.pInt "" "123" `shouldParse` AST.IntLiter 123
 
-    it "parses positive integer literal" $
-      parseMaybe Expressions.pInt "+123" `shouldBe` Just (AST.IntLiter 123)
+    it "positive int" $
+      parse Expressions.pInt "" "+123" `shouldParse` AST.IntLiter 123
 
-    it "parses negative integer literal" $
-      parseMaybe Expressions.pInt "-123" `shouldBe` Just (AST.IntLiter (-123))
+    it "negative int" $
+      parse Expressions.pInt "" "-123" `shouldParse` AST.IntLiter (-123)
 
-    it "can't parse only a sign" $
-      parseMaybe Expressions.pInt "+" `shouldBe` Nothing
+    it "fails on just sign (+, -)" $
+      parse Expressions.pInt "" `shouldFailOn` "+"
 
-    it "can't parse nothing" $
-      parseMaybe Expressions.pInt "" `shouldBe` Nothing
+    it "fails on nothing" $
+      parse Expressions.pInt "" `shouldFailOn` ""
 
   describe "Character" $ do
-    it "parses 'a'" $
-      parseMaybe Expressions.pChar "'a'" `shouldBe` Just (AST.CharLiter 'a')
+    it "single char" $
+      parse Expressions.pChar "" "'a'" `shouldParse` AST.CharLiter 'a'
 
-    it "can't parse empty character" $
-      parseMaybe Expressions.pChar "''" `shouldBe` Nothing
+    it "fails on empty char" $
+      parse Expressions.pChar "" `shouldFailOn` "''"
 
-    it "can't parse multiple characters" $
-      parseMaybe Expressions.pChar "'aa'" `shouldBe` Nothing
+    it "fails on multiple chars" $
+      parse Expressions.pChar "" `shouldFailOn` "'aa'"
 
-    it "can't parse nothing" $
-      parseMaybe Expressions.pChar "" `shouldBe` Nothing
+    it "fails on nothing" $
+      parse Expressions.pChar "" `shouldFailOn` ""
 
   describe "String" $ do
-    it "parses \"aa\"" $
-      parseMaybe Expressions.pString "\"aa\"" `shouldBe` Just (AST.StrLiter "aa")
+    it "multi char string" $
+      parse Expressions.pString "" "\"aa\"" `shouldParse` AST.StrLiter "aa"
 
-    it "parses empty string" $
-      parseMaybe Expressions.pString "\"\"" `shouldBe` Just (AST.StrLiter "")
+    it "empty string" $
+      parse Expressions.pString "" "\"\"" `shouldParse` AST.StrLiter ""
 
-    it "can't parse incorrect string notation" $
-      parseMaybe Expressions.pString "\"a\"\"" `shouldBe` Nothing
+    it "fails on too many quote marks" $
+      parse Expressions.pString "" `shouldFailOn` "\"a\"\""
 
-    it "can't parse nothing" $
-      parseMaybe Expressions.pString "" `shouldBe` Nothing
+    it "fails on nothing" $
+      parse Expressions.pString "" `shouldFailOn` ""
 
   describe "Pair" $ do
-    it "parses a pair literal" $
-      parseMaybe Expressions.pPairLit "null" `shouldBe` Just AST.PairLiter
+    it "pair literal" $
+      parse Expressions.pPairLit "" "null" `shouldParse` AST.PairLiter
 
-    it "can't the empty string" $
-      parseMaybe Expressions.pPairLit "" `shouldBe` Nothing
+    it "fails on nothing" $
+      parse Expressions.pPairLit "" `shouldFailOn` ""
