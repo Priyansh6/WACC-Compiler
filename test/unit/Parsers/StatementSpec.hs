@@ -39,6 +39,9 @@ spec = do
       test pRVal "[true,false]" `shouldParse` ArrayLiter [BoolLiter True, BoolLiter False]
 
   describe "Declarative Assignments" $ do
+    it "dec assign a LExpr bool" $ do
+      test pDecAssign "bool a = true" `shouldParse` DecAssign WBool (Ident "a") (RExpr (BoolLiter True))
+
     it "dec assign a RExpr integer" $ do
       test pDecAssign "int bob = 1" `shouldParse` DecAssign WInt (Ident "bob") (RExpr (IntLiter 1))
 
@@ -59,3 +62,59 @@ spec = do
 
     xit "dec assign a read pair from array elem" $ do
       test pDecAssign "char sss = fst a[0][1]" `shouldParse` DecAssign WChar (Ident "sss") (RPair (Fst (LArray (ArrayElem (Ident "a") [IntLiter 0, IntLiter 1]))))
+
+  describe "Statement" $ do
+    it "skip" $ do
+      test pStat "skip" `shouldParse` Skip
+
+    it "free expr" $ do
+      test pStat "free 1" `shouldParse` Free (IntLiter 1)
+
+    it "dec assign a LExpr bool" $ do
+      test pStat "bool a = true" `shouldParse` DecAssign WBool (Ident "a") (RExpr (BoolLiter True))
+
+    it "dec assign a RExpr integer" $ do
+      test pStat "int bob = 1" `shouldParse` DecAssign WInt (Ident "bob") (RExpr (IntLiter 1))
+
+    it "dec assign a RExpr string" $ do
+      test pStat "string _0 = \"hell'o\"" `shouldParse` DecAssign WStr (Ident "_0") (RExpr (StrLiter "hell'o"))
+
+    it "dec assign a RExpr char" $ do
+      test pStat "char _q = '\"'" `shouldParse` DecAssign WChar (Ident "_q") (RExpr (CharLiter '\"'))
+
+    it "dec assign an ArrayLiter" $ do
+      test pStat "char[] Zy_ = ['\"']" `shouldParse` DecAssign (WArr WChar 1) (Ident "Zy_") (ArrayLiter [CharLiter '\"'])
+
+    it "dec assign a NewPair" $ do
+      test pStat "pair(char, bool) _ = newpair('\\0', true)" `shouldParse` DecAssign (WPair WChar WBool) (Ident "_") (NewPair (CharLiter '\0') (BoolLiter True))
+
+    it "dec assign a read pair" $ do
+      test pStat "string s = snd p" `shouldParse` DecAssign WStr (Ident "s") (RPair (Snd (LIdent (Ident "p"))))
+
+  describe "Statements" $ do
+    it "skip" $ do
+      test pStats "skip" `shouldParse` [Skip]
+
+    it "free expr" $ do
+      test pStats "free 1" `shouldParse` [Free (IntLiter 1)]
+
+    it "dec assign a LExpr bool" $ do
+      test pStats "bool a = true" `shouldParse` [DecAssign WBool (Ident "a") (RExpr (BoolLiter True))]
+
+    it "dec assign a RExpr integer" $ do
+      test pStats "int bob = 1" `shouldParse` [DecAssign WInt (Ident "bob") (RExpr (IntLiter 1))]
+
+    it "dec assign a RExpr string" $ do
+      test pStats "string _0 = \"hell'o\"" `shouldParse` [DecAssign WStr (Ident "_0") (RExpr (StrLiter "hell'o"))]
+
+    it "dec assign a RExpr char" $ do
+      test pStats "char _q = '\"'" `shouldParse` [DecAssign WChar (Ident "_q") (RExpr (CharLiter '\"'))]
+
+    it "dec assign an ArrayLiter" $ do
+      test pStats "char[] Zy_ = ['\"']" `shouldParse` [DecAssign (WArr WChar 1) (Ident "Zy_") (ArrayLiter [CharLiter '\"'])]
+
+    it "dec assign a NewPair" $ do
+      test pStats "pair(char, bool) _ = newpair('\\0', true)" `shouldParse` [DecAssign (WPair WChar WBool) (Ident "_") (NewPair (CharLiter '\0') (BoolLiter True))]
+
+    it "dec assign a read pair" $ do
+      test pStats "string s = snd p" `shouldParse` [DecAssign WStr (Ident "s") (RPair (Snd (LIdent (Ident "p"))))]

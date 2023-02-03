@@ -20,7 +20,7 @@ pProgram :: Parser AST.Program
 pProgram = AST.Program <$> (keyword "begin" *> many pFunc) <*> (pStats <* keyword "end")
 
 pFunc :: Parser AST.Func
-pFunc = AST.Func <$> pWType <*> pIdent <*> parens pParamList <*> (keyword "is" *> pStats <* keyword "end")
+pFunc = try $ AST.Func <$> pWType <*> pIdent <*> parens pParamList <*> (keyword "is" *> pStats <* keyword "end")
 
 pParamList :: Parser [(AST.WType, AST.Ident)]
 pParamList = pParam `sepBy` symbol ","
