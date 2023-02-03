@@ -79,7 +79,7 @@ pRVal = choice
   ]
 
 pArrLiter :: Parser AST.RVal
-pArrLiter = AST.ArrayLiter <$> brackets pExpr `sepBy1` symbol ","
+pArrLiter = AST.ArrayLiter <$> brackets (pExpr `sepBy1` symbol ",")
 
 pNewPair :: Parser AST.RVal
 pNewPair = AST.NewPair <$> (keyword "newpair" *> symbol "(" *> pExpr) <*> (symbol "," *> pExpr <* symbol ")")

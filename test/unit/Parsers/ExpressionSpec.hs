@@ -70,6 +70,9 @@ spec = do
   it "expression with chr unop" $
     test pExpr "chr 5" `shouldParse` Chr (IntLiter 5)
 
+  it "nested unaries" $
+    test pExpr "chr (ord 5)" `shouldParse` Chr (Ord (IntLiter 5))
+
   it "len unop applied to no arguments" $
     test pExpr `shouldFailOn` "len"
 
