@@ -12,7 +12,7 @@ import Text.Megaparsec
 import Text.Megaparsec.Char
 
 pStats :: Parser AST.Stats
-pStats = pStat `sepBy` symbol ";"
+pStats = pStat `sepBy1` symbol ";"
 
 pStat :: Parser AST.Stat
 pStat = choice 
