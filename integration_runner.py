@@ -3,7 +3,8 @@ import re
 import subprocess
 import sys
 
-tests = [("invalid/syntaxErr/", 100)]
+tests = [("invalid/syntax/", 100),
+         ("valid/", 0)]
 
 base = "test/integration/"
 
