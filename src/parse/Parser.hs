@@ -2,6 +2,7 @@
 
 module Parser
   ( Parser,
+    sc,
     pToken,
     symbol,
     pIdent,
