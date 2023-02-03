@@ -79,7 +79,7 @@ renameStat scopeAccum (While expr stat)
     (scopeAccum', expr') = renameExpr scopeAccum expr
     (scopeAccum'', stat') = renameStat (prepareNewScope scopeAccum scopeAccum') stat
 renameStat scopeAccum (Begin stat)
-  = (scopeAccum' { scopeStack = scopeStack scopeAccum }, While stat')
+  = (scopeAccum' { scopeStack = scopeStack scopeAccum }, Begin stat')
   where
     (scopeAccum', stat') = renameStat (prepareNewScope scopeAccum scopeAccum) stat
 renameStat scopeAccum (Seq stat1 stat2)
