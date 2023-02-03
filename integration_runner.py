@@ -1,30 +1,21 @@
-import glob
+import pathlib
 import re
 import subprocess
 import sys
 
-tests = []
+tests = [("invalid/syntaxErr/", 100)]
 
 base = "test/integration/"
-
-def get_return_code(fname):
-  with open(fname) as f:
-    lines = f.readlines()
-    for i in range(len(lines)):
-      if lines[i].startswith("# Exit:"):
-        return int(re.search("[0-9]+", lines[i+1]).group())
-  return 0
 
 passing = 0
 total = 0
 
-for test_entry in tests:
-  for fname in glob.glob(base + test_entry):
+for (test_entry, expected) in tests:
+  for fname in pathlib.Path(base + test_entry).rglob("*.wacc"):
     proc = subprocess.run(["sh", "compile", fname], stdout=subprocess.DEVNULL)
 
     # Return code check
     actual = proc.returncode
-    expected = get_return_code(fname)
     total += 1
     if actual == expected:
       passing += 1
