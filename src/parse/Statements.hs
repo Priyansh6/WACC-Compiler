@@ -1,6 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-{-# HLINT ignore "Use <$>" #-}
 
 module Statements (module Statements) where
 
@@ -36,19 +35,10 @@ pSkip :: Parser AST.Stat
 pSkip = AST.Skip <$ keyword "skip"
 
 pDecAssign :: Parser AST.Stat
-pDecAssign = do
-              t <- pWType
-              i <- pIdent
-              symbol "="
-              rval <- pRVal
-              return (AST.DecAssign t i rval)
+pDecAssign = AST.DecAssign <$> pWType <*> pIdent <*> (symbol "=" *> pRVal)
 
 pAssign :: Parser AST.Stat
-pAssign = do 
-            lval <- pLVal
-            symbol "="
-            rval <- pRVal
-            return (AST.Assign lval rval)
+pAssign = AST.Assign <$> pLVal <*> (symbol "=" *> pRVal)
 
 pRead :: Parser AST.Stat
 pRead = AST.Read <$> (keyword "read" *> pLVal)
@@ -71,22 +61,11 @@ pArrType = try $ do
             return (AST.WArr t dimension)
 
 pPairType :: Parser AST.WType
-pPairType = try $ do
-              keyword "pair"
-              symbol "("
-              et <- pPairElemType
-              symbol ","
-              et' <- pPairElemType
-              symbol ")"
-              return (AST.WPair et et')
-            where
-              pPairElemType :: Parser AST.WType
-              pPairElemType = pArrType <|> (AST.WUnit <$ keyword "pair") <|> pBaseType 
+pPairType = AST.WPair <$> (keyword "pair" *> symbol "(" *> pPairElemType) <*> (symbol "," *> pPairElemType <* symbol ")")
+  where
+    pPairElemType :: Parser AST.WType
+    pPairElemType = pArrType <|> (AST.WUnit <$ keyword "pair") <|> pBaseType 
 
-
--- pPairType :: Parser AST.WType 
--- pPairType = AST.WPair <$> (keyword "pair" *> symbol "(") *> pPairElemType <* symbol "," *> pPairElemType <* symbol ")"
---   where
 pLVal :: Parser AST.LVal 
 pLVal = (AST.LIdent <$> pIdent) <|> (AST.LArray <$> pArrayElem) <|> (AST.LPair <$> pPairElem)
 
@@ -103,26 +82,13 @@ pArrLiter :: Parser AST.RVal
 pArrLiter = AST.ArrayLiter <$> brackets pExpr `sepBy1` symbol ","
 
 pNewPair :: Parser AST.RVal
-pNewPair = do 
-            keyword "newpair"
-            symbol "("
-            e <- pExpr
-            symbol ","
-            e' <- pExpr
-            symbol ")"
-            return (AST.NewPair e e')
+pNewPair = AST.NewPair <$> (keyword "newpair" *> symbol "(" *> pExpr) <*> (symbol "," *> pExpr <* symbol ")")
 
 pPairElem :: Parser AST.PairElem
 pPairElem = (AST.Fst <$> (keyword "fst" *> pLVal)) <|> (AST.Snd <$> (keyword "snd" *> pLVal))
 
 pCall :: Parser AST.RVal
-pCall = do 
-          keyword "call"
-          i <- pIdent
-          symbol "("
-          args <- pArgsList
-          symbol ")"
-          return (AST.Call i args)
+pCall = AST.Call <$> (keyword "call" *> pIdent) <*> brackets pArgsList
 
 pArgsList :: Parser [AST.Expr]
 pArgsList = pExpr `sepBy` symbol ","
@@ -143,28 +109,10 @@ pPrintln :: Parser AST.Stat
 pPrintln = AST.Println <$> (keyword "println" *> pExpr)
 
 pIf :: Parser AST.Stat
-pIf = do 
-        keyword "if"
-        e <- pExpr
-        keyword "then"
-        ss <- pStats
-        keyword "else"
-        ss' <- pStats
-        keyword "fi"
-        return (AST.If e ss ss')
+pIf = AST.If <$> (keyword "if" *> pExpr) <*> (keyword "then" *> pStats) <*> (keyword "else" *> pStats <* keyword "fi")
 
 pWhile :: Parser AST.Stat
-pWhile = do
-          keyword "while"
-          e <- pExpr
-          keyword "do"
-          ss <- pStats
-          keyword "done"
-          return (AST.While e ss)
+pWhile = AST.While <$> (keyword "while" *> pExpr) <*> (keyword "do" *> pStats <* keyword "done")
 
 pBegin :: Parser AST.Stat
-pBegin = do 
-          keyword "begin"
-          ss <- pStats
-          keyword "end"
-          return (AST.Begin ss)
+pBegin = AST.Begin <$> (keyword "begin" *> pStats <* keyword "end")
