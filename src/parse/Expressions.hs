@@ -20,7 +20,7 @@ import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
 
 pBool :: Parser AST.Expr
-pBool = pToken $ AST.BoolLiter <$> ((True <$ string "true") <|> (False <$ string "false"))
+pBool = pToken $ AST.BoolLiter <$> ((True <$ keyword "true") <|> (False <$ keyword "false"))
 
 pInt :: Parser AST.Expr
 pInt = pToken $ AST.IntLiter <$> L.signed (return ()) L.decimal
@@ -32,7 +32,7 @@ pString :: Parser AST.Expr
 pString = pToken $ AST.StrLiter . T.pack <$> (char '\"' *> manyTill L.charLiteral (char '\"'))
 
 pPairLit :: Parser AST.Expr
-pPairLit = pToken $ AST.PairLiter <$ string "null"
+pPairLit = pToken $ AST.PairLiter <$ keyword "null"
 
 pArrayElem :: Parser AST.ArrayElem
 pArrayElem = pToken $ do

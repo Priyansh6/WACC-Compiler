@@ -38,7 +38,9 @@ pIdent :: Parser AST.Ident
 pIdent = pToken $ do 
   c <- char '_' <|> letterChar
   cs <- many (char '_' <|> alphaNumChar)
-  return (AST.Ident (T.pack (c:cs)))
+  if (c:cs) `elem` keywords 
+    then fail "ident is a keyword!"
+    else return (AST.Ident (T.pack (c:cs)))
 
 brackets :: Parser a -> Parser a
 brackets = between (symbol "[") (symbol "]")

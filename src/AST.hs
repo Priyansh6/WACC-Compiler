@@ -1,4 +1,4 @@
-module AST where
+module AST (module AST) where
 
 import qualified Data.Text as T 
 
@@ -30,7 +30,7 @@ data WType
   | WBool
   | WChar
   | WStr
-  | WArr WType
+  | WArr WType Int
   | WPair WType WType
   deriving (Show, Eq)
 
