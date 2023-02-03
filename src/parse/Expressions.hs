@@ -59,7 +59,8 @@ operatorTable =
   [ [ prefix "-" AST.Neg 
     , prefix "len" AST.Len
     , prefix "ord" AST.Ord
-    , prefix "chr" AST.Chr ]
+    , prefix "chr" AST.Chr 
+    , prefix "!" AST.Not ]
   , [ binary "*" (AST.:*:)
     , binary "/" (AST.:/:)
     , binary "%" (AST.:%:) ]
