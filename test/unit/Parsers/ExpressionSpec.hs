@@ -78,3 +78,6 @@ spec = do
 
   it "chr unop applied to a paranthesised expression" $
     test pExpr "chr(5 * (6 + 7))" `shouldParse` Chr (IntLiter 5 :*: (IntLiter 6 :+: IntLiter 7))
+
+  it "array elem with dimension of 1" $
+    test pArrayElem "arr[5]" `shouldParse` ArrayElem (Ident "arr") [IntLiter 5]
