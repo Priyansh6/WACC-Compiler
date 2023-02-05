@@ -35,10 +35,7 @@ pPairLit :: Parser AST.Expr
 pPairLit = pToken $ AST.PairLiter <$ keyword "null"
 
 pArrayElem :: Parser AST.ArrayElem
-pArrayElem = pToken $ do
-  ident <- pIdent
-  exprs <- some (brackets pExpr)
-  return (AST.ArrayElem ident exprs)
+pArrayElem = pToken $ AST.ArrayElem <$> pIdent <*> some (brackets pExpr)
 
 pTerm :: Parser AST.Expr
 pTerm = choice 
@@ -66,10 +63,10 @@ operatorTable =
     , binary "%" (AST.:%:) ]
   , [ binary "+" (AST.:+:)
     , binary "-" (AST.:-:) ]
-  , [ binary ">" (AST.:>:) 
-    , binary ">=" (AST.:>=:)
+  , [ binary ">=" (AST.:>=:)
+    , binary ">" (AST.:>:) 
     , binary "<=" (AST.:<=:)
-    , binary "<=" (AST.:<=:) ]
+    , binary "<" (AST.:<:) ]
   , [ binary "==" (AST.:==:)
     , binary "!=" (AST.:!=:) ]
   , [ binary "&&" (AST.:&&:) ]
