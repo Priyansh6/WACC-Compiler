@@ -66,10 +66,10 @@ operatorTable =
     , binary "%" (AST.:%:) ]
   , [ binary "+" (AST.:+:)
     , binary "-" (AST.:-:) ]
-  , [ binary ">" (AST.:>:) 
-    , binary ">=" (AST.:>=:)
+  , [ binary ">=" (AST.:>=:)
+    , binary ">" (AST.:>:) 
     , binary "<=" (AST.:<=:)
-    , binary "<=" (AST.:<=:) ]
+    , binary "<" (AST.:<:) ]
   , [ binary "==" (AST.:==:)
     , binary "!=" (AST.:!=:) ]
   , [ binary "&&" (AST.:&&:) ]
