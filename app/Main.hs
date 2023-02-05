@@ -15,7 +15,6 @@ main :: IO ()
 main = do 
   (fname:_) <- getArgs
   contents <- TIO.readFile fname
-  -- parseTest (sc *> pProgram <* eof) contents
   let res = runParser (sc *> pProgram <* eof) fname contents
   case res of
     Left _ -> exitWith (ExitFailure 100)
