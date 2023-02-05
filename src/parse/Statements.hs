@@ -79,7 +79,7 @@ pRVal = choice
   ]
 
 pArrLiter :: Parser AST.RVal
-pArrLiter = AST.ArrayLiter <$> brackets (pExpr `sepBy1` symbol ",")
+pArrLiter = AST.ArrayLiter <$> brackets (pExpr `sepBy` symbol ",")
 
 pNewPair :: Parser AST.RVal
 pNewPair = AST.NewPair <$> (keyword "newpair" *> symbol "(" *> pExpr) <*> (symbol "," *> pExpr <* symbol ")")
@@ -88,7 +88,7 @@ pPairElem :: Parser AST.PairElem
 pPairElem = (AST.Fst <$> (keyword "fst" *> pLVal)) <|> (AST.Snd <$> (keyword "snd" *> pLVal))
 
 pCall :: Parser AST.RVal
-pCall = AST.Call <$> (keyword "call" *> pIdent) <*> brackets pArgsList
+pCall = AST.Call <$> (keyword "call" *> pIdent) <*> parens pArgsList
 
 pArgsList :: Parser [AST.Expr]
 pArgsList = pExpr `sepBy` symbol ","
