@@ -38,6 +38,9 @@ spec = do
     it "ArrayLiter" $ do
       test pRVal "[true,false]" `shouldParse` ArrayLiter [BoolLiter True, BoolLiter False]
 
+    it "Empty ArrayLiter" $ 
+      test pRVal "[]" `shouldParse` ArrayLiter []
+
   describe "Declarative Assignments" $ do
     it "dec assign a LExpr bool" $ do
       test pDecAssign "bool a = true" `shouldParse` DecAssign WBool (Ident "a") (RExpr (BoolLiter True))
