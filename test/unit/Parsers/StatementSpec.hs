@@ -25,6 +25,12 @@ spec = do
   it "fails on nested keyword stats" $ do
     test pPrint `shouldFailOn` "print exit 'h'"
 
+  it "calling functions with one argument" $ do
+    test pCall "call f(x)" `shouldParse` Call (Ident "f") [IdentExpr (Ident "x")]
+
+  it "calling functions with multiple arguments" $ do
+    test pCall "call f(x, y, 'c', 7)" `shouldParse` Call (Ident "f") [IdentExpr (Ident "x"), IdentExpr (Ident "y"), CharLiter 'c', IntLiter 7]
+
   describe "RVal" $ do
     it "RExpression of integer" $ do
       test pRVal "911" `shouldParse` RExpr (IntLiter 911)

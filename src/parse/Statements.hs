@@ -88,7 +88,7 @@ pPairElem :: Parser AST.PairElem
 pPairElem = (AST.Fst <$> (keyword "fst" *> pLVal)) <|> (AST.Snd <$> (keyword "snd" *> pLVal))
 
 pCall :: Parser AST.RVal
-pCall = AST.Call <$> (keyword "call" *> pIdent) <*> brackets pArgsList
+pCall = AST.Call <$> (keyword "call" *> pIdent) <*> parens pArgsList
 
 pArgsList :: Parser [AST.Expr]
 pArgsList = pExpr `sepBy` symbol ","
