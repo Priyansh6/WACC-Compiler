@@ -1,16 +1,21 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Main (main) where
 
+import Parser (sc)
+import Programs (pProgram)
+
 import Text.Megaparsec
-import Text.Megaparsec.Char
-
 import Data.Void
-
 import System.Environment
-
-type Parser = Parsec Void String
+import System.Exit
+import qualified Data.Text.IO as TIO
 
 main :: IO ()
 main = do 
   (fname:_) <- getArgs
-  contents <- readFile fname
-  parseTest (char 'a' :: Parser Char) contents
+  contents <- TIO.readFile fname
+  let res = runParser (sc *> pProgram <* eof) fname contents
+  case res of
+    Left _ -> exitWith (ExitFailure 100)
+    Right _ -> exitWith ExitSuccess

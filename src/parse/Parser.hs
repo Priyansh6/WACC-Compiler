@@ -2,12 +2,15 @@
 
 module Parser
   ( Parser,
+    sc,
     pToken,
     symbol,
     pIdent,
     brackets,
     parens,
-    lexeme
+    lexeme,
+    keyword,
+    keywords
   )
 where
 
@@ -36,7 +39,9 @@ pIdent :: Parser AST.Ident
 pIdent = pToken $ do 
   c <- char '_' <|> letterChar
   cs <- many (char '_' <|> alphaNumChar)
-  return (AST.Ident (T.pack (c:cs)))
+  if (c:cs) `elem` keywords 
+    then fail "ident is a keyword!"
+    else return (AST.Ident (T.pack (c:cs)))
 
 brackets :: Parser a -> Parser a
 brackets = between (symbol "[") (symbol "]")
@@ -44,12 +49,13 @@ brackets = between (symbol "[") (symbol "]")
 parens :: Parser a -> Parser a
 parens = between (symbol "(") (symbol ")")
 
--- keyword :: String -> Parser ()
--- keyword k = token (string k *> notFollowedBy alphaNumChar)
+keyword :: T.Text -> Parser ()
+keyword k = pToken (string k *> notFollowedBy alphaNumChar)
 
+keywords :: [String]
 keywords = ["begin", "end", "is", "end", "skip", "read",
             "free", "return", "exit", "print", "println",
             "if", "then", "else", "fi", "while", "do", 
-            "done", "fst", "snd", "newpair", "call", 
+            "done", "fst", "snd", "null", "newpair", "call", 
             "int", "bool", "char", "string", "pair", 
             "len", "ord", "chr"]
