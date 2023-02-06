@@ -56,6 +56,6 @@ keywords :: [String]
 keywords = ["begin", "end", "is", "end", "skip", "read",
             "free", "return", "exit", "print", "println",
             "if", "then", "else", "fi", "while", "do", 
-            "done", "fst", "snd", "newpair", "call", 
+            "done", "fst", "snd", "null", "newpair", "call", 
             "int", "bool", "char", "string", "pair", 
             "len", "ord", "chr"]

@@ -127,3 +127,6 @@ spec = do
 
     it "dec assign a read pair" $ do
       test pStats "string s = snd p" `shouldParse` [DecAssign WStr (Ident "s") (RPair (Snd (LIdent (Ident "p"))))]
+
+    it "dec assign, then reassign a RExpr integer" $ do
+      test pStats "int bob = 1; bob = 2" `shouldParse` [DecAssign WInt (Ident "bob") (RExpr (IntLiter 1)), Assign (LIdent (Ident "bob")) (RExpr (IntLiter 2))]
