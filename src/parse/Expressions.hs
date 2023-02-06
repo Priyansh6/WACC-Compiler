@@ -23,7 +23,15 @@ pBool :: Parser AST.Expr
 pBool = pToken $ AST.BoolLiter <$> ((True <$ keyword "true") <|> (False <$ keyword "false"))
 
 pInt :: Parser AST.Expr
-pInt = pToken $ AST.IntLiter <$> L.signed (return ()) L.decimal
+pInt = pToken $ AST.IntLiter <$> (L.signed (return ()) L.decimal >>= validWaccInt)
+  where
+    validWaccInt :: Integer -> Parser Integer
+    validWaccInt x
+      | x <= biggestWaccInt && x >= smallestWaccInt = pure x
+      | otherwise = fail "Int literal outside of valid bounds!"
+
+    biggestWaccInt = (2 ^ 31) - 1
+    smallestWaccInt = -(2 ^ 31)
 
 pChar :: Parser AST.Expr
 pChar = pToken $ AST.CharLiter <$> between (char '\'') (lexeme (char '\'')) L.charLiteral
