@@ -67,7 +67,7 @@ pPairType = AST.WPair <$> (keyword "pair" *> symbol "(" *> pPairElemType) <*> (s
     pPairElemType = pArrType <|> (AST.WUnit <$ keyword "pair") <|> pBaseType 
 
 pLVal :: Parser AST.LVal 
-pLVal = (AST.LArray <$> pArrayElem) <|> (AST.LIdent <$> pIdent) <|> (AST.LPair <$> pPairElem)
+pLVal = (AST.LArray <$> pArrayElem) <|> (AST.LPair <$> pPairElem) <|> (AST.LIdent <$> pIdent)
 
 pRVal :: Parser AST.RVal
 pRVal = choice 
