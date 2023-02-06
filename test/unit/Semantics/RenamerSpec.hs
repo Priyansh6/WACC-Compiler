@@ -12,8 +12,15 @@ import Test.Hspec
 spec :: Spec
 spec = do
   it "renames parameters" $
-    renameFunc (ScopeAccum { vars = M.empty, scopeStack = [],  scopeCounter = 0}) 
+    renameFunc (ScopeAccum { 
+                    scopeMap = M.empty, 
+                    scopeStack = [0],  
+                    scopeCounter = 0
+                }) 
                (Func WInt (Ident (pack "ashdkf")) [(WInt, Ident "x"), (WInt, Ident "y")] Skip) 
                `shouldBe` 
-               (ScopeAccum {vars = fromList [(Ident "x0",Ident "x"),(Ident "y0",Ident "y")], scopeStack = [], scopeCounter = 0},
-                Func WInt (Ident "ashdkf") [(WInt,Ident "x0"),(WInt,Ident "y0")] Skip)
+               (ScopeAccum {
+                   scopeMap = fromList [(0, [Ident "ashdkf"]), (1, [Ident "y-1", Ident "x-1"])],
+                   scopeStack = [0],
+                   scopeCounter = 1
+                 }, Func WInt (Ident "ashdkf") [(WInt, Ident "x-1"), (WInt, Ident "y-1")] Skip)
