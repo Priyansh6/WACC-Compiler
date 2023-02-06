@@ -88,8 +88,8 @@ spec = do
     xit "dec assign a RExpr string" $ do
       test pStat "string _0 = \"hell\'o\"" `shouldParse` DecAssign WStr (Ident "_0") (RExpr (StrLiter "hell'o"))
 
-    xit "dec assign a RExpr char" $ do
-      test pStat "char _q = '\"'" `shouldParse` DecAssign WChar (Ident "_q") (RExpr (CharLiter '\"'))
+    it "dec assign a RExpr char" $ do
+      test pStat "char _q = ' '" `shouldParse` DecAssign WChar (Ident "_q") (RExpr (CharLiter ' '))
 
     xit "dec assign an ArrayLiter" $ do
       test pStat "char[] Zy_ = ['\"']" `shouldParse` DecAssign (WArr WChar 1) (Ident "Zy_") (ArrayLiter [CharLiter '\"'])

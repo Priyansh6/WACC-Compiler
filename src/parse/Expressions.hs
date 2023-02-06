@@ -1,73 +1,48 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Expressions
-  ( pInt,
+  ( pIdent,
     pBool,
+    pInt,
     pChar,
     pString,
     pPairLit,
-    pExpr,
     pArrayElem,
+    pExpr,
   )
 where
 
 import qualified AST 
 import Control.Monad.Combinators.Expr 
-import Data.Maybe (fromJust)
 import qualified Data.Text as T
-import Parser (Parser, pToken, symbol, pIdent, brackets, parens, lexeme, keyword)
+import Parser (Parser)
 import Text.Megaparsec
-import Text.Megaparsec.Char
-import qualified Text.Megaparsec.Char.Lexer as L
+import Text.Megaparsec.Char (char)
+import qualified Lexer as L
+
+pIdent :: Parser AST.Ident
+pIdent = AST.Ident <$> L.ident
 
 pBool :: Parser AST.Expr
-pBool = pToken $ AST.BoolLiter <$> ((True <$ keyword "true") <|> (False <$ keyword "false"))
+pBool = AST.BoolLiter <$> ((True <$ "true") <|> (False <$ "false"))
 
 pInt :: Parser AST.Expr
-pInt = pToken $ AST.IntLiter <$> (L.signed (return ()) L.decimal >>= validWaccInt)
-  where
-    validWaccInt :: Integer -> Parser Integer
-    validWaccInt x
-      | x <= biggestWaccInt && x >= smallestWaccInt = pure x
-      | otherwise = fail "Int literal outside of valid bounds!"
-
-    biggestWaccInt = 2 ^ (31 :: Integer) 
-    smallestWaccInt = -(2 ^ (31 :: Integer))
+pInt = AST.IntLiter <$> L.number
 
 pChar :: Parser AST.Expr
-pChar = pToken $ AST.CharLiter <$> between (char '\'') (lexeme (char '\'')) pChar'
+pChar = try $ AST.CharLiter <$> between (char '\'') "\'" L.char
 
 pString :: Parser AST.Expr
-pString = pToken $ AST.StrLiter . T.pack <$> (char '\"' *> many pChar' <* char '\"')
-
-pChar' :: Parser Char
-pChar' = satisfy validChar <|> (char '\\' *> satisfy escapedChar >>= toEscaped)
-  where
-    validChar :: Char -> Bool
-    validChar c = ' ' <= c && c <= '\DEL' && notElem c ['\\', '\'', '"']
-
-    escapedChar :: Char -> Bool
-    escapedChar c = c `elem` ['0', 'b', 't', 'n', 'f', 'r', '"', '\'', '\\']
-
-    toEscaped :: Char -> Parser Char
-    toEscaped c = pure $ fromJust $ lookup c [ ('0', '\0')
-                                             , ('b', '\b')
-                                             , ('t', '\t')
-                                             , ('n', '\n')
-                                             , ('f', '\f')
-                                             , ('r', '\r')
-                                             , ('"', '\"')
-                                             , ('\'', '\'')
-                                             , ('\\', '\\') ]
+pString = try $ AST.StrLiter . T.pack <$> between (char '"') "\"" (many L.char)
 
 pPairLit :: Parser AST.Expr
-pPairLit = pToken $ AST.PairLiter <$ keyword "null"
+pPairLit = try $ AST.PairLiter <$ "null"
 
 pArrayElem :: Parser AST.ArrayElem
-pArrayElem = pToken $ AST.ArrayElem <$> pIdent <*> some (brackets pExpr)
+pArrayElem = try $ AST.ArrayElem <$> pIdent <*> some (L.brackets pExpr)
 
 pTerm :: Parser AST.Expr
-pTerm = choice 
+pTerm = try $ choice 
   [ pInt,
     pBool,
     pChar,
@@ -75,7 +50,7 @@ pTerm = choice
     pPairLit,
     AST.ArrayExpr <$> pArrayElem,
     AST.IdentExpr <$> pIdent,
-    parens pExpr ]
+    L.parens pExpr ]
 
 pExpr :: Parser AST.Expr
 pExpr = makeExprParser pTerm operatorTable
@@ -101,8 +76,8 @@ operatorTable =
   , [ binary "&&" (AST.:&&:) ]
   , [ binary "||" (AST.:||:) ]]
 
-binary :: T.Text -> (AST.Expr -> AST.Expr -> AST.Expr) -> Operator Parser AST.Expr
-binary s c = InfixL (c <$ symbol s)
+binary :: Parser () -> (AST.Expr -> AST.Expr -> AST.Expr) -> Operator Parser AST.Expr
+binary s c = InfixL (c <$ s)
 
-prefix :: T.Text -> (AST.Expr -> AST.Expr) -> Operator Parser AST.Expr
-prefix s c = Prefix (c <$ symbol s)
+prefix :: Parser () -> (AST.Expr -> AST.Expr) -> Operator Parser AST.Expr
+prefix s c = Prefix (c <$ s)

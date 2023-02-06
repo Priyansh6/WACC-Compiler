@@ -3,7 +3,7 @@
 module Parsers.IdentifierSpec (spec) where
 
 import AST
-import Parser
+import Expressions
 import Parsers.Test
 import Test.Hspec
 import Test.Hspec.Megaparsec

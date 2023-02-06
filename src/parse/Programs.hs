@@ -6,21 +6,19 @@ module Programs
   ) 
 where
 
-import qualified Data.Text as T
-import qualified AST 
-import Control.Monad.Combinators.Expr 
-import qualified Data.Text as T
-import Parser (Parser, pToken, symbol, pIdent, brackets, parens, lexeme, keyword)
-import Expressions (pExpr, pArrayElem)
-import Statements
+import Control.Monad.Combinators
+import Expressions (pIdent) 
+import Parser (Parser)
 import Text.Megaparsec
-import Text.Megaparsec.Char
+import Statements (pStats, pWType)
+import qualified AST 
+import qualified Lexer as L
 
 pProgram :: Parser AST.Program
-pProgram = AST.Program <$> (keyword "begin" *> many pFunc) <*> (pStats <* keyword "end")
+pProgram = AST.Program <$> ("begin" *> many pFunc) <*> (pStats <* "end")
 
 pFunc :: Parser AST.Func
-pFunc = try $ AST.Func <$> pWType <*> pIdent <*> parens pParamList <*> (keyword "is" *> pStats <* keyword "end") >>= vFunc
+pFunc = try $ AST.Func <$> pWType <*> pIdent <*> L.parens pParamList <*> ("is" *> pStats <* "end") >>= vFunc
   where
     vFunc :: AST.Func -> Parser AST.Func
     vFunc f@(AST.Func _ _ _ xs)
@@ -36,7 +34,7 @@ pFunc = try $ AST.Func <$> pWType <*> pIdent <*> parens pParamList <*> (keyword 
     validThroughAllPaths _ = False
 
 pParamList :: Parser [(AST.WType, AST.Ident)]
-pParamList = pParam `sepBy` symbol ","
+pParamList = pParam `sepBy` ","
   where
     pParam :: Parser (AST.WType, AST.Ident)
     pParam = (,) <$> pWType <*> pIdent

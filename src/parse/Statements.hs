@@ -1,18 +1,34 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-module Statements (module Statements) where
+module Statements 
+  ( pStats
+  , pStat
+  , pWType
+  , pSkip
+  , pDecAssign
+  , pAssign
+  , pRead
+  , pBaseType
+  , pArrType
+  , pPairType
+  , pLVal
+  , pRVal
+  , pFree
+  , pReturn
+  , pCall
+  , pPrint
+  , pExit
+  ) where
 
-import qualified AST 
-import Control.Monad.Combinators.Expr 
-import qualified Data.Text as T
-import Parser (Parser, pToken, symbol, pIdent, brackets, parens, lexeme, keyword)
-import Expressions (pExpr, pArrayElem)
+import Expressions (pExpr, pArrayElem, pIdent)
+import Parser (Parser) 
 import Text.Megaparsec
-import Text.Megaparsec.Char
+import qualified AST 
+import qualified Lexer as L
 
 pStats :: Parser AST.Stats
-pStats = pStat `sepBy1` symbol ";"
+pStats = pStat `sepBy1` ";"
 
 pStat :: Parser AST.Stat
 pStat = choice 
@@ -32,39 +48,39 @@ pStat = choice
   ]
 
 pSkip :: Parser AST.Stat
-pSkip = AST.Skip <$ keyword "skip"
+pSkip = AST.Skip <$ "skip"
 
 pDecAssign :: Parser AST.Stat
-pDecAssign = AST.DecAssign <$> pWType <*> pIdent <*> (symbol "=" *> pRVal)
+pDecAssign = AST.DecAssign <$> pWType <*> pIdent <*> ("=" *> pRVal)
 
 pAssign :: Parser AST.Stat
-pAssign = AST.Assign <$> pLVal <*> (symbol "=" *> pRVal)
+pAssign = AST.Assign <$> pLVal <*> ("=" *> pRVal)
 
 pRead :: Parser AST.Stat
-pRead = AST.Read <$> (keyword "read" *> pLVal)
+pRead = AST.Read <$> ("read" *> pLVal)
 
 pWType :: Parser AST.WType
 pWType = pArrType <|> pPairType <|> pBaseType 
 
 pBaseType :: Parser AST.WType 
-pBaseType = try $ choice 
-  [ AST.WInt <$ keyword "int"
-  , AST.WBool <$ keyword "bool"
-  , AST.WChar <$ keyword "char"
-  , AST.WStr <$ keyword "string" ]
+pBaseType = choice 
+  [ AST.WInt <$ "int"
+  , AST.WBool <$ "bool"
+  , AST.WChar <$ "char"
+  , AST.WStr <$ "string" ]
 
 pArrType :: Parser AST.WType
 pArrType = try $ do
             t <- pBaseType <|> pPairType
-            bs <- some (symbol "[]")
+            bs <- some "[]"
             let dimension = length bs
             return (AST.WArr t dimension)
 
 pPairType :: Parser AST.WType
-pPairType = AST.WPair <$> (keyword "pair" *> symbol "(" *> pPairElemType) <*> (symbol "," *> pPairElemType <* symbol ")")
+pPairType = AST.WPair <$> ("pair" *> "(" *> pPairElemType) <*> ("," *> pPairElemType <* ")")
   where
     pPairElemType :: Parser AST.WType
-    pPairElemType = pArrType <|> (AST.WUnit <$ keyword "pair") <|> pBaseType 
+    pPairElemType = pArrType <|> (AST.WUnit <$ "pair") <|> pBaseType 
 
 pLVal :: Parser AST.LVal 
 pLVal = (AST.LArray <$> pArrayElem) <|> (AST.LPair <$> pPairElem) <|> (AST.LIdent <$> pIdent)
@@ -79,40 +95,40 @@ pRVal = choice
   ]
 
 pArrLiter :: Parser AST.RVal
-pArrLiter = AST.ArrayLiter <$> brackets (pExpr `sepBy` symbol ",")
+pArrLiter = AST.ArrayLiter <$> L.brackets (pExpr `sepBy` ",")
 
 pNewPair :: Parser AST.RVal
-pNewPair = AST.NewPair <$> (keyword "newpair" *> symbol "(" *> pExpr) <*> (symbol "," *> pExpr <* symbol ")")
+pNewPair = AST.NewPair <$> ("newpair" *> "(" *> pExpr) <*> ("," *> pExpr <* ")")
 
 pPairElem :: Parser AST.PairElem
-pPairElem = (AST.Fst <$> (keyword "fst" *> pLVal)) <|> (AST.Snd <$> (keyword "snd" *> pLVal))
+pPairElem = (AST.Fst <$> ("fst" *> pLVal)) <|> (AST.Snd <$> ("snd" *> pLVal))
 
 pCall :: Parser AST.RVal
-pCall = AST.Call <$> (keyword "call" *> pIdent) <*> parens pArgsList
+pCall = AST.Call <$> ("call" *> pIdent) <*> L.parens pArgsList
 
 pArgsList :: Parser [AST.Expr]
-pArgsList = pExpr `sepBy` symbol ","
+pArgsList = pExpr `sepBy` ","
 
 pFree :: Parser AST.Stat
-pFree = AST.Free <$> (keyword "free" *> pExpr)
+pFree = AST.Free <$> ("free" *> pExpr)
 
 pReturn :: Parser AST.Stat
-pReturn = AST.Return <$> (keyword "return" *> pExpr)
+pReturn = AST.Return <$> ("return" *> pExpr)
 
 pExit :: Parser AST.Stat
-pExit = AST.Exit <$> (keyword "exit" *> pExpr)
+pExit = AST.Exit <$> ("exit" *> pExpr)
 
 pPrint :: Parser AST.Stat
-pPrint = AST.Print <$> (keyword "print" *> pExpr)
+pPrint = AST.Print <$> ("print" *> pExpr)
 
 pPrintln :: Parser AST.Stat
-pPrintln = AST.Println <$> (keyword "println" *> pExpr)
+pPrintln = AST.Println <$> ("println" *> pExpr)
 
 pIf :: Parser AST.Stat
-pIf = AST.If <$> (keyword "if" *> pExpr) <*> (keyword "then" *> pStats) <*> (keyword "else" *> pStats <* keyword "fi")
+pIf = AST.If <$> ("if" *> pExpr) <*> ("then" *> pStats) <*> ("else" *> pStats <* "fi")
 
 pWhile :: Parser AST.Stat
-pWhile = AST.While <$> (keyword "while" *> pExpr) <*> (keyword "do" *> pStats <* keyword "done")
+pWhile = AST.While <$> ("while" *> pExpr) <*> ("do" *> pStats <* "done")
 
 pBegin :: Parser AST.Stat
-pBegin = AST.Begin <$> (keyword "begin" *> pStats <* keyword "end")
+pBegin = AST.Begin <$> ("begin" *> pStats <* "end")

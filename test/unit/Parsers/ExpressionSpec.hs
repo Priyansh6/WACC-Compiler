@@ -7,6 +7,8 @@ import Expressions
 import Parsers.Test
 import Test.Hspec
 import Test.Hspec.Megaparsec
+import Expressions (pIdent)
+import AST (Expr(CharLiter))
 
 spec :: Spec
 spec = do
@@ -81,3 +83,18 @@ spec = do
 
   it "array elem with dimension of 1" $
     test pArrayElem "arr[5]" `shouldParse` ArrayElem (Ident "arr") [IntLiter 5]
+
+  it "identifier _" $
+    test pIdent "_" `shouldParse` Ident "_"
+
+  it "single char identifier" $
+    test pIdent "a" `shouldParse` Ident "a"
+
+  it "identifier multichar identifier" $
+    test pIdent "abc" `shouldParse` Ident "abc"
+
+  it "empty char literal" $
+    test pChar "' '" `shouldParse` CharLiter ' '
+
+  it "char literal" $
+    test pChar "'a'" `shouldParse` CharLiter 'a'
