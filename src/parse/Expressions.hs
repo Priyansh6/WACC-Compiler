@@ -30,8 +30,8 @@ pInt = pToken $ AST.IntLiter <$> (L.signed (return ()) L.decimal >>= validWaccIn
       | x <= biggestWaccInt && x >= smallestWaccInt = pure x
       | otherwise = fail "Int literal outside of valid bounds!"
 
-    biggestWaccInt = (2 ^ 31) - 1
-    smallestWaccInt = -(2 ^ 31)
+    biggestWaccInt = (2 ^ (31 :: Integer)) - 1
+    smallestWaccInt = -(2 ^ (31 :: Integer))
 
 pChar :: Parser AST.Expr
 pChar = pToken $ AST.CharLiter <$> between (char '\'') (lexeme (char '\'')) L.charLiteral
