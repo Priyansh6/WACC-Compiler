@@ -22,14 +22,14 @@ findAll id st@(SymbolTable parentSt _)
     ids = find id st
 
 checkProg :: SymbolTable -> Program -> SymbolTable
-checkProg st (Program fs s)
-  = checkStat stFuncs s
+checkProg st (Program fs ss)
+  = checkStat stFuncs ss
     where
       stFuncs = foldl' checkFunc st fs
 
 checkFunc :: SymbolTable -> Func -> SymbolTable
 checkFunc = undefined
 
-checkStat :: SymbolTable -> Stat -> SymbolTable
+checkStat :: SymbolTable -> Stats -> SymbolTable
 checkStat = undefined
 
