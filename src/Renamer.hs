@@ -13,176 +13,142 @@ data ScopeAccum = ScopeAccum { scopeMap :: ScopeMap,
                                scopeStack :: [Int], 
                                scopeCounter :: Int } deriving (Show, Eq)
 
+mapSnd :: (b -> c) -> (a, b) -> (a, c)
+mapSnd f (x, y) = (x, f y)
+
+mapFst :: (a -> c) -> (a, b) -> (c, b)
+mapFst f (x, y) = (f x, y)
+
 getCurrentScope :: ScopeAccum -> Int
 getCurrentScope = L.head . scopeStack
 
 getScopedVars :: ScopeAccum -> Int -> [Ident]
 getScopedVars scopeAccum s = M.findWithDefault [] s (scopeMap scopeAccum)
 
+prepareNewScope :: ScopeAccum -> ScopeAccum -> ScopeAccum
+prepareNewScope oldScopeAccum scopeAccum
+  = scopeAccum { scopeStack = scopeCounter scopeAccum + 1 : scopeStack oldScopeAccum, 
+                 scopeCounter = scopeCounter scopeAccum + 1 }
+
+resetScope :: ScopeAccum -> ScopeAccum -> ScopeAccum
+resetScope oldScopeAccum scopeAccum
+  = scopeAccum { scopeStack = scopeStack oldScopeAccum }
+
+chain :: (acc -> x -> (acc, x)) -> x -> (acc, x -> y) -> (acc, y)
+chain accFunc x (acc, f)
+  = mapSnd f (accFunc acc x)
+
+chainNewScope :: (ScopeAccum -> x -> (ScopeAccum, x)) -> x -> ScopeAccum -> (ScopeAccum, x -> y) -> (ScopeAccum, y)
+chainNewScope accFunc x oldScopeAccum (acc, f)
+  = mapSnd f (accFunc (prepareNewScope oldScopeAccum acc) x)
+
+chainResetScope :: ScopeAccum -> (ScopeAccum, x) -> (ScopeAccum, x)
+chainResetScope oldScopeAccum = mapFst (resetScope oldScopeAccum)
+
 rename :: Program -> (ScopeMap, Program)
 rename prog
-  = (scopeMap scopeAccum', prog')
+  = mapFst scopeMap (renameProg scopeAccum prog)
   where 
-    (scopeAccum', prog') = renameProg scopeAccum prog
     scopeAccum = ScopeAccum { scopeMap = M.empty, scopeStack = [0],  scopeCounter = 0}
 
 renameProg :: ScopeAccum -> Program -> (ScopeAccum, Program)
 renameProg scopeAccum (Program funcs stats)
-  = (scopeAccum'', Program funcs' stats')
-    where 
-      (scopeAccum', funcs') = L.mapAccumL renameFunc scopeAccum funcs
-      (scopeAccum'', stats') = L.mapAccumL renameStat scopeAccum' stats
+  = (chain (L.mapAccumL renameStat) stats . chain (L.mapAccumL renameFunc) funcs) (scopeAccum, Program)
 
 -- Error handling
 
 renameFunc :: ScopeAccum -> Func -> (ScopeAccum, Func)
 renameFunc scopeAccum (Func t ident params stats)
   | L.elem ident (getScopedVars scopeAccum 0) = error("function defined already")
-  | otherwise                                 = (scopeAccum'''' { scopeStack = scopeStack scopeAccum } , Func t ident params' stats')
+  | otherwise = (chainResetScope scopeAccum . chain (L.mapAccumL renameStat) stats . 
+                 chainNewScope (L.mapAccumL renameParam) params scopeAccum) (scopeAccum', Func t ident)
   where
     scopeAccum' = scopeAccum { scopeMap = M.insert 0 (ident : getScopedVars scopeAccum 0) (scopeMap scopeAccum) }
-    scopeAccum'' = prepareNewScope scopeAccum scopeAccum'
-    (types, idents) = L.unzip params
-    (scopeAccum''', idents') = L.mapAccumL renameUndeclaredIdent scopeAccum'' idents
-    params' = L.zip types idents'
-    (scopeAccum'''', stats') = L.mapAccumL renameStat scopeAccum''' stats
 
-mapSnd :: (b -> c) -> (a, b) -> (a, c)
-mapSnd f (x, y) = (x, f y)
-
-prepareNewScope :: ScopeAccum -> ScopeAccum -> ScopeAccum
-prepareNewScope oldScopeAccum previousScopeAccum
-  = previousScopeAccum { scopeStack = scopeCounter previousScopeAccum + 1 : scopeStack oldScopeAccum, 
-                         scopeCounter = scopeCounter previousScopeAccum + 1 }
+renameParam :: ScopeAccum -> (WType, Ident) -> (ScopeAccum, (WType, Ident))
+renameParam scopeAccum (t, name)
+  = mapSnd (\n -> (t, n)) (renameUndeclaredIdent scopeAccum name)
 
 renameStat :: ScopeAccum -> Stat -> (ScopeAccum, Stat)
 renameStat scopeAccum Skip = (scopeAccum, Skip)
 renameStat scopeAccum (DecAssign t ident rVal)
-  = (scopeAccum'', DecAssign t ident' rVal')
-  where
-    (scopeAccum', rVal') = renameRVal scopeAccum rVal
-    (scopeAccum'', ident') = renameUndeclaredIdent scopeAccum' ident
+  = (chain renameUndeclaredIdent ident . chain renameRVal rVal) (scopeAccum, flip (DecAssign t))
 renameStat scopeAccum (Assign lVal rVal)
-  = (scopeAccum'', Assign lVal' rVal')
-  where
-    (scopeAccum', rVal') = renameRVal scopeAccum rVal
-    (scopeAccum'', lVal') = renameLVal scopeAccum' lVal
-renameStat scopeAccum (Read lVal) = mapSnd Read (renameLVal scopeAccum lVal)
-renameStat scopeAccum (Free expr) = mapSnd Free (renameExpr scopeAccum expr)
-renameStat scopeAccum (Return expr) = mapSnd Return (renameExpr scopeAccum expr)
-renameStat scopeAccum (Exit expr) = mapSnd Exit (renameExpr scopeAccum expr)
-renameStat scopeAccum (Print expr) = mapSnd Print (renameExpr scopeAccum expr)
-renameStat scopeAccum (Println expr) = mapSnd Println (renameExpr scopeAccum expr)
+  = (chain renameLVal lVal . chain renameRVal rVal) (scopeAccum, flip Assign)
+renameStat scopeAccum (Read lVal) = chain renameLVal lVal (scopeAccum, Read)
+renameStat scopeAccum (Free expr) = chain renameExpr expr (scopeAccum, Free)
+renameStat scopeAccum (Return expr) = chain renameExpr expr (scopeAccum, Return)
+renameStat scopeAccum (Exit expr) = chain renameExpr expr (scopeAccum, Exit)
+renameStat scopeAccum (Print expr) = chain renameExpr expr (scopeAccum, Print)
+renameStat scopeAccum (Println expr) = chain renameExpr expr (scopeAccum, Println)
 renameStat scopeAccum (If expr stats1 stats2)
-  = (scopeAccum''' { scopeStack = scopeStack scopeAccum }, If expr' stats1' stats2')
-  where
-    (scopeAccum', expr') = renameExpr scopeAccum expr
-    (scopeAccum'', stats1') = L.mapAccumL renameStat (prepareNewScope scopeAccum scopeAccum') stats1
-    (scopeAccum''', stats2') = L.mapAccumL renameStat (prepareNewScope scopeAccum scopeAccum'') stats2
+  = (chainResetScope scopeAccum . chainNewScope (L.mapAccumL renameStat) stats2 scopeAccum .
+     chainNewScope (L.mapAccumL renameStat) stats1 scopeAccum . chain renameExpr expr) (scopeAccum, If)
 renameStat scopeAccum (While expr stats)
-  = (scopeAccum'' { scopeStack = scopeStack scopeAccum }, While expr' stats')
-  where
-    (scopeAccum', expr') = renameExpr scopeAccum expr
-    (scopeAccum'', stats') = L.mapAccumL renameStat (prepareNewScope scopeAccum scopeAccum') stats
+  = (chainResetScope scopeAccum . chainNewScope (L.mapAccumL renameStat) stats scopeAccum .
+     chain renameExpr expr) (scopeAccum, While)
 renameStat scopeAccum (Begin stats)
-  = (scopeAccum' { scopeStack = scopeStack scopeAccum }, Begin stats')
-  where
-    (scopeAccum', stats') = L.mapAccumL renameStat (prepareNewScope scopeAccum scopeAccum) stats
+  = (chainResetScope scopeAccum . chainNewScope (L.mapAccumL renameStat) stats scopeAccum) (scopeAccum, Begin)
 
 renameLVal :: ScopeAccum -> LVal -> (ScopeAccum, LVal)
-renameLVal scopeAccum (LIdent i) = mapSnd LIdent (renameDeclaredIdent scopeAccum i)
-renameLVal scopeAccum (LArray arrayElem) = mapSnd LArray (renameArrayElem scopeAccum arrayElem)
-renameLVal scopeAccum (LPair pairElem) = mapSnd LPair (renamePairElem scopeAccum pairElem)
+renameLVal scopeAccum (LIdent i) = chain renameDeclaredIdent i (scopeAccum, LIdent)
+renameLVal scopeAccum (LArray arrayElem) = chain renameArrayElem arrayElem (scopeAccum, LArray)
+renameLVal scopeAccum (LPair pairElem) = chain renamePairElem pairElem (scopeAccum, LPair)
 
 renameRVal :: ScopeAccum -> RVal -> (ScopeAccum, RVal)
-renameRVal scopeAccum (RExpr expr) = mapSnd RExpr (renameExpr scopeAccum expr)
-renameRVal scopeAccum (ArrayLiter exprs) = mapSnd ArrayLiter (L.mapAccumL renameExpr scopeAccum exprs)
+renameRVal scopeAccum (RExpr expr) = chain renameExpr expr (scopeAccum, RExpr)
+renameRVal scopeAccum (ArrayLiter exprs) = chain (L.mapAccumL renameExpr) exprs (scopeAccum, ArrayLiter)
 renameRVal scopeAccum (NewPair expr1 expr2)
-  = (scopeAccum'', NewPair expr1' expr2')
-  where
-    (scopeAccum', expr1') = renameExpr scopeAccum expr1
-    (scopeAccum'', expr2') = renameExpr scopeAccum' expr2
-renameRVal scopeAccum (RPair pairElem) = mapSnd RPair (renamePairElem scopeAccum pairElem)
+  = (chain renameExpr expr2 . chain renameExpr expr1) (scopeAccum, NewPair)
+renameRVal scopeAccum (RPair pairElem) = chain renamePairElem pairElem (scopeAccum, RPair)
 renameRVal scopeAccum (Call i exprs)
   | not (L.elem i (getScopedVars scopeAccum 0)) = error("Function not defined")
-  | otherwise                                   = (scopeAccum'', Call i' exprs')
-  where
-    (scopeAccum', i') = renameDeclaredIdent scopeAccum i
-    (scopeAccum'', exprs') = L.mapAccumL renameExpr scopeAccum' exprs
+  | otherwise                                   = chain (L.mapAccumL renameExpr) exprs (scopeAccum, Call i)
 
 renameExpr :: ScopeAccum -> Expr -> (ScopeAccum, Expr)
-renameExpr scopeAccum (IdentExpr i) = mapSnd IdentExpr (renameDeclaredIdent scopeAccum i)
-renameExpr scopeAccum (ArrayExpr arrayElem) = mapSnd ArrayExpr (renameArrayElem scopeAccum arrayElem)
-renameExpr scopeAccum (Not expr) = mapSnd Not (renameExpr scopeAccum expr)
-renameExpr scopeAccum (Neg expr) = mapSnd Neg (renameExpr scopeAccum expr)
-renameExpr scopeAccum (Len expr) = mapSnd Len (renameExpr scopeAccum expr)
-renameExpr scopeAccum (Ord expr) = mapSnd Ord (renameExpr scopeAccum expr)
-renameExpr scopeAccum (Chr expr) = mapSnd Chr (renameExpr scopeAccum expr)
+renameExpr scopeAccum (IdentExpr i) = chain renameDeclaredIdent i (scopeAccum, IdentExpr)
+renameExpr scopeAccum (ArrayExpr arrayElem) = chain renameArrayElem arrayElem (scopeAccum, ArrayExpr)
+renameExpr scopeAccum (Not expr) = chain renameExpr expr (scopeAccum, Not)
+renameExpr scopeAccum (Neg expr) = chain renameExpr expr (scopeAccum, Neg)
+renameExpr scopeAccum (Len expr) = chain renameExpr expr (scopeAccum, Len)
+renameExpr scopeAccum (Ord expr) = chain renameExpr expr (scopeAccum, Ord)
+renameExpr scopeAccum (Chr expr) = chain renameExpr expr (scopeAccum, Chr)
 renameExpr scopeAccum (expr1 :*: expr2)
-  = (scopeAccum', expr1' :*: expr2')
-  where
-    (scopeAccum', [expr1', expr2']) = L.mapAccumL renameExpr scopeAccum [expr1, expr2]
+  = (chain renameExpr expr2 . chain renameExpr expr1) (scopeAccum, (:*:))
 renameExpr scopeAccum (expr1 :/: expr2)
-  = (scopeAccum', expr1' :/: expr2')
-  where
-    (scopeAccum', [expr1', expr2']) = L.mapAccumL renameExpr scopeAccum [expr1, expr2]
+  = (chain renameExpr expr2 . chain renameExpr expr1) (scopeAccum, (:/:))
 renameExpr scopeAccum (expr1 :%: expr2)
-  = (scopeAccum', expr1' :%: expr2')
-  where
-    (scopeAccum', [expr1', expr2']) = L.mapAccumL renameExpr scopeAccum [expr1, expr2]
+  = (chain renameExpr expr2 . chain renameExpr expr1) (scopeAccum, (:%:))
 renameExpr scopeAccum (expr1 :+: expr2)
-  = (scopeAccum', expr1' :+: expr2')
-  where
-    (scopeAccum', [expr1', expr2']) = L.mapAccumL renameExpr scopeAccum [expr1, expr2]
+  = (chain renameExpr expr2 . chain renameExpr expr1) (scopeAccum, (:+:))
 renameExpr scopeAccum (expr1 :-: expr2)
-  = (scopeAccum', expr1' :-: expr2')
-  where
-    (scopeAccum', [expr1', expr2']) = L.mapAccumL renameExpr scopeAccum [expr1, expr2]
+  = (chain renameExpr expr2 . chain renameExpr expr1) (scopeAccum, (:-:))
 renameExpr scopeAccum (expr1 :>: expr2)
-  = (scopeAccum', expr1' :>: expr2')
-  where
-    (scopeAccum', [expr1', expr2']) = L.mapAccumL renameExpr scopeAccum [expr1, expr2]
+  = (chain renameExpr expr2 . chain renameExpr expr1) (scopeAccum, (:>:))
 renameExpr scopeAccum (expr1 :>=: expr2)
-  = (scopeAccum', expr1' :>=: expr2')
-  where
-    (scopeAccum', [expr1', expr2']) = L.mapAccumL renameExpr scopeAccum [expr1, expr2]
+  = (chain renameExpr expr2 . chain renameExpr expr1) (scopeAccum, (:>=:))
 renameExpr scopeAccum (expr1 :<: expr2)
-  = (scopeAccum', expr1' :<: expr2')
-  where
-    (scopeAccum', [expr1', expr2']) = L.mapAccumL renameExpr scopeAccum [expr1, expr2]
+  = (chain renameExpr expr2 . chain renameExpr expr1) (scopeAccum, (:<:))
 renameExpr scopeAccum (expr1 :<=: expr2)
-  = (scopeAccum', expr1' :<=: expr2')
-  where
-    (scopeAccum', [expr1', expr2']) = L.mapAccumL renameExpr scopeAccum [expr1, expr2]
+  = (chain renameExpr expr2 . chain renameExpr expr1) (scopeAccum, (:<=:))
 renameExpr scopeAccum (expr1 :==: expr2)
-  = (scopeAccum', expr1' :==: expr2')
-  where
-    (scopeAccum', [expr1', expr2']) = L.mapAccumL renameExpr scopeAccum [expr1, expr2]
+  = (chain renameExpr expr2 . chain renameExpr expr1) (scopeAccum, (:==:))
 renameExpr scopeAccum (expr1 :!=: expr2)
-  = (scopeAccum', expr1' :!=: expr2')
-  where
-    (scopeAccum', [expr1', expr2']) = L.mapAccumL renameExpr scopeAccum [expr1, expr2]
+  = (chain renameExpr expr2 . chain renameExpr expr1) (scopeAccum, (:!=:))
 renameExpr scopeAccum (expr1 :&&: expr2)
-  = (scopeAccum', expr1' :&&: expr2')
-  where
-    (scopeAccum', [expr1', expr2']) = L.mapAccumL renameExpr scopeAccum [expr1, expr2]
+  = (chain renameExpr expr2 . chain renameExpr expr1) (scopeAccum, (:&&:))
 renameExpr scopeAccum (expr1 :||: expr2)
-  = (scopeAccum', expr1' :||: expr2')
-  where
-    (scopeAccum', (expr1':expr2':_)) = L.mapAccumL renameExpr scopeAccum [expr1, expr2]
+  = (chain renameExpr expr2 . chain renameExpr expr1) (scopeAccum, (:||:))
 renameExpr scopeAccum expr
   = (scopeAccum, expr)
 
 renameArrayElem :: ScopeAccum -> ArrayElem -> (ScopeAccum, ArrayElem)
 renameArrayElem scopeAccum (ArrayElem i exprs)
-  = (scopeAccum'', ArrayElem i' exprs')
-  where
-    (scopeAccum', exprs') = L.mapAccumL renameExpr scopeAccum exprs
-    (scopeAccum'', i') = renameDeclaredIdent scopeAccum' i
+  = (chain (L.mapAccumL renameExpr) exprs . chain renameDeclaredIdent i) (scopeAccum, ArrayElem)
 
 renamePairElem :: ScopeAccum -> PairElem -> (ScopeAccum, PairElem)
-renamePairElem scopeAccum (Fst lVal) = mapSnd Fst (renameLVal scopeAccum lVal)
-renamePairElem scopeAccum (Snd lVal) = mapSnd Snd (renameLVal scopeAccum lVal)
+renamePairElem scopeAccum (Fst lVal) = chain renameLVal lVal (scopeAccum, Fst)
+renamePairElem scopeAccum (Snd lVal) = chain renameLVal lVal (scopeAccum, Snd)
 
 addScopeToIdent :: Int -> Ident -> Ident
 addScopeToIdent scope (Ident i)
@@ -195,7 +161,7 @@ getOriginalIdent (Ident i) = Ident (T.takeWhile ('-' /=) i)
 
 renameUndeclaredIdent :: ScopeAccum -> Ident -> (ScopeAccum, Ident)
 renameUndeclaredIdent scopeAccum name@(Ident i)
-  | L.elem name' (getScopedVars scopeAccum s) = error(msg)
+  | L.elem name' (getScopedVars scopeAccum s) = error msg
   | otherwise                                 = (scopeAccum', name')
   where
     msg = "Error: Variable " ++ T.unpack i ++ " already defined."
@@ -206,16 +172,17 @@ renameUndeclaredIdent scopeAccum name@(Ident i)
 -- Error handling
 
 renameDeclaredIdent :: ScopeAccum -> Ident -> (ScopeAccum, Ident)
-renameDeclaredIdent scopeAccum ident
-  | isNothing ident' = error("fuck you")
-  | otherwise        = (scopeAccum, fromJust ident')
+renameDeclaredIdent scopeAccum name@(Ident i)
+  | isNothing name'  = error msg
+  | otherwise        = (scopeAccum, fromJust name')
   where
-    ident' = findInScopeStack (scopeStack scopeAccum) ident
+    msg = "Error: Variable " ++ T.unpack i ++ " not defined."
+    name' = findInScopeStack (scopeStack scopeAccum) name
     
     findInScopeStack :: [Int] -> Ident -> Maybe Ident
     findInScopeStack [] _ = Nothing
-    findInScopeStack (scope:scopes) name
-      | L.elem name' (getScopedVars scopeAccum scope) = Just name'
-      | otherwise                                     = findInScopeStack scopes name
+    findInScopeStack (scope:scopes) ident
+      | L.elem ident' (getScopedVars scopeAccum scope) = Just ident'
+      | otherwise                                     = findInScopeStack scopes ident
       where
-        name' = addScopeToIdent scope name
+        ident' = addScopeToIdent scope ident
