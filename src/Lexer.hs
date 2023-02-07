@@ -6,9 +6,9 @@ import Data.Maybe
 import Data.String
 import Parser (Parser)
 import Text.Megaparsec hiding (token)
-import qualified Text.Megaparsec.Char as C
 
 import qualified Data.Text as T
+import qualified Text.Megaparsec.Char as C
 import qualified Text.Megaparsec.Char.Lexer as L
 
 sc :: Parser ()
