@@ -3,6 +3,9 @@
 module Main (main) where
 
 import Programs (pProgram)
+import Renamer (rename)
+import SymbolTable (checkProg)
+
 import Text.Megaparsec
 import System.Environment
 import System.Exit
@@ -16,4 +19,6 @@ main = do
   let res = runParser (L.fully pProgram) fname contents
   case res of
     Left _ -> exitWith (ExitFailure 100)
-    Right _ -> exitSuccess
+    Right ast -> case rename ast of
+                  ((_, []), renamedAST) -> print $ checkProg renamedAST
+                  _ -> exitWith (ExitFailure 1)
