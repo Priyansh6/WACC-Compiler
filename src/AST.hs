@@ -2,24 +2,27 @@ module AST (module AST) where
 
 import qualified Data.Text as T 
 
+type Position = (Int, Int)
+
 data Program = Program [Func] Stats deriving (Show, Eq)
-data Func = Func WType Ident [(WType, Ident)] Stats deriving (Show, Eq)
+
+data Func = Func WType Ident [(WType, Ident)] Stats Position deriving (Show, Eq)
 
 type Stats = [Stat]
 
 data Stat
   = Skip
-  | DecAssign WType Ident RVal
-  | Assign LVal RVal
-  | Read LVal
-  | Free Expr
-  | Return Expr
-  | Exit Expr
+  | DecAssign WType Ident RVal Position
+  | Assign LVal RVal Position
+  | Read LVal Position
+  | Free Expr Position
+  | Return Expr Position
+  | Exit Expr Position
   | Print Expr
   | Println Expr
-  | If Expr Stats Stats
-  | While Expr Stats
-  | Begin Stats
+  | If Expr Stats Stats Position
+  | While Expr Stats Position
+  | Begin Stats 
   deriving (Show, Eq)
 
 -- An AST node representing all possible WACC types
@@ -42,43 +45,45 @@ data LVal
 
 data RVal
   = RExpr Expr
-  | ArrayLiter [Expr]
-  | NewPair Expr Expr
+  | ArrayLiter [Expr] Position
+  | NewPair Expr Expr Position
   | RPair PairElem
-  | Call Ident [Expr]
+  | Call Ident [Expr] Position
   deriving (Show, Eq)
 
 data Expr
-  = IntLiter Integer
-  | BoolLiter Bool
-  | CharLiter Char
-  | StrLiter T.Text
-  | PairLiter 
-  | IdentExpr Ident 
-  | ArrayExpr ArrayElem
-  | Not Expr
-  | Neg Expr
-  | Len Expr
-  | Ord Expr
-  | Chr Expr
-  | Expr :*: Expr
-  | Expr :/: Expr
-  | Expr :%: Expr
-  | Expr :+: Expr
-  | Expr :-: Expr
-  | Expr :>: Expr
-  | Expr :>=: Expr
-  | Expr :<: Expr
-  | Expr :<=: Expr
-  | Expr :==: Expr
-  | Expr :!=: Expr
-  | Expr :&&: Expr
-  | Expr :||: Expr
+  = IntLiter Integer Position
+  | BoolLiter Bool Position
+  | CharLiter Char Position
+  | StrLiter T.Text Position
+  | PairLiter Position
+  | IdentExpr Ident Position
+  | ArrayExpr ArrayElem Position
+  | Not Expr Position
+  | Neg Expr Position
+  | Len Expr Position
+  | Ord Expr Position
+  | Chr Expr Position
+  | (:*:) Expr Expr Position
+  | (:/:) Expr Expr Position
+  | (:%:) Expr Expr Position
+  | (:+:) Expr Expr Position
+  | (:-:) Expr Expr Position
+  | (:>:) Expr Expr Position
+  | (:>=:) Expr Expr Position
+  | (:<:) Expr Expr Position
+  | (:<=:) Expr Expr Position
+  | (:==:) Expr Expr Position
+  | (:!=:) Expr Expr Position
+  | (:&&:) Expr Expr Position
+  | (:||:) Expr Expr Position
   deriving (Show, Eq)
 
-data Ident = Ident T.Text deriving (Show, Eq)
-data ArrayElem = ArrayElem Ident [Expr] deriving (Show, Eq)
+data Ident = Ident T.Text Position deriving (Show, Eq)
+
+data ArrayElem = ArrayElem Ident [Expr] Position deriving (Show, Eq)
+
 data PairElem
-  = Fst LVal
-  | Snd LVal
+  = Fst LVal Position
+  | Snd LVal Position
   deriving (Show, Eq)
