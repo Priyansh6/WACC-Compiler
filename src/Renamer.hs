@@ -62,8 +62,8 @@ renameProg scopeAccum (Program funcs stats)
 
 renameFunc :: ScopeAccum -> Func -> (ScopeAccum, Func)
 renameFunc scopeAccum (Func t name@(Ident i) params stats)
-  | otherwise = (chainResetScope scopeAccum . chain (L.mapAccumL renameStat) stats . 
-                 chainNewScope (L.mapAccumL renameParam) params scopeAccum) (scopeAccum'', Func t name)
+  = (chainResetScope scopeAccum . chain (L.mapAccumL renameStat) stats . 
+     chainNewScope (L.mapAccumL renameParam) params scopeAccum) (scopeAccum'', Func t name)
   where
     scopeAccum' = scopeAccum { scopeMap = M.insert 0 (name : getScopedVars scopeAccum 0) (scopeMap scopeAccum) }
     scopeAccum'' = if L.elem name (getScopedVars scopeAccum 0)
@@ -169,13 +169,13 @@ getOriginalIdent (Ident i) = Ident (T.takeWhile ('-' /=) i)
 
 renameUndeclaredIdent :: ScopeAccum -> Ident -> (ScopeAccum, Ident)
 renameUndeclaredIdent scopeAccum name@(Ident i)
-  = (scopeAccum'', name')
+  = (scopeAccum'', name'')
   where
     s = getCurrentScope scopeAccum
     scopeAccum' = scopeAccum { scopeMap = M.insert s (name' : getScopedVars scopeAccum s) (scopeMap scopeAccum)}
-    scopeAccum'' = if L.elem name' (getScopedVars scopeAccum s) 
-                      then scopeAccum { errors = errorMsg : errors scopeAccum } 
-                      else scopeAccum'
+    (scopeAccum'', name'') = if L.elem name' (getScopedVars scopeAccum s) 
+                                then (scopeAccum { errors = errorMsg : errors scopeAccum }, name)
+                                else (scopeAccum', name')
     name' = addScopeToIdent s name
     errorMsg = "Error: Variable " ++ T.unpack i ++ " already defined."
 
