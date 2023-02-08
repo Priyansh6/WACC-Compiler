@@ -4,6 +4,8 @@ module Main (main) where
 
 import Parser (sc)
 import Programs (pProgram)
+import Renamer (rename)
+import SymbolTable (checkProg)
 
 import Text.Megaparsec
 import Data.Void
@@ -18,4 +20,7 @@ main = do
   let res = runParser (sc *> pProgram <* eof) fname contents
   case res of
     Left _ -> exitWith (ExitFailure 100)
-    Right _ -> exitWith ExitSuccess
+    Right ast -> case rename ast of
+                  ((_, []), renamedAST) -> print $ checkProg renamedAST
+                  _ -> exitWith (ExitFailure 1)
+    
