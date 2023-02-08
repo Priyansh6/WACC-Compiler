@@ -3,7 +3,6 @@
 module Parsers.TypeSpec (spec) where
 
 import AST
-import Parser
 import Statements
 import Parsers.Test
 import Test.Hspec
