@@ -14,6 +14,12 @@ data ScopeAccum = ScopeAccum { scopeMap :: ScopeMap,
                                scopeCounter :: Int,
                                errors :: [String]} deriving (Show, Eq)
 
+initialScopeAccum :: ScopeAccum
+initialScopeAccum = ScopeAccum { scopeMap = M.empty, 
+                                 scopeStack = [0], 
+                                 scopeCounter = 0, 
+                                 errors = [] }
+
 mapSnd :: (b -> c) -> (a, b) -> (a, c)
 mapSnd f (x, y) = (x, f y)
 
@@ -48,9 +54,7 @@ chainResetScope oldScopeAccum = mapFst (resetScope oldScopeAccum)
 
 rename :: Program -> ((ScopeMap, [String]), Program)
 rename prog
-  = mapFst (\sa -> (scopeMap sa, errors sa)) (renameProg scopeAccum prog)
-  where 
-    scopeAccum = ScopeAccum { scopeMap = M.empty, scopeStack = [0], scopeCounter = 0, errors = [] }
+  = mapFst (\sa -> (scopeMap sa, errors sa)) (renameProg initialScopeAccum prog)
 
 renameProg :: ScopeAccum -> Program -> (ScopeAccum, Program)
 renameProg scopeAccum (Program funcs stats)

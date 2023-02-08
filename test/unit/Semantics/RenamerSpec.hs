@@ -11,13 +11,7 @@ import Test.Hspec
 spec :: Spec
 spec = do
   it "renames function parameters" $
-    renameFunc (ScopeAccum { 
-                    scopeMap = M.empty, 
-                    scopeStack = [0],  
-                    scopeCounter = 0,
-                    errors = []
-                }) 
-               (Func WInt (Ident "ashdkf") [(WInt, Ident "x"), (WInt, Ident "y")] [Skip]) 
+    renameFunc initialScopeAccum (Func WInt (Ident "ashdkf") [(WInt, Ident "x"), (WInt, Ident "y")] [Skip]) 
                `shouldBe` 
                (ScopeAccum {
                    scopeMap = fromList [(0, [Ident "ashdkf"]), (1, [Ident "y-1", Ident "x-1"])],
