@@ -78,7 +78,12 @@ checkStat (Assign lval rval pos) = do
   ltype <- checkLVal lval
   rtype <- checkRVal rval
   unless (areTypesCompatible ltype rtype) $ throwError $ T.pack ("Assignment types not compatible!" <> show ltype <> " " <> show rtype)
-checkStat (Read lval pos) = void $ checkLVal lval
+checkStat (Read lval pos) = do 
+  wtype <- checkLVal lval
+  case wtype of 
+    WInt -> return ()
+    WChar -> return ()
+    _ -> void $ throwError "Trying to read into a non char/int location!"
 checkStat (Free expr pos) = do
   wtype <- checkExprType expr
   case wtype of
@@ -149,13 +154,13 @@ checkPairElemType (Fst (LIdent ident) pos) = do
   case identType of
     WPair t _ -> return t
     _ -> throwError "Taking fst of a non pair type"
-checkPairElemType (Fst lval@(LPair _) pos) = checkLVal lval
+checkPairElemType (Fst lval@(LPair _) pos) = return WUnit
 checkPairElemType (Snd (LIdent ident) pos) = do
   identType <- getIdentType ident
   case identType of
     WPair _ t -> return t
     _ -> throwError "Taking snd of a non pair type"
-checkPairElemType (Snd lval@(LPair _) pos) = checkLVal lval
+checkPairElemType (Snd lval@(LPair _) pos) = return WUnit
 checkPairElemType _ = throwError "Taking fst or snd of an array" 
 
 checkExprType :: Expr -> ScopedSemanticAnalyser WType
@@ -223,13 +228,13 @@ insertParam :: WType -> Ident -> SemanticAnalyser ()
 insertParam wtype ident = modify $ M.insert ident (VarType wtype)
 
 areTypesCompatible :: WType -> WType -> Bool
+areTypesCompatible WUnit WUnit = False
+areTypesCompatible WUnit _ = True
+areTypesCompatible _ WUnit = True
 areTypesCompatible (WPair pt1 pt2) (WPair pt1' pt2') = areTypesCompatible pt1 pt1' && areTypesCompatible pt2 pt2'
 areTypesCompatible (WPair _ _) _ = False
 areTypesCompatible WStr (WArr WChar _) = True
 areTypesCompatible (WArr t dim) (WArr t' dim') = areTypesCompatible (getArrayBaseType t) (getArrayBaseType t') && dim == dim'
-areTypesCompatible WUnit WUnit = False
-areTypesCompatible WUnit _ = True
-areTypesCompatible _ WUnit = True
 areTypesCompatible a b = a == b
 
 getArrayElemBaseType :: ArrayElem -> ScopedSemanticAnalyser WType
