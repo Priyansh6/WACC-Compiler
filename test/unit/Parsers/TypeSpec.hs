@@ -25,7 +25,7 @@ spec = do
       test pPairType "pair(int,bool)" `shouldParse` WPair WInt WBool
 
     it "pair type of pair & bool array" $
-      test pPairType "pair(pair,bool[])" `shouldParse` WPair WUnit (WArr WBool 1)
+      test pPairType "pair(pair,bool[])" `shouldParse` WPair (WPair WUnit WUnit) (WArr WBool 1)
 
     it "pair with whitespace" $
       test pPairType "pair( pair(int,bool)[] , int )" `shouldParse` WPair (WArr (WPair WInt WBool) 1) WInt

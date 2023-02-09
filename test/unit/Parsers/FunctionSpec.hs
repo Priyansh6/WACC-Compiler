@@ -17,7 +17,7 @@ spec = do
     test mkFunc "int aFunc(char c) is return 0 end" `shouldParse` Func WInt (Ident "aFunc" (1, 5)) [(WChar, Ident "c" (1, 16))] [Return (IntLiter 0 (1, 29)) (1, 22)] (1, 1)
 
   it "parses a no-op function with multiple params" $ do
-    test mkFunc "int aFunc(char c, pair(int, pair) ps) is return 0 end" `shouldParse` Func WInt (Ident "aFunc" (1, 5)) [(WChar, Ident "c" (1, 16)), (WPair WInt WUnit, Ident "ps" (1, 35))] [Return (IntLiter 0 (1, 49)) (1, 42)] (1, 1)
+    test mkFunc "int aFunc(char c, pair(int, pair) ps) is return 0 end" `shouldParse` Func WInt (Ident "aFunc" (1, 5)) [(WChar, Ident "c" (1, 16)), (WPair WInt (WPair WUnit WUnit), Ident "ps" (1, 35))] [Return (IntLiter 0 (1, 49)) (1, 42)] (1, 1)
 
   it "parses a multi statement function with no params" $ do
     test mkFunc "int aFunc() is return 7; exit 8; read hello; return 0 end" `shouldParse` Func WInt (Ident "aFunc" (1, 5)) [] [Return (IntLiter 7 (1, 23)) (1, 16), Exit (IntLiter 8 (1, 31)) (1, 26), Read (LIdent (Ident "hello" (1, 39))) (1, 34), Return (IntLiter 0 (1, 53)) (1, 46)] (1, 1)
