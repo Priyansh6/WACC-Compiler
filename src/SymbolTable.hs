@@ -65,17 +65,17 @@ checkStat :: Stat -> SemanticAnalyser ()
 checkStat (DecAssign wtype ident rval pos) = do
   insertAssign wtype ident
   wtype' <- checkRVal rval
-  case wtype of 
-    (WArr ltype _) -> case wtype' of 
-      (WArr WUnit _) -> return ()
-      (WArr rtype _) -> when (rtype /= ltype) $ throwError ("Declared type and assigned type do not match!" `T.append` T.pack(show wtype ++ " " ++ show wtype'))
-      _ -> throwError ("Declared type and assigned type do not match!" `T.append` T.pack(show wtype ++ " " ++ show wtype'))
-    _ -> return ()
+  unless (areTypesCompatible wtype wtype') $ throwError $ T.pack ("Assignment types not compatible!" <> show wtype <> show wtype')
+  -- case wtype of 
+  --   (WArr ltype _) -> case wtype' of 
+  --     (WArr WUnit _) -> return ()
+  --     (WArr rtype _) -> let rtype' = getArrayBaseType rtype in when (rtype' /= ltype) $ throwError ("Declared type and assigned type do not match!" `T.append` T.pack(show wtype ++ " " ++ show wtype'))
+  --     _ -> throwError ("Declared type and assigned type do not match!" `T.append` T.pack(show wtype ++ " " ++ show wtype'))
+  --   _ -> return ()
 checkStat (Assign lval rval pos) = do
   ltype <- checkLVal lval
   rtype <- checkRVal rval
-  when (ltype == WUnit && rtype == WUnit) $ throwError "Assigning to nested pair!"
-  unless (ltype == rtype) $ throwError "Left type != right type"
+  unless (areTypesCompatible ltype rtype) $ throwError $ T.pack ("Assignment types not compatible!" <> show ltype <> " " <> show rtype)
 checkStat (Read lval pos) = void $ checkLVal lval
 checkStat (Free expr pos) = do
   wtype <- checkExprType expr
@@ -136,9 +136,9 @@ checkLVal (LArray (ArrayElem ident exprs position)) = do
   identType <- getIdentType ident
   exprTypes <- mapM checkExprType exprs
   case identType of
-    WArr t _ -> if all (== identType) exprTypes
-                then return t
-                else throwError "Indices aren't all integers"
+    a@(WArr _ _) -> if all (== WInt) exprTypes
+                then return a
+                else throwError $ T.pack ("Indices aren't all integers" <> show exprTypes)
     _ -> throwError "Not a valid array type"
 
 checkLVal (LPair pairElem) = checkPairElemType pairElem
@@ -165,7 +165,9 @@ checkExprType (CharLiter _ _) = return WChar
 checkExprType (StrLiter _ _) = return WStr
 checkExprType (PairLiter _) = return $ WPair WUnit WUnit
 checkExprType (IdentExpr ident _) = getIdentType ident
-checkExprType (ArrayExpr (ArrayElem ident _ _) _) = getIdentType ident
+checkExprType (ArrayExpr (ArrayElem ident _ _) _) = do 
+  wtype <- getIdentType ident 
+  return $ getArrayBaseType wtype
 checkExprType (Not expr pos) = checkUnOpType (== WBool) WBool expr pos
 checkExprType (Neg expr pos) = checkUnOpType (== WInt) WInt expr pos
 checkExprType (Len expr pos) = checkUnOpType isArrType WInt expr pos
@@ -221,3 +223,16 @@ insertParams = mapM_ (uncurry insertParam)
 
 insertParam :: WType -> Ident -> SemanticAnalyser ()
 insertParam wtype ident = modify $ M.insert ident (VarType wtype)
+
+areTypesCompatible :: WType -> WType -> Bool
+areTypesCompatible (WPair pt1 pt2) (WPair pt1' pt2') = areTypesCompatible pt1 pt1' && areTypesCompatible pt2 pt2'
+areTypesCompatible (WPair _ _) _ = False
+areTypesCompatible (WArr t _) t' = areTypesCompatible (getArrayBaseType t) (getArrayBaseType t')
+areTypesCompatible WUnit WUnit = False
+areTypesCompatible WUnit _ = True
+areTypesCompatible _ WUnit = True
+areTypesCompatible a b = a == b
+
+getArrayBaseType :: WType -> WType
+getArrayBaseType (WArr wtype _ ) = getArrayBaseType wtype
+getArrayBaseType wtype = wtype
