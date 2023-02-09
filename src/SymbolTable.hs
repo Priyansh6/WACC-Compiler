@@ -11,6 +11,7 @@ import Data.Map ((!))
 import Data.Maybe
 import qualified Data.Map as M
 import qualified Data.Text as T
+import qualified Control.Arrow as T
 
 type SymbolTable = M.Map Ident IdentType
 
@@ -64,7 +65,12 @@ checkStat :: Stat -> SemanticAnalyser ()
 checkStat (DecAssign wtype ident rval pos) = do
   insertAssign wtype ident
   wtype' <- checkRVal rval
-  unless (wtype == wtype') $ throwError "Declared type and assigned type do not match!" 
+  case wtype of 
+    (WArr ltype _) -> case wtype' of 
+      (WArr WUnit _) -> return ()
+      (WArr rtype _) -> when (rtype /= ltype) $ throwError ("Declared type and assigned type do not match!" `T.append` T.pack(show wtype ++ " " ++ show wtype'))
+      _ -> throwError ("Declared type and assigned type do not match!" `T.append` T.pack(show wtype ++ " " ++ show wtype'))
+    _ -> return ()
 checkStat (Assign lval rval pos) = do
   ltype <- checkLVal lval
   rtype <- checkRVal rval
@@ -99,11 +105,11 @@ checkStat Skip = return ()
 
 checkRVal :: RVal -> SemanticAnalyser WType
 checkRVal (RExpr expr) = checkExprType expr
-checkRVal (ArrayLiter [] pos) = return $ WArr WUnit 0
+checkRVal (ArrayLiter [] pos) = return $ WArr WUnit 1
 checkRVal (ArrayLiter exprs pos) = do
   wtypes <- mapM checkExprType exprs
   if all (== head wtypes) wtypes
-    then return $ WArr (head wtypes) $ length wtypes
+    then return $ WArr (head wtypes) 1
     else throwError "Types of expression do not match"
 
 checkRVal (NewPair e1 e2 pos) = do
