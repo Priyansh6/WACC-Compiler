@@ -53,14 +53,14 @@ spec = do
                  )
 
   it "renames function body" $
-    renameFunc initialScopeAccum (Func WInt (Ident "func" (0, 0)) [(WInt, Ident "x" (0, 0))] [DecAssign WInt (Ident "y" (0, 0)) (RExpr (IdentExpr (Ident "x" (0, 0)) (0, 0))) (0, 0)] (0, 0))
+    renameFunc initialScopeAccum (Func WInt (Ident "func" (0, 0)) [(WInt, Ident "x" (0, 0))] [DecAssign WInt (Ident "x" (0, 0)) (RExpr (IdentExpr (Ident "x" (0, 0)) (0, 0))) (0, 0)] (0, 0))
       `shouldBe` ( ScopeAccum
-                     { scopeMap = fromList [(1, [Ident "x-1" (0, 0)]), (2, [Ident "y-2" (0, 0)])],
+                     { scopeMap = fromList [(1, [Ident "x-1" (0, 0)]), (2, [Ident "x-2" (0, 0)])],
                        scopeStack = [0],
                        scopeCounter = 2,
                        errors = []
                      },
-                   Func WInt (Ident "func" (0, 0)) [(WInt, Ident "x-1" (0, 0))] [DecAssign WInt (Ident "y-2" (0, 0)) (RExpr (IdentExpr (Ident "x-1" (0, 0)) (0, 0))) (0, 0)] (0, 0)
+                   Func WInt (Ident "func" (0, 0)) [(WInt, Ident "x-1" (0, 0))] [DecAssign WInt (Ident "x-2" (0, 0)) (RExpr (IdentExpr (Ident "x-1" (0, 0)) (0, 0))) (0, 0)] (0, 0)
                  )
 
   it "can't rename already defined function" $
@@ -73,6 +73,16 @@ spec = do
                      },
                    Program [Func WInt (Ident "func" (0, 0)) [] [] (0, 0)] []
                  )
+  
+  it "renames functions that are mutually recursive" $
+    renameProg initialScopeAccum (Program [Func WInt (Ident "func1" (0, 0)) [] [DecAssign WInt (Ident "x" (0, 0)) (Call (Ident "func2" (0, 0)) [] (0, 0)) (0, 0)] (0, 0), Func WInt (Ident "func2" (0,0)) [] [DecAssign WInt (Ident "x" (0,0)) (Call (Ident "func1" (0,0)) [] (0,0)) (0,0)] (0,0)] [])
+      `shouldBe` ( ScopeAccum 
+                     { scopeMap = fromList [(0,[Ident "func2" (0,0),Ident "func1" (0,0)]),(2,[Ident "x-2" (0,0)]),(4,[Ident "x-4" (0,0)])], 
+                       scopeStack = [0], 
+                       scopeCounter = 4, 
+                       errors = []
+                     },
+                   Program [Func WInt (Ident "func1" (0,0)) [] [DecAssign WInt (Ident "x-2" (0,0)) (Call (Ident "func2" (0,0)) [] (0,0)) (0,0)] (0,0),Func WInt (Ident "func2" (0,0)) [] [DecAssign WInt (Ident "x-4" (0,0)) (Call (Ident "func1" (0,0)) [] (0,0)) (0,0)] (0,0)] [])
 
   it "renames parameters" $
     renameParam initialScopeAccum (WInt, Ident "x" (0, 0))
