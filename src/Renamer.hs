@@ -40,10 +40,10 @@ getCurrentScope = L.head . scopeStack
 getScopedVars :: ScopeAccum -> Int -> [Ident]
 getScopedVars scopeAccum s = M.findWithDefault [] s (scopeMap scopeAccum)
 
-prepareNewScope :: ScopeAccum -> ScopeAccum -> ScopeAccum
-prepareNewScope oldScopeAccum scopeAccum =
+prepareNewScope :: ScopeAccum -> ScopeAccum
+prepareNewScope scopeAccum =
   scopeAccum
-    { scopeStack = scopeCounter scopeAccum + 1 : scopeStack oldScopeAccum,
+    { scopeStack = scopeCounter scopeAccum + 1 : scopeStack scopeAccum,
       scopeCounter = scopeCounter scopeAccum + 1
     }
 
@@ -55,9 +55,9 @@ chain :: (acc -> x -> (acc, x)) -> x -> (acc, x -> y) -> (acc, y)
 chain accFunc x (acc, f) =
   mapSnd f (accFunc acc x)
 
-chainNewScope :: (ScopeAccum -> x -> (ScopeAccum, x)) -> x -> ScopeAccum -> (ScopeAccum, x -> y) -> (ScopeAccum, y)
-chainNewScope accFunc x oldScopeAccum (acc, f) =
-  mapSnd f (accFunc (prepareNewScope oldScopeAccum acc) x)
+chainNewScope :: (ScopeAccum -> x -> (ScopeAccum, x)) -> x -> (ScopeAccum, x -> y) -> (ScopeAccum, y)
+chainNewScope accFunc x (acc, f) =
+  mapSnd f (accFunc (prepareNewScope acc) x)
 
 chainResetScope :: ScopeAccum -> (ScopeAccum, x) -> (ScopeAccum, x)
 chainResetScope oldScopeAccum = mapFst (resetScope oldScopeAccum)
@@ -66,26 +66,29 @@ rename :: Program -> ((ScopeMap, [String]), Program)
 rename prog =
   mapFst (\sa -> (scopeMap sa, errors sa)) (renameProg initialScopeAccum prog)
 
+addFuncName :: ScopeAccum -> Func -> ScopeAccum
+addFuncName scopeAccum (Func _ name@(Ident i pos) _ _ _)
+  | name `L.elem` getScopedVars scopeAccum 0 = scopeAccum {errors = errorMsg : errors scopeAccum}
+  | otherwise                                = scopeAccum'
+  where
+    scopeAccum' = scopeAccum {scopeMap = M.insert 0 (name : getScopedVars scopeAccum 0) (scopeMap scopeAccum)}
+    errorMsg = "Error: Function " ++ T.unpack i ++ " already defined."
+
 renameProg :: ScopeAccum -> Program -> (ScopeAccum, Program)
 renameProg scopeAccum (Program funcs stats) =
-  (chain (L.mapAccumL renameStat) stats . chain (L.mapAccumL renameFunc) funcs) (scopeAccum, Program)
+  (chain (L.mapAccumL renameStat) stats . chain (L.mapAccumL renameFunc) funcs) (scopeAccum', Program)
+  where
+    scopeAccum' = foldl addFuncName scopeAccum funcs
 
 renameFunc :: ScopeAccum -> Func -> (ScopeAccum, Func)
 renameFunc scopeAccum (Func t name@(Ident i _) params stats pos) =
   mapSndFunc pos $
     ( chainResetScope scopeAccum
-        . chain (L.mapAccumL renameStat) stats
-        . chainNewScope (L.mapAccumL renameParam) params scopeAccum
+        . chainNewScope (L.mapAccumL renameStat) stats
+        . chainNewScope (L.mapAccumL renameParam) params
     )
-      (scopeAccum'', Func t name)
-  where
-    scopeAccum' = scopeAccum {scopeMap = M.insert 0 (name : getScopedVars scopeAccum 0) (scopeMap scopeAccum)}
-    scopeAccum'' =
-      if name `L.elem` getScopedVars scopeAccum 0
-        then scopeAccum {errors = errorMsg : errors scopeAccum}
-        else scopeAccum'
-    errorMsg = "Error: Function " ++ T.unpack i ++ " already defined."
-
+      (scopeAccum, Func t name)
+      
 renameParam :: ScopeAccum -> (WType, Ident) -> (ScopeAccum, (WType, Ident))
 renameParam scopeAccum (t, name) =
   mapSnd (\n -> (t, n)) (renameUndeclaredIdent scopeAccum name)
@@ -105,20 +108,21 @@ renameStat scopeAccum (Println expr) = chain renameExpr expr (scopeAccum, Printl
 renameStat scopeAccum (If expr stats1 stats2 pos) =
   mapSndFunc pos $
     ( chainResetScope scopeAccum
-        . chainNewScope (L.mapAccumL renameStat) stats2 scopeAccum
-        . chainNewScope (L.mapAccumL renameStat) stats1 scopeAccum
+        . chainNewScope (L.mapAccumL renameStat) stats2
+        . chainResetScope scopeAccum
+        . chainNewScope (L.mapAccumL renameStat) stats1
         . chain renameExpr expr
     )
       (scopeAccum, If)
 renameStat scopeAccum (While expr stats pos) =
   mapSndFunc pos $
     ( chainResetScope scopeAccum
-        . chainNewScope (L.mapAccumL renameStat) stats scopeAccum
+        . chainNewScope (L.mapAccumL renameStat) stats
         . chain renameExpr expr
     )
       (scopeAccum, While)
 renameStat scopeAccum (Begin stats) =
-  (chainResetScope scopeAccum . chainNewScope (L.mapAccumL renameStat) stats scopeAccum) (scopeAccum, Begin)
+  (chainResetScope scopeAccum . chainNewScope (L.mapAccumL renameStat) stats) (scopeAccum, Begin)
 
 renameLVal :: ScopeAccum -> LVal -> (ScopeAccum, LVal)
 renameLVal scopeAccum (LIdent i) = chain renameDeclaredIdent i (scopeAccum, LIdent)
