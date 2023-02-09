@@ -1,61 +1,50 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Parser
-  ( Parser,
-    sc,
-    pToken,
-    symbol,
-    pIdent,
-    brackets,
-    parens,
-    lexeme,
-    keyword,
-    keywords
+  ( Parser
+  , liftPos1
+  , liftPos2
+  , liftPos3
+  , liftPos4
+  , deferLiftPos1
+  , deferLiftPos2
+  , deferLiftPos3
+  , getPosition
   )
 where
 
-import qualified AST 
+import AST (Position)
+import Control.Applicative ((<**>))
+import Data.Functor ((<&>))
+import Data.Void (Void)
+import Text.Megaparsec (Parsec, getSourcePos)
+import Text.Megaparsec.Pos
 import qualified Data.Text as T
-import Data.Void
-import Text.Megaparsec
-import Text.Megaparsec.Char
-import qualified Text.Megaparsec.Char.Lexer as L
 
 type Parser = Parsec Void T.Text
 
-sc :: Parser ()
-sc = L.space space1 (L.skipLineComment "#") empty
+liftPos1 :: (a -> Position -> c) -> Parser a -> Parser c
+liftPos1 cons p = getPosition <**> (cons <$> p)
 
-lexeme :: Parser a -> Parser a
-lexeme = L.lexeme sc
+liftPos2 :: (a -> b -> Position -> c) -> Parser a -> Parser b -> Parser c
+liftPos2 cons p1 p2 = getPosition <**> (cons <$> p1 <*> p2)
 
-symbol :: T.Text -> Parser T.Text
-symbol = L.symbol sc
+liftPos3 :: (a -> b -> c -> Position -> d) -> Parser a -> Parser b -> Parser c -> Parser d
+liftPos3 cons p1 p2 p3 = getPosition <**> (cons <$> p1 <*> p2 <*> p3)
 
-pToken :: Parser a -> Parser a
-pToken = lexeme . try
+liftPos4 :: (a -> b -> c -> d -> Position -> e) -> Parser a -> Parser b -> Parser c -> Parser d -> Parser e
+liftPos4 cons p1 p2 p3 p4 = getPosition <**> (cons <$> p1 <*> p2 <*> p3 <*> p4)
 
-pIdent :: Parser AST.Ident
-pIdent = pToken $ do 
-  c <- char '_' <|> letterChar
-  cs <- many (char '_' <|> alphaNumChar)
-  if (c:cs) `elem` keywords 
-    then fail "ident is a keyword!"
-    else return (AST.Ident (T.pack (c:cs)))
+deferLiftPos1 :: (a -> Position -> b) -> Parser (a -> b)
+deferLiftPos1 cons = flip cons <$> getPosition
 
-brackets :: Parser a -> Parser a
-brackets = between (symbol "[") (symbol "]")
+deferLiftPos2 :: (a -> b -> Position -> c) -> Parser (a -> b -> c)
+deferLiftPos2 cons = (\c a b -> cons a b c) <$> getPosition
 
-parens :: Parser a -> Parser a
-parens = between (symbol "(") (symbol ")")
+deferLiftPos3 :: (a -> b -> c -> Position -> d) -> Parser (a -> b -> c -> d)
+deferLiftPos3 cons = (\d a b c -> cons a b c d) <$> getPosition
 
-keyword :: T.Text -> Parser ()
-keyword k = pToken (string k *> notFollowedBy alphaNumChar)
+toPosition :: SourcePos -> Position
+toPosition SourcePos {sourceLine=line, sourceColumn=col}
+  = (unPos line, unPos col)
 
-keywords :: [String]
-keywords = ["begin", "end", "is", "end", "skip", "read",
-            "free", "return", "exit", "print", "println",
-            "if", "then", "else", "fi", "while", "do", 
-            "done", "fst", "snd", "null", "newpair", "call", 
-            "int", "bool", "char", "string", "pair", 
-            "len", "ord", "chr"]
+getPosition :: Parser Position
+getPosition = getSourcePos <&> toPosition

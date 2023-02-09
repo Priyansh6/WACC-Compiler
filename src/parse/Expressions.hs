@@ -1,108 +1,94 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Expressions
-  ( pInt,
-    pBool,
-    pChar,
-    pString,
-    pPairLit,
+  ( mkIdent,
     pExpr,
-    pArrayElem,
+    mkArrayElem,
   )
 where
 
 import qualified AST 
+import Control.Applicative ((<**>))
 import Control.Monad.Combinators.Expr 
-import Data.Maybe (fromJust)
-import qualified Data.Text as T
-import Parser (Parser, pToken, symbol, pIdent, brackets, parens, lexeme, keyword)
+import Parser (Parser, liftPos1, liftPos2, deferLiftPos1, deferLiftPos2, getPosition)
 import Text.Megaparsec
-import Text.Megaparsec.Char
-import qualified Text.Megaparsec.Char.Lexer as L
+import Text.Megaparsec.Char (char)
+import qualified Data.Text as T
+import qualified Lexer as L
 
-pBool :: Parser AST.Expr
-pBool = pToken $ AST.BoolLiter <$> ((True <$ keyword "true") <|> (False <$ keyword "false"))
+mkIdent :: Parser AST.Ident
+mkIdent = liftPos1 AST.Ident L.ident 
 
-pInt :: Parser AST.Expr
-pInt = pToken $ AST.IntLiter <$> (L.signed (return ()) L.decimal >>= validWaccInt)
-  where
-    validWaccInt :: Integer -> Parser Integer
-    validWaccInt x
-      | x <= biggestWaccInt && x >= smallestWaccInt = pure x
-      | otherwise = fail "Int literal outside of valid bounds!"
+mkArrayElem :: Parser AST.ArrayElem
+mkArrayElem = try $ liftPos2 AST.ArrayElem mkIdent (some (L.brackets pExpr))
 
-    biggestWaccInt = 2 ^ (31 :: Integer) 
-    smallestWaccInt = -(2 ^ (31 :: Integer))
+pBool :: Parser Bool
+pBool = (True <$ "true") <|> (False <$ "false")
 
-pChar :: Parser AST.Expr
-pChar = pToken $ AST.CharLiter <$> between (char '\'') (lexeme (char '\'')) pChar'
+pChar :: Parser Char
+pChar = try $ between (char '\'') "\'" L.char
 
-pString :: Parser AST.Expr
-pString = pToken $ AST.StrLiter . T.pack <$> (char '\"' *> many pChar' <* char '\"')
+pString :: Parser T.Text
+pString = try $ T.pack <$> between (char '"') "\"" (many L.char)
 
-pChar' :: Parser Char
-pChar' = satisfy validChar <|> (char '\\' *> satisfy escapedChar >>= toEscaped)
-  where
-    validChar :: Char -> Bool
-    validChar c = ' ' <= c && c <= '\DEL' && notElem c ['\\', '\'', '"']
+mkIdentExpr :: Parser AST.Expr
+mkIdentExpr = liftPos1 AST.IdentExpr mkIdent 
 
-    escapedChar :: Char -> Bool
-    escapedChar c = c `elem` ['0', 'b', 't', 'n', 'f', 'r', '"', '\'', '\\']
+mkArrayExpr :: Parser AST.Expr
+mkArrayExpr = liftPos1 AST.ArrayExpr mkArrayElem 
 
-    toEscaped :: Char -> Parser Char
-    toEscaped c = pure $ fromJust $ lookup c [ ('0', '\0')
-                                             , ('b', '\b')
-                                             , ('t', '\t')
-                                             , ('n', '\n')
-                                             , ('f', '\f')
-                                             , ('r', '\r')
-                                             , ('"', '\"')
-                                             , ('\'', '\'')
-                                             , ('\\', '\\') ]
+mkBool :: Parser AST.Expr
+mkBool = liftPos1 AST.BoolLiter pBool 
 
-pPairLit :: Parser AST.Expr
-pPairLit = pToken $ AST.PairLiter <$ keyword "null"
+mkInt :: Parser AST.Expr
+mkInt = liftPos1 AST.IntLiter L.number 
 
-pArrayElem :: Parser AST.ArrayElem
-pArrayElem = pToken $ AST.ArrayElem <$> pIdent <*> some (brackets pExpr)
+mkChar :: Parser AST.Expr
+mkChar = liftPos1 AST.CharLiter pChar 
+
+mkString :: Parser AST.Expr
+mkString = liftPos1 AST.StrLiter pString 
+
+mkPairLit :: Parser AST.Expr
+mkPairLit = getPosition <**> (AST.PairLiter <$ "null")
 
 pTerm :: Parser AST.Expr
-pTerm = choice 
-  [ pInt,
-    pBool,
-    pChar,
-    pString,
-    pPairLit,
-    AST.ArrayExpr <$> pArrayElem,
-    AST.IdentExpr <$> pIdent,
-    parens pExpr ]
+pTerm = try $ choice 
+  [ mkInt,
+    mkBool,
+    mkChar,
+    mkString,
+    mkPairLit,
+    mkArrayExpr,
+    mkIdentExpr,
+    L.parens pExpr ]
 
 pExpr :: Parser AST.Expr
 pExpr = makeExprParser pTerm operatorTable
 
 operatorTable :: [[Operator Parser AST.Expr]]
 operatorTable = 
-  [ [ prefix "-" AST.Neg 
-    , prefix "len" AST.Len
-    , prefix "ord" AST.Ord
-    , prefix "chr" AST.Chr 
-    , prefix "!" AST.Not ]
-  , [ binary "*" (AST.:*:)
-    , binary "/" (AST.:/:)
-    , binary "%" (AST.:%:) ]
-  , [ binary "+" (AST.:+:)
-    , binary "-" (AST.:-:) ]
-  , [ binary ">=" (AST.:>=:)
-    , binary ">" (AST.:>:) 
-    , binary "<=" (AST.:<=:)
-    , binary "<" (AST.:<:) ]
-  , [ binary "==" (AST.:==:)
-    , binary "!=" (AST.:!=:) ]
-  , [ binary "&&" (AST.:&&:) ]
-  , [ binary "||" (AST.:||:) ]]
+  [ [ prefix "-"   (deferLiftPos1 AST.Neg)
+    , prefix "len" (deferLiftPos1 AST.Len)
+    , prefix "ord" (deferLiftPos1 AST.Ord)    
+    , prefix "chr" (deferLiftPos1 AST.Chr)    
+    , prefix "!"   (deferLiftPos1 AST.Not)    ]
+  , [ binary "*"   (deferLiftPos2 (AST.:*:))  
+    , binary "/"   (deferLiftPos2 (AST.:/:))  
+    , binary "%"   (deferLiftPos2 (AST.:%:))  ]
+  , [ binary "+"   (deferLiftPos2 (AST.:+:)) 
+    , binary "-"   (deferLiftPos2 (AST.:-:))  ]
+  , [ binary ">="  (deferLiftPos2 (AST.:>=:)) 
+    , binary ">"   (deferLiftPos2 (AST.:>:))   
+    , binary "<="  (deferLiftPos2 (AST.:<=:)) 
+    , binary "<"   (deferLiftPos2 (AST.:<:))  ]
+  , [ binary "=="  (deferLiftPos2 (AST.:==:)) 
+    , binary "!="  (deferLiftPos2 (AST.:!=:)) ]
+  , [ binary "&&"  (deferLiftPos2 (AST.:&&:)) ]
+  , [ binary "||"  (deferLiftPos2 (AST.:||:)) ]]
 
-binary :: T.Text -> (AST.Expr -> AST.Expr -> AST.Expr) -> Operator Parser AST.Expr
-binary s c = InfixL (c <$ symbol s)
+binary :: Parser () -> Parser (AST.Expr -> AST.Expr -> AST.Expr) -> Operator Parser AST.Expr
+binary s c = InfixL (c <* s)
 
-prefix :: T.Text -> (AST.Expr -> AST.Expr) -> Operator Parser AST.Expr
-prefix s c = Prefix (c <$ symbol s)
+prefix :: Parser () -> Parser (AST.Expr -> AST.Expr) -> Operator Parser AST.Expr
+prefix s c = Prefix (c <* s)

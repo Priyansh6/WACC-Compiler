@@ -2,7 +2,6 @@
 
 module Main (main) where
 
-import Parser (sc)
 import Programs (pProgram)
 import Renamer (rename)
 import SymbolTable (checkProg)
@@ -10,17 +9,17 @@ import SymbolTable (checkProg)
 import Control.Monad.Except
 import Control.Monad.Trans.State
 import Text.Megaparsec
-import Data.Void
 import System.Environment
 import System.Exit
 import qualified Data.Map as M
 import qualified Data.Text.IO as TIO
+import qualified Lexer as L
 
 main :: IO ()
 main = do 
   (fname:_) <- getArgs
   contents <- TIO.readFile fname
-  let res = runParser (sc *> pProgram <* eof) fname contents
+  let res = runParser (L.fully pProgram) fname contents
   case res of
     Left _ -> exitWith (ExitFailure 100)
     Right ast -> case rename ast of

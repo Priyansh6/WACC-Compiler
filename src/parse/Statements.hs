@@ -1,118 +1,173 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-module Statements (module Statements) where
+module Statements 
+  ( pStats
+  , pStat
+  , pWType
+  , pSkip
+  , mkDecAssign
+  , mkAssign
+  , mkRead
+  , pBaseType
+  , pArrType
+  , pPairType
+  , pLVal
+  , pRVal
+  , mkFree
+  , mkReturn
+  , mkCall
+  , pPrint
+  , mkExit
+  ) where
 
-import qualified AST 
-import Control.Monad.Combinators.Expr 
-import qualified Data.Text as T
-import Parser (Parser, pToken, symbol, pIdent, brackets, parens, lexeme, keyword)
-import Expressions (pExpr, pArrayElem)
+import Expressions (pExpr, mkArrayElem, mkIdent)
+import Parser (Parser, liftPos1, liftPos2, liftPos3) 
 import Text.Megaparsec
-import Text.Megaparsec.Char
+import qualified AST 
+import qualified Lexer as L
 
 pStats :: Parser AST.Stats
-pStats = pStat `sepBy1` symbol ";"
+pStats = pStat `sepBy1` ";"
 
 pStat :: Parser AST.Stat
 pStat = choice 
   [
     pSkip,
-    pDecAssign,
-    pAssign,
-    pRead,
-    pFree,
-    pReturn,
-    pExit,
+    mkDecAssign,
+    mkAssign,
+    mkRead,
+    mkFree,
+    mkReturn,
+    mkExit,
     pPrint,
     pPrintln,
-    pIf,
+    mkIf,
     pWhile,
     pBegin
   ]
 
 pSkip :: Parser AST.Stat
-pSkip = AST.Skip <$ keyword "skip"
+pSkip = AST.Skip <$ "skip"
 
-pDecAssign :: Parser AST.Stat
-pDecAssign = AST.DecAssign <$> pWType <*> pIdent <*> (symbol "=" *> pRVal)
+mkDecAssign :: Parser AST.Stat
+mkDecAssign = liftPos3 AST.DecAssign pWType mkIdent ("=" *> pRVal)
 
-pAssign :: Parser AST.Stat
-pAssign = AST.Assign <$> pLVal <*> (symbol "=" *> pRVal)
+mkAssign :: Parser AST.Stat
+mkAssign = liftPos2 AST.Assign pLVal ("=" *> pRVal)
 
-pRead :: Parser AST.Stat
-pRead = AST.Read <$> (keyword "read" *> pLVal)
+mkRead :: Parser AST.Stat
+mkRead = liftPos1 AST.Read ("read" *> pLVal)
 
 pWType :: Parser AST.WType
 pWType = pArrType <|> pPairType <|> pBaseType 
 
 pBaseType :: Parser AST.WType 
-pBaseType = try $ choice 
-  [ AST.WInt <$ keyword "int"
-  , AST.WBool <$ keyword "bool"
-  , AST.WChar <$ keyword "char"
-  , AST.WStr <$ keyword "string" ]
+pBaseType = choice 
+  [ AST.WInt <$ "int"
+  , AST.WBool <$ "bool"
+  , AST.WChar <$ "char"
+  , AST.WStr <$ "string" ]
 
 pArrType :: Parser AST.WType
 pArrType = try $ do
             t <- pBaseType <|> pPairType
-            bs <- some (symbol "[]")
+            bs <- some "[]"
             let dimension = length bs
             return (AST.WArr t dimension)
 
 pPairType :: Parser AST.WType
-pPairType = AST.WPair <$> (keyword "pair" *> symbol "(" *> pPairElemType) <*> (symbol "," *> pPairElemType <* symbol ")")
+pPairType = AST.WPair <$> ("pair" *> "(" *> pPairElemType) <*> ("," *> pPairElemType <* ")")
   where
     pPairElemType :: Parser AST.WType
-    pPairElemType = pArrType <|> (AST.WUnit <$ keyword "pair") <|> pBaseType 
+    pPairElemType = pArrType <|> (AST.WUnit <$ "pair") <|> pBaseType 
 
 pLVal :: Parser AST.LVal 
-pLVal = (AST.LArray <$> pArrayElem) <|> (AST.LPair <$> pPairElem) <|> (AST.LIdent <$> pIdent)
+pLVal = (AST.LArray <$> mkArrayElem) <|> (AST.LPair <$> pPairElem) <|> (AST.LIdent <$> mkIdent)
 
 pRVal :: Parser AST.RVal
 pRVal = choice 
   [ AST.RExpr <$> pExpr
-  , pArrLiter
-  , pNewPair
+  , mkArrLiter
+  , mkNewPair
   , AST.RPair <$> pPairElem
-  , pCall
+  , mkCall
   ]
 
-pArrLiter :: Parser AST.RVal
-pArrLiter = AST.ArrayLiter <$> brackets (pExpr `sepBy` symbol ",")
+pArrLiter :: Parser [AST.Expr]
+pArrLiter = L.brackets (pExpr `sepBy` ",")
 
-pNewPair :: Parser AST.RVal
-pNewPair = AST.NewPair <$> (keyword "newpair" *> symbol "(" *> pExpr) <*> (symbol "," *> pExpr <* symbol ")")
+mkArrLiter :: Parser AST.RVal
+mkArrLiter = liftPos1 AST.ArrayLiter pArrLiter
+
+pNewPairFstExpr :: Parser AST.Expr
+pNewPairFstExpr = "newpair" *> "(" *> pExpr
+
+pNewPairSndExpr :: Parser AST.Expr
+pNewPairSndExpr = "," *> pExpr <* ")"
+
+mkNewPair :: Parser AST.RVal
+mkNewPair = liftPos2 AST.NewPair pNewPairFstExpr pNewPairSndExpr
 
 pPairElem :: Parser AST.PairElem
-pPairElem = (AST.Fst <$> (keyword "fst" *> pLVal)) <|> (AST.Snd <$> (keyword "snd" *> pLVal))
+pPairElem = mkPairFst <|> mkPairSnd
 
-pCall :: Parser AST.RVal
-pCall = AST.Call <$> (keyword "call" *> pIdent) <*> parens pArgsList
+mkPairFst :: Parser AST.PairElem
+mkPairFst = liftPos1 AST.Fst ("fst" *> pLVal)
+
+mkPairSnd :: Parser AST.PairElem
+mkPairSnd = liftPos1 AST.Snd ("snd" *> pLVal)
+
+mkCall :: Parser AST.RVal
+mkCall = liftPos2 AST.Call ("call" *> mkIdent) (L.parens pArgsList)
 
 pArgsList :: Parser [AST.Expr]
-pArgsList = pExpr `sepBy` symbol ","
+pArgsList = pExpr `sepBy` ","
 
-pFree :: Parser AST.Stat
-pFree = AST.Free <$> (keyword "free" *> pExpr)
+pFree :: Parser AST.Expr
+pFree = "free" *> pExpr
 
-pReturn :: Parser AST.Stat
-pReturn = AST.Return <$> (keyword "return" *> pExpr)
+mkFree :: Parser AST.Stat
+mkFree = liftPos1 AST.Free pFree
 
-pExit :: Parser AST.Stat
-pExit = AST.Exit <$> (keyword "exit" *> pExpr)
+pReturn :: Parser AST.Expr
+pReturn = "return" *> pExpr
+
+mkReturn :: Parser AST.Stat
+mkReturn = liftPos1 AST.Return pReturn
+
+pExit :: Parser AST.Expr
+pExit = "exit" *> pExpr
+
+mkExit :: Parser AST.Stat
+mkExit = liftPos1 AST.Exit pExit
 
 pPrint :: Parser AST.Stat
-pPrint = AST.Print <$> (keyword "print" *> pExpr)
+pPrint = AST.Print <$> ("print" *> pExpr)
 
 pPrintln :: Parser AST.Stat
-pPrintln = AST.Println <$> (keyword "println" *> pExpr)
+pPrintln = AST.Println <$> ("println" *> pExpr)
 
-pIf :: Parser AST.Stat
-pIf = AST.If <$> (keyword "if" *> pExpr) <*> (keyword "then" *> pStats) <*> (keyword "else" *> pStats <* keyword "fi")
+pIfExpr :: Parser AST.Expr
+pIfExpr = "if" *> pExpr
+
+pIfBranchA :: Parser AST.Stats
+pIfBranchA = "then" *> pStats
+
+pIfBranchB :: Parser AST.Stats
+pIfBranchB = "else" *> pStats <* "fi"
+
+mkIf :: Parser AST.Stat
+mkIf = liftPos3 AST.If pIfExpr pIfBranchA pIfBranchB
+
+pWhileExpr :: Parser AST.Expr
+pWhileExpr = "while" *> pExpr
+
+pWhileBody :: Parser AST.Stats
+pWhileBody = "do" *> pStats <* "done"
 
 pWhile :: Parser AST.Stat
-pWhile = AST.While <$> (keyword "while" *> pExpr) <*> (keyword "do" *> pStats <* keyword "done")
+pWhile = liftPos2 AST.While pWhileExpr pWhileBody
 
 pBegin :: Parser AST.Stat
-pBegin = AST.Begin <$> (keyword "begin" *> pStats <* keyword "end")
+pBegin = AST.Begin <$> ("begin" *> pStats <* "end")
