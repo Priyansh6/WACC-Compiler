@@ -1,13 +1,18 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module SymbolTable (checkProg) where
 
 import AST
+import Control.Monad (void)
+import Control.Monad.Except
+import Control.Monad.Trans.Writer
+import Control.Monad.State
 import Data.Map ((!))
-import qualified Data.List as L
+import Data.Maybe
 import qualified Data.Map as M
+import qualified Data.Text as T
 
 type SymbolTable = M.Map Ident IdentType
-
-data Error = Error Ident (Int, Int) 
 
 data IdentType =  FuncType WType [Ident] 
                 | VarType WType
@@ -15,221 +20,198 @@ data IdentType =  FuncType WType [Ident]
                 | PairType WType WType
                 deriving(Show, Eq)
 
+type SemanticAnalyser = StateT SymbolTable (Except T.Text)
+
 fromIdentType :: IdentType -> WType
 fromIdentType (FuncType wtype _) = wtype
 fromIdentType (VarType wtype) = wtype
-fromIdentType (ArrType wtype _) = wtype
+fromIdentType (ArrType wtype x) = WArr wtype x
 fromIdentType (PairType wtype wtype') = WPair wtype wtype'
 
-checkProg :: Program  -> SymbolTable
-checkProg (Program funcs stats) = st'
-  where 
-    st = checkFuncs M.empty funcs
-    st' = checkStats st stats
+getIdentType :: Ident -> SemanticAnalyser WType
+getIdentType ident = do
+  st <- get 
+  return $ fromIdentType $ st ! ident
 
-checkFuncs :: SymbolTable -> [Func] -> SymbolTable
-checkFuncs = L.foldl checkFunc 
+isArrType :: WType -> Bool
+isArrType (WArr _ _) = True
+isArrType _ = False
 
-checkFunc :: SymbolTable -> Func -> SymbolTable
-checkFunc st (Func wtype ident params stats) 
-  = case last stats of
-      Exit _ -> st'''
-      Return expr | wtype == checkExprType st''' expr -> st'''
-      _ -> error "function type does not match return type"
-  where
-    ( _ , paramIds) = unzip params
-    st' = M.insert ident (FuncType wtype paramIds) st
-    st'' = insertParams params st'
-    st''' = checkStats st'' stats
+isPairType :: WType -> Bool
+isPairType (WPair _ _) = True
+isPairType _ = False
 
-checkStats :: SymbolTable -> Stats -> SymbolTable
-checkStats = L.foldl checkStat
+checkProg :: Program -> SemanticAnalyser ()
+checkProg (Program funcs stats) = checkFuncs funcs >> checkStats stats
 
-checkStat :: SymbolTable -> Stat -> SymbolTable
-checkStat st (DecAssign wtype ident rval)
-  | wtype == checkRVal st rval = st'
-  | otherwise = error ("rval type failed in DecAssign " ++ show rval ++ show wtype)
-  where
-    st' = insertAssign st wtype ident
-checkStat st (Assign lval rval)
-  | checkLVal st lval == checkRVal st rval = st
-  | otherwise = error ("rval type didnt equal lval type in assign " ++ show rval ++ show lval)
-checkStat st (Free expr)
-  = case checkExprType st expr of
-      (WPair _ _) -> st
-      (WArr _ _) -> st
-      _ -> error ("Free " ++ show expr)
-checkStat st (Exit expr)
-  | checkExprType st expr == WInt = st
-  | otherwise = error ("exit " ++ show expr)
-checkStat st (If expr stats1 stats2)
-  | checkExprType st expr == WBool = st''
-  | otherwise = error ("If " ++ show expr ++ " " ++ show stats1 ++ " " ++ show stats2)
-  where 
-    st' = checkStats st stats1
-    st''= checkStats st' stats2
-checkStat st (While expr stats)
-  | checkExprType st expr == WBool = checkStats st stats
-  | otherwise = error ("while " ++ show expr)
-checkStat st (Begin stats) = st'
-  where
-    st' = checkStats st stats
-checkStat st _ = st
+checkFuncs :: [Func] -> SemanticAnalyser ()
+checkFuncs = mapM_ checkFunc
 
-checkRVal :: SymbolTable -> RVal -> WType
-checkRVal st (RExpr expr) = checkExprType st expr 
-checkRVal st (ArrayLiter exprs)
-  | allTypesSame exprTypes = head exprTypes
-  | otherwise = error ("arraylit " ++ show exprs)
-  where 
-    exprTypes = map (checkExprType st) exprs
-    allTypesSame xs = all (== head xs) (tail xs)
-checkRVal st (NewPair e1 e2) = WPair wtype1' wtype2'
-  where
-    wtype1 = checkExprType st e1
-    wtype1' = case wtype1 of 
-      WPair _ _ -> WUnit
-      _ -> wtype1
-    wtype2 = checkExprType st e2
-    wtype2' = case wtype2 of 
-      WPair _ _ -> WUnit
-      _ -> wtype2
-checkRVal st (RPair pairElem) = checkPairElemType st pairElem
-checkRVal st (Call ident exprs)
-  | typesMatchParams = wtype
-  | otherwise = error ("function call params " ++ show (Call ident exprs))
-  where 
-    types = map (checkExprType st) exprs
-    paramTypes = map (fromIdentType . (st !)) ids
-    typesMatchParams = types == paramTypes
-    (wtype, ids) = case st ! ident of 
-              FuncType wt idents -> (wt, idents)
-              _ -> error ("function call not a function " ++ show (Call ident exprs))
+checkFunc :: Func -> SemanticAnalyser ()
+checkFunc (Func wtype ident params stats) = do
+  let (_, paramIds) = unzip params
+  modify (M.insert ident (FuncType wtype paramIds))  
+  insertParams params
+  -- Give this a reader monad with wtype
+  checkStats stats
+  -- Check return statements everywhere 
+  return ()
 
-checkLVal :: SymbolTable -> LVal -> WType
-checkLVal st (LIdent i) = fromIdentType $ st ! i
-checkLVal st (LArray (ArrayElem i es)) 
-  | all ((== WInt) . checkExprType st) es = fromIdentType $ st ! i
-  | otherwise = error ("lval checkpairelemtype " ++ show (LArray (ArrayElem i es)))
-checkLVal st (LPair p) = checkPairElemType st p
+checkStats :: Stats -> SemanticAnalyser ()
+checkStats = mapM_ checkStat
 
-checkPairElemType :: SymbolTable -> PairElem -> WType
-checkPairElemType st (Fst (LIdent i))
-  = case fromIdentType $ st ! i of
-    WPair t _ -> t
-    _ -> error "taking fst of a non pair"
-checkPairElemType st (Fst lval@(LPair _)) = checkLVal st lval
-checkPairElemType st (Snd (LIdent i))
-  = case fromIdentType $ st ! i of
-    WPair _ t -> t
-    _ -> error "taking snd of a non pair"
-checkPairElemType st (Snd lval@(LPair _)) = checkLVal st lval
-checkPairElemType _ _ = error "don't call fst/snd on an array you fucking idiot"
+checkStat :: Stat -> SemanticAnalyser ()
+checkStat (DecAssign wtype ident rval) = do
+  insertAssign wtype ident
+  wtype' <- checkRVal rval
+  unless (wtype == wtype') $ throwError "Declared type and assigned type do not match!" 
+checkStat (Assign lval rval) = do
+  ltype <- checkLVal lval
+  rtype <- checkRVal rval
+  when (ltype == WUnit && rtype == WUnit) $ throwError "Assigning to nested pair!"
+  unless (ltype == rtype) $ throwError "Left type != right type"
+checkStat (Read lval) = void $ checkLVal lval
+checkStat (Free expr) = do
+  wtype <- checkExprType expr
+  case wtype of
+    WPair _ _ -> return ()
+    WArr _ _ -> return ()
+    _ -> throwError "Attempt to free a non-pair or non-array"
 
-checkExprType :: SymbolTable -> Expr -> WType
-checkExprType _ (IntLiter _ ) = WInt 
-checkExprType _ (BoolLiter _ ) = WBool 
-checkExprType _ (CharLiter _) = WChar
-checkExprType _ (StrLiter _ ) = WStr
-checkExprType _ PairLiter = WPair WUnit WUnit
-checkExprType st (IdentExpr i) = fromIdentType $ st ! i
-checkExprType st (ArrayExpr (ArrayElem i _)) = fromIdentType $ st ! i
-checkExprType st (Not e) 
-  = case checkExprType st e of
-    WBool -> WBool
-    _ -> error ("Not " ++ show e)
-checkExprType st (Neg e) 
-  = case checkExprType st e of
-    WInt -> WInt
-    _ -> error ("Neg " ++ show e)
+checkStat (Return expr) = void $ checkExprType expr
 
-checkExprType st (Len e) 
-  = case checkExprType st e of
-    WArr _ _ -> WInt
-    _ -> error ("Len " ++ show e)
+checkStat (Exit expr) = do
+  wtype <- checkExprType expr
+  unless (wtype == WInt) $ throwError "Attempt to exit with a non integer expression"
+checkStat (Print expr) = void $ checkExprType expr
+checkStat (Println expr) = void $ checkExprType expr
+checkStat (If expr stats1 stats2) = do
+  checkStats stats1
+  checkStats stats2
+  wtype <- checkExprType expr
+  unless (wtype == WBool) $ throwError "Expression in if statement does not evaluate to bool"
+checkStat (While expr stats) = do
+  checkStats stats
+  wtype <- checkExprType expr
+  unless (wtype == WBool) $ throwError "Expression in while statement does not evaluate to bool"
+checkStat (Begin stats) = checkStats stats
+checkStat Skip = return ()
 
-checkExprType st (Ord e) 
-  = case checkExprType st e of
-    WChar -> WInt
-    _ -> error ("Ord " ++ show e)
+checkRVal :: RVal -> SemanticAnalyser WType
+checkRVal (RExpr expr) = checkExprType expr
+checkRVal (ArrayLiter []) = return $ WArr WUnit 0
+checkRVal (ArrayLiter exprs) = do
+  wtypes <- mapM checkExprType exprs
+  if all (== head wtypes) wtypes
+    then return $ WArr (head wtypes) $ length wtypes
+    else throwError "Types of expression do not match"
 
-checkExprType st (Chr e) 
-  = case checkExprType st e of
-    WInt -> WChar
-    _ -> error ("Chr " ++ show e)
+checkRVal (NewPair e1 e2) = do
+  wtype1 <- checkExprType e1
+  wtype2 <- checkExprType e2
+  return $ WPair wtype1 wtype2
 
-checkExprType st (e1 :*: e2)
-  | checkExprType st e1 == WInt && checkExprType st e2 == WInt = WInt
-  | otherwise = error "* operands are not both ints"
-checkExprType st (e1 :/: e2)
-  | checkExprType st e1 == WInt && checkExprType st e2 == WInt = WInt
-  | otherwise = error "/ operands are not both ints"
-checkExprType st (e1 :%: e2)
-  | checkExprType st e1 == WInt && checkExprType st e2 == WInt = WInt
-  | otherwise = error "% operands are not both ints"
-checkExprType st (e1 :+: e2)
-  | checkExprType st e1 == WInt && checkExprType st e2 == WInt = WInt
-  | otherwise = error "+ operands are not both ints"
-checkExprType st (e1 :-: e2)
-  | checkExprType st e1 == WInt && checkExprType st e2 == WInt = WInt
-  | otherwise = error "- operands are not both ints"
+checkRVal (RPair pairElem) = checkPairElemType pairElem
+checkRVal (Call ident exprs) = do 
+  st <- get
+  let identType = st ! ident
+  case identType of
+    FuncType funcType paramIdents -> do 
+      exprTypes <- mapM checkExprType exprs
+      paramTypes <- mapM getIdentType paramIdents
+      if paramTypes == exprTypes
+          then return funcType
+          else throwError "Argument types do not match parameter types"
+    _ -> throwError "Calling an identifier that is not a function"
 
-checkExprType st (e1 :>: e2)
-  | te1 `notElem` [WChar, WInt] = error "first operand of > not char/int"
-  | te2 `notElem` [WChar, WInt] = error "second operand of > not char/int"
-  | te1 == te2 = WBool
-  | otherwise = error "> operands are not the same type"
-  where
-    te1 = checkExprType st e1
-    te2 = checkExprType st e2
-checkExprType st (e1 :>=: e2)
-  | te1 `notElem` [WChar, WInt] = error "first operand of >= not char/int"
-  | te2 `notElem` [WChar, WInt] = error "second operand of >= not char/int"
-  | te1 == te2 = WBool
-  | otherwise = error ">= operands are not the same type"
-  where
-    te1 = checkExprType st e1
-    te2 = checkExprType st e2
-checkExprType st (e1 :<: e2)
-  | te1 `notElem` [WChar, WInt] = error "first operand of < not char/int"
-  | te2 `notElem` [WChar, WInt] = error "second operand of < not char/int"
-  | te1 == te2 = error (show te1 ++ show te2)
-  | otherwise = error "< operands are not the same type"
-  where
-    te1 = checkExprType st e1
-    te2 = checkExprType st e2
-checkExprType st (e1 :<=: e2)
-  | te1 `notElem` [WChar, WInt] = error "first operand of <= not char/int"
-  | te2 `notElem` [WChar, WInt] = error "second operand of <= not char/int"
-  | te1 == te2 = WBool
-  | otherwise = error "<= operands are not the same type"
-  where
-    te1 = checkExprType st e1
-    te2 = checkExprType st e2
+checkLVal :: LVal -> SemanticAnalyser WType
+checkLVal (LIdent ident) = getIdentType ident
+checkLVal (LArray (ArrayElem ident exprs)) = do
+  identType <- getIdentType ident
+  exprTypes <- mapM checkExprType exprs
+  case identType of
+    WArr t _ -> if all (== identType) exprTypes
+                then return t
+                else throwError "Indices aren't all integers"
+    _ -> throwError "Not a valid array type"
 
-checkExprType st (e1 :==: e2)
-  | checkExprType st e1 == checkExprType st e2 = WBool
-  | otherwise = error "== operands are not the same type"
-checkExprType st (e1 :!=: e2)
-  | checkExprType st e1 == checkExprType st e2 = WBool
-  | otherwise = error "!= operands are not the same type"
+checkLVal (LPair pairElem) = checkPairElemType pairElem
 
-checkExprType st (e1 :&&: e2)
-  | checkExprType st e1 == WBool && checkExprType st e2 == WBool = WBool
-  | otherwise = error "&& operands are not both bools"
-checkExprType st (e1 :||: e2)
-  | checkExprType st e1 == WBool && checkExprType st e2 == WBool = WBool
-  | otherwise = error "|| operands are not both bools"
+checkPairElemType :: PairElem -> SemanticAnalyser WType
+checkPairElemType (Fst (LIdent ident)) = do
+  identType <- getIdentType ident
+  case identType of
+    WPair t _ -> return t
+    _ -> throwError "Taking fst of a non pair type"
+checkPairElemType (Fst lval@(LPair _)) = checkLVal lval
+checkPairElemType (Snd (LIdent ident)) = do
+  identType <- getIdentType ident
+  case identType of
+    WPair _ t -> return t
+    _ -> throwError "Taking snd of a non pair type"
+checkPairElemType (Snd lval@(LPair _)) = checkLVal lval
+checkPairElemType _ = throwError "Taking fst or snd of an array" 
 
-insertAssign :: SymbolTable -> WType -> Ident -> SymbolTable
-insertAssign st (WArr wtype int) ident = M.insert ident (ArrType wtype int) st
-insertAssign st (WPair wtype1 wtype2) ident = M.insert ident (PairType wtype1 wtype2) st
-insertAssign st wtype ident = M.insert ident (VarType wtype) st 
+checkExprType :: Expr -> SemanticAnalyser WType
+checkExprType (IntLiter _) = return WInt
+checkExprType (BoolLiter _) = return WBool
+checkExprType (CharLiter _) = return WChar
+checkExprType (StrLiter _) = return WStr
+checkExprType PairLiter = return $ WPair WUnit WUnit
+checkExprType (IdentExpr ident) = getIdentType ident
+checkExprType (ArrayExpr (ArrayElem ident _)) = getIdentType ident
+checkExprType (Not expr) = checkUnOpType (== WBool) WBool expr
+checkExprType (Neg expr) = checkUnOpType (== WInt) WInt expr
+checkExprType (Len expr) = checkUnOpType isArrType WInt expr
+checkExprType (Ord expr) = checkUnOpType (== WChar) WInt expr
+checkExprType (Chr expr) = checkUnOpType (== WInt) WChar expr
+checkExprType (expr :*: expr') = checkBinOpType isValidNumericOperator WInt expr expr'
+checkExprType (expr :/: expr') = checkBinOpType isValidNumericOperator WInt expr expr'
+checkExprType (expr :%: expr') = checkBinOpType isValidNumericOperator WInt expr expr'
+checkExprType (expr :+: expr') = checkBinOpType isValidNumericOperator WInt expr expr'
+checkExprType (expr :-: expr') = checkBinOpType isValidNumericOperator WInt expr expr'
+checkExprType (expr :>: expr') = checkBinOpType isValidComparisonOperator WBool expr expr'
+checkExprType (expr :>=: expr') = checkBinOpType isValidComparisonOperator WBool expr expr'
+checkExprType (expr :<: expr') = checkBinOpType isValidComparisonOperator WBool expr expr'
+checkExprType (expr :<=: expr') = checkBinOpType isValidComparisonOperator WBool expr expr'
+checkExprType (expr :==: expr') = checkBinOpType (==) WBool expr expr'
+checkExprType (expr :!=: expr') = checkBinOpType (==) WBool expr expr'
+checkExprType (expr :&&: expr') = checkBinOpType isValidBooleanOperator WBool expr expr'
+checkExprType (expr :||: expr') = checkBinOpType isValidBooleanOperator WBool expr expr'
 
+checkUnOpType :: (WType -> Bool) -> WType -> Expr -> SemanticAnalyser WType
+checkUnOpType p out expr = do
+  wtype <- checkExprType expr
+  unless (p wtype) $ throwError "Unary operator applied to the wrong type"
+  return out
 
-insertParams :: [(WType, Ident)] -> SymbolTable -> SymbolTable
-insertParams [] st = st
-insertParams ((wType, ident):params) st 
-  = insertParams params (M.insert ident (VarType wType) st) 
+checkBinOpType :: (WType -> WType -> Bool) -> WType -> Expr -> Expr -> SemanticAnalyser WType
+checkBinOpType p out expr1 expr2 = do
+  wtype1 <- checkExprType expr1
+  wtype2 <- checkExprType expr2
+  unless (p wtype1 wtype2) $ throwError "Binary operator applied to the wrong types"
+  return out
 
+isValidNumericOperator :: WType -> WType -> Bool
+isValidNumericOperator WInt WInt = True
+isValidNumericOperator _ _ = False
 
+isValidComparisonOperator :: WType -> WType -> Bool
+isValidComparisonOperator WChar WChar = True
+isValidComparisonOperator WInt WInt = True
+isValidComparisonOperator _ _ = False
+
+isValidBooleanOperator :: WType -> WType -> Bool
+isValidBooleanOperator WBool WBool = True
+isValidBooleanOperator _ _ = False
+
+insertAssign :: WType -> Ident -> SemanticAnalyser ()
+insertAssign (WArr wtype x) ident = modify $ M.insert ident (ArrType wtype x) 
+insertAssign (WPair wtype wtype') ident = modify $ M.insert ident (PairType wtype wtype')
+insertAssign wtype ident = modify $ M.insert ident (VarType wtype)
+
+insertParams :: [(WType, Ident)] -> SemanticAnalyser ()
+insertParams = mapM_ (uncurry insertParam)
+
+insertParam :: WType -> Ident -> SemanticAnalyser ()
+insertParam wtype ident = modify $ M.insert ident (VarType wtype)

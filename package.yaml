@@ -27,6 +27,8 @@ dependencies:
 - hspec-megaparsec
 - parser-combinators
 - hspec
+- transformers
+- mtl
 
 ghc-options:
 - -Wall
