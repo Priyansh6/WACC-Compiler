@@ -80,7 +80,7 @@ pPairType :: Parser AST.WType
 pPairType = AST.WPair <$> ("pair" *> "(" *> pPairElemType) <*> ("," *> pPairElemType <* ")")
   where
     pPairElemType :: Parser AST.WType
-    pPairElemType = pArrType <|> (AST.WUnit <$ "pair") <|> pBaseType 
+    pPairElemType = pArrType <|> (AST.WPair AST.WUnit AST.WUnit <$ "pair") <|> pBaseType 
 
 pLVal :: Parser AST.LVal 
 pLVal = (AST.LArray <$> mkArrayElem) <|> (AST.LPair <$> pPairElem) <|> (AST.LIdent <$> mkIdent)

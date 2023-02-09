@@ -70,14 +70,15 @@ checkStats :: Stats -> ScopedSemanticAnalyser ()
 checkStats = mapM_ checkStat
 
 checkStat :: Stat -> ScopedSemanticAnalyser ()
-checkStat (DecAssign wtype ident rval pos) = do
-  insertAssign wtype ident
-  wtype' <- checkRVal rval
-  unless (areTypesCompatible wtype wtype') $ throwError $ T.pack ("Assignment types not compatible!" <> show wtype <> show wtype')
+checkStat (DecAssign ltype ident rval pos) = do
+  insertAssign ltype ident
+  rtype <- checkRVal rval
+  unless (areTypesCompatible ltype rtype) $ throwError $ T.pack ("DecAssignment types not compatible!" <> show ltype <> show rtype)
 checkStat (Assign lval rval pos) = do
   ltype <- checkLVal lval
   rtype <- checkRVal rval
   unless (areTypesCompatible ltype rtype) $ throwError $ T.pack ("Assignment types not compatible!" <> show ltype <> " " <> show rtype)
+
 checkStat (Read lval pos) = do 
   wtype <- checkLVal lval
   case wtype of 
@@ -90,7 +91,6 @@ checkStat (Free expr pos) = do
     WPair _ _ -> return ()
     WArr _ _ -> return ()
     _ -> throwError "Attempt to free a non-pair or non-array"
-
 checkStat (Return expr pos) = do
   rtype <- checkExprType expr
   ftype <- ask
@@ -98,7 +98,6 @@ checkStat (Return expr pos) = do
     Nothing -> throwError "Attempting to return from main!"
     Just wtype -> unless (areTypesCompatible wtype rtype) $ throwError "Return type does not match declared return type"
   return ()
-
 checkStat (Exit expr pos) = do
   wtype <- checkExprType expr
   unless (wtype == WInt) $ throwError "Attempt to exit with a non integer expression"
@@ -129,7 +128,9 @@ checkRVal (ArrayLiter exprs pos) = do
 checkRVal (NewPair e1 e2 pos) = do
   wtype1 <- checkExprType e1
   wtype2 <- checkExprType e2
-  return $ WPair wtype1 wtype2
+  let wtype1' = erasePairType wtype1
+      wtype2' = erasePairType wtype2
+  return $ WPair wtype1' wtype2'
 checkRVal (RPair pairElem) = checkPairElemType pairElem
 checkRVal (Call ident exprs pos) = do 
   st <- get
@@ -143,10 +144,24 @@ checkRVal (Call ident exprs pos) = do
           else throwError "Argument types do not match parameter types"
     _ -> throwError "Calling an identifier that is not a function"
 
+erasePairType :: WType -> WType
+erasePairType (WPair _ _) = WPair WUnit WUnit
+erasePairType x = x
+
 checkLVal :: LVal -> ScopedSemanticAnalyser WType
 checkLVal (LIdent ident) = getIdentType ident
 checkLVal (LArray al@(ArrayElem ident exprs position)) = getArrayElemBaseType al
 checkLVal (LPair pairElem) = checkPairElemType pairElem
+
+-- arePairTypesCompatible :: WType -> WType -> Bool
+-- arePairTypesCompatible WUnit WUnit = False
+-- arePairTypesCompatible WUnit t2
+--   | not $ isPairType t2 = True
+--   | otherwise = False
+-- arePairTypesCompatible t1 WUnit
+--   | not $ isPairType t1 = True
+--   | otherwise = False
+-- arePairTypesCompatible t1 t2 = True
 
 checkPairElemType :: PairElem -> ScopedSemanticAnalyser WType
 checkPairElemType (Fst (LIdent ident) pos) = do
@@ -155,13 +170,22 @@ checkPairElemType (Fst (LIdent ident) pos) = do
     WPair t _ -> return t
     _ -> throwError "Taking fst of a non pair type"
 checkPairElemType (Fst lval@(LPair _) pos) = return WUnit
+checkPairElemType (Fst (LArray arrayElem) pos) = do
+  baseType <- getArrayElemBaseType arrayElem
+  case baseType of
+    WPair t _ -> return t 
+    _ -> throwError "Taking fst of a non pair type"
 checkPairElemType (Snd (LIdent ident) pos) = do
   identType <- getIdentType ident
   case identType of
     WPair _ t -> return t
     _ -> throwError "Taking snd of a non pair type"
 checkPairElemType (Snd lval@(LPair _) pos) = return WUnit
-checkPairElemType _ = throwError "Taking fst or snd of an array" 
+checkPairElemType (Snd (LArray arrayElem) pos) = do 
+  baseType <- getArrayElemBaseType arrayElem
+  case baseType of
+    WPair _ t -> return t
+    _ -> throwError "Taking snd of a non pair type"
 
 checkExprType :: Expr -> ScopedSemanticAnalyser WType
 checkExprType (IntLiter _ _) = return WInt
@@ -185,8 +209,8 @@ checkExprType ((:>:) expr expr' pos) = checkBinOpType isValidComparisonOperator 
 checkExprType ((:<:) expr expr' pos) = checkBinOpType isValidComparisonOperator WBool expr expr' pos
 checkExprType ((:>=:) expr expr' pos) = checkBinOpType isValidComparisonOperator WBool expr expr' pos
 checkExprType ((:<=:) expr expr' pos) = checkBinOpType isValidComparisonOperator WBool expr expr' pos
-checkExprType ((:==:) expr expr' pos) = checkBinOpType (==) WBool expr expr' pos
-checkExprType ((:!=:) expr expr' pos) = checkBinOpType (==) WBool expr expr' pos
+checkExprType ((:==:) expr expr' pos) = checkBinOpType isValidEqualityOperator WBool expr expr' pos
+checkExprType ((:!=:) expr expr' pos) = checkBinOpType isValidEqualityOperator WBool expr expr' pos
 checkExprType ((:&&:) expr expr' pos) = checkBinOpType isValidBooleanOperator WBool expr expr' pos
 checkExprType ((:||:) expr expr' pos) = checkBinOpType isValidBooleanOperator WBool expr expr' pos
 
@@ -200,7 +224,7 @@ checkBinOpType :: (WType -> WType -> Bool) -> WType -> Expr -> Expr -> Position 
 checkBinOpType p out expr1 expr2 pos = do
   wtype1 <- checkExprType expr1
   wtype2 <- checkExprType expr2
-  unless (p wtype1 wtype2) $ throwError ("Binary operator applied to the wrong types " `T.append` T.pack (show pos))
+  unless (p wtype1 wtype2) $ throwError ("Binary operator applied to the wrong types " `T.append` T.pack (show pos <> show wtype1 <> show wtype2))
   return out
 
 isValidNumericOperator :: WType -> WType -> Bool
@@ -215,6 +239,10 @@ isValidComparisonOperator _ _ = False
 isValidBooleanOperator :: WType -> WType -> Bool
 isValidBooleanOperator WBool WBool = True
 isValidBooleanOperator _ _ = False
+
+isValidEqualityOperator :: WType -> WType -> Bool
+isValidEqualityOperator (WPair _ _) (WPair _ _) = True
+isValidEqualityOperator x y = x == y
 
 insertAssign :: WType -> Ident -> ScopedSemanticAnalyser ()
 insertAssign (WArr wtype x) ident = modify $ M.insert ident (ArrType wtype x)
@@ -231,6 +259,7 @@ areTypesCompatible :: WType -> WType -> Bool
 areTypesCompatible WUnit WUnit = False
 areTypesCompatible WUnit _ = True
 areTypesCompatible _ WUnit = True
+areTypesCompatible (WPair WUnit WUnit) (WPair WUnit WUnit) = True
 areTypesCompatible (WPair pt1 pt2) (WPair pt1' pt2') = areTypesCompatible pt1 pt1' && areTypesCompatible pt2 pt2'
 areTypesCompatible (WPair _ _) _ = False
 areTypesCompatible WStr (WArr WChar _) = True
