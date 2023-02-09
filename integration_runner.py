@@ -3,8 +3,11 @@ import re
 import subprocess
 import sys
 
-# tests = [("invalid/syntaxErr/", 100),
-tests = [("invalid/semanticErr/", 200), ("valid/", 0)]
+tests = [
+    # ("invalid/syntaxErr/", 100),
+    ("invalid/semanticErr/", 200),
+    ("valid/", 0),
+]
 
 base = "test/integration/"
 
@@ -19,7 +22,7 @@ for test_entry, expected in tests:
         print("\u001b[34m" + testname + "\u001b[0m")
         proc = subprocess.run(
             ["sh", "compile", fname],
-            stdout=subprocess.DEVNULL
+            # stdout=subprocess.DEVNULL # comment line to view haskell output
         )
 
         # Return code check
@@ -30,7 +33,7 @@ for test_entry, expected in tests:
         else:
             failed_list.append(fname)
             print(
-                f"\u001b[31mFailed {testname}\n\tExpected exit:\t\u001b[31;1m{expected}\u001b[0m\u001b[31m\n\tActual exit:\t\u001b[31;1m{actual}\u001b[0m\n"
+                f" \u001b[31m\tExpected exit:\t\u001b[31;1m{expected}\u001b[0m\u001b[31m\n\tActual exit:\t\u001b[31;1m{actual}\u001b[0m\n"
             )
     # print("\n")
 

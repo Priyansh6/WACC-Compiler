@@ -5,6 +5,7 @@ import qualified Data.List as L
 import qualified Data.Map as M
 import Data.Maybe
 import qualified Data.Text as T
+import SemanticErrors
 
 type ScopeMap = M.Map Int [Ident]
 
@@ -12,7 +13,7 @@ data ScopeAccum = ScopeAccum
   { scopeMap :: ScopeMap,
     scopeStack :: [Int],
     scopeCounter :: Int,
-    errors :: [String]
+    errors :: [SemanticError]
   }
   deriving (Show, Eq)
 
@@ -62,17 +63,16 @@ chainNewScope accFunc x (acc, f) =
 chainResetScope :: ScopeAccum -> (ScopeAccum, x) -> (ScopeAccum, x)
 chainResetScope oldScopeAccum = mapFst (resetScope oldScopeAccum)
 
-rename :: Program -> ((ScopeMap, [String]), Program)
+rename :: Program -> ((ScopeMap, [SemanticError]), Program)
 rename prog =
-  mapFst (\sa -> (scopeMap sa, errors sa)) (renameProg initialScopeAccum prog)
+  mapFst (\sa -> (scopeMap sa, reverse $ errors sa)) (renameProg initialScopeAccum prog)
 
 addFuncName :: ScopeAccum -> Func -> ScopeAccum
 addFuncName scopeAccum (Func _ name@(Ident i pos) _ _ _)
-  | name `L.elem` getScopedVars scopeAccum 0 = scopeAccum {errors = errorMsg : errors scopeAccum}
+  | name `L.elem` getScopedVars scopeAccum 0 = scopeAccum {errors = SemanticError FunctionAlreadyDefined name : errors scopeAccum}
   | otherwise                                = scopeAccum'
   where
     scopeAccum' = scopeAccum {scopeMap = M.insert 0 (name : getScopedVars scopeAccum 0) (scopeMap scopeAccum)}
-    errorMsg = "Error: Function " ++ T.unpack i ++ " already defined."
 
 renameProg :: ScopeAccum -> Program -> (ScopeAccum, Program)
 renameProg scopeAccum (Program funcs stats) =
@@ -81,7 +81,7 @@ renameProg scopeAccum (Program funcs stats) =
     scopeAccum' = foldl addFuncName scopeAccum funcs
 
 renameFunc :: ScopeAccum -> Func -> (ScopeAccum, Func)
-renameFunc scopeAccum (Func t name@(Ident i _) params stats pos) =
+renameFunc scopeAccum (Func t name params stats pos) =
   mapSndFunc pos $
     ( chainResetScope scopeAccum
         . chainNewScope (L.mapAccumL renameStat) stats
@@ -135,14 +135,13 @@ renameRVal scopeAccum (ArrayLiter exprs pos) = mapSndFunc pos $ chain (L.mapAccu
 renameRVal scopeAccum (NewPair expr1 expr2 pos) =
   mapSndFunc pos $ (chain renameExpr expr2 . chain renameExpr expr1) (scopeAccum, NewPair)
 renameRVal scopeAccum (RPair pairElem) = chain renamePairElem pairElem (scopeAccum, RPair)
-renameRVal scopeAccum (Call name@(Ident i _) exprs pos) =
+renameRVal scopeAccum (Call name exprs pos) =
   mapSndFunc pos $ chain (L.mapAccumL renameExpr) exprs (scopeAccum', Call name)
   where
     scopeAccum' =
       if name `L.elem` getScopedVars scopeAccum 0
         then scopeAccum
-        else scopeAccum {errors = errorMsg : errors scopeAccum}
-    errorMsg = "Error: Function " ++ T.unpack i ++ " not defined."
+        else scopeAccum {errors = SemanticError FunctionNotDefined name : errors scopeAccum}
 
 renameExpr :: ScopeAccum -> Expr -> (ScopeAccum, Expr)
 renameExpr scopeAccum (IdentExpr i pos) = mapSndFunc pos $ chain renameDeclaredIdent i (scopeAccum, IdentExpr)
@@ -197,25 +196,23 @@ getOriginalIdent :: Ident -> Ident
 getOriginalIdent (Ident i pos) = Ident (T.takeWhile ('-' /=) i) pos
 
 renameUndeclaredIdent :: ScopeAccum -> Ident -> (ScopeAccum, Ident)
-renameUndeclaredIdent scopeAccum name@(Ident i _) =
+renameUndeclaredIdent scopeAccum name =
   (scopeAccum'', name'')
   where
     s = getCurrentScope scopeAccum
     scopeAccum' = scopeAccum {scopeMap = M.insert s (name' : getScopedVars scopeAccum s) (scopeMap scopeAccum)}
     (scopeAccum'', name'') =
       if name' `L.elem` getScopedVars scopeAccum s
-        then (scopeAccum {errors = errorMsg : errors scopeAccum}, name)
+        then (scopeAccum {errors = SemanticError VariableAlreadyDefined name : errors scopeAccum}, name)
         else (scopeAccum', name')
     name' = addScopeToIdent s name
-    errorMsg = "Error: Variable " ++ T.unpack i ++ " already defined."
 
 renameDeclaredIdent :: ScopeAccum -> Ident -> (ScopeAccum, Ident)
-renameDeclaredIdent scopeAccum name@(Ident i _) =
+renameDeclaredIdent scopeAccum name =
   (scopeAccum', fromMaybe name name')
   where
     name' = findInScopeStack (scopeStack scopeAccum) name
-    scopeAccum' = if isNothing name' then scopeAccum {errors = errorMsg : errors scopeAccum} else scopeAccum
-    errorMsg = "Error: Variable " ++ T.unpack i ++ " not defined."
+    scopeAccum' = if isNothing name' then scopeAccum {errors = SemanticError VariableNotDefined name : errors scopeAccum} else scopeAccum
 
     findInScopeStack :: [Int] -> Ident -> Maybe Ident
     findInScopeStack [] _ = Nothing
