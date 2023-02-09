@@ -4,8 +4,7 @@ import subprocess
 import sys
 
 # tests = [("invalid/syntaxErr/", 100),
-tests = [("invalid/semanticErr/", 200),
-         ("valid/", 0)]
+tests = [("invalid/semanticErr/", 200), ("valid/", 0)]
 
 base = "test/integration/"
 
@@ -14,10 +13,13 @@ total = 0
 
 failed_list = []
 
-for (test_entry, expected) in tests:
+for test_entry, expected in tests:
     for fname in pathlib.Path(base + test_entry).rglob("*.wacc"):
-        proc = subprocess.run(["sh", "compile", fname],
-                              stdout=subprocess.DEVNULL)
+        testname = f"{fname}"[17:-5]
+        print("\u001b[34m" + testname + "\u001b[0m")
+        proc = subprocess.run(
+            ["sh", "compile", fname],
+        )
 
         # Return code check
         actual = proc.returncode
@@ -27,7 +29,8 @@ for (test_entry, expected) in tests:
         else:
             failed_list.append(fname)
             print(
-                f"Failed test {fname}. Expected exit code {expected} but got {actual}")
+                f"\u001b[31mFailed {testname}\n\tExpected exit: \u001b[31;1m{expected}\u001b[0m\u001b[31m\n\tActual exit: \u001b[31;1m{actual}"
+            )
     print("\n")
 
 
