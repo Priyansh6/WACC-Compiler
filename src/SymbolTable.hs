@@ -4,6 +4,8 @@ module SymbolTable (checkProg) where
 
 import AST
 import Control.Monad (void)
+
+import Control.Monad.Reader
 import Control.Monad.Except
 import Control.Monad.Trans.Writer
 import Control.Monad.State
@@ -11,15 +13,21 @@ import Data.Map ((!))
 import qualified Data.Map as M
 import qualified Data.Text as T
 
+-------------------
+type Env = Maybe WType
+-------------------
+
 type SymbolTable = M.Map Ident IdentType
 
 data IdentType =  FuncType WType [Ident]
                 | VarType WType
+                | ParamType WType
                 | ArrType WType Int
                 | PairType WType WType
                 deriving(Show, Eq)
 
 type SemanticAnalyser = StateT SymbolTable (Except T.Text)
+type ScopedSemanticAnalyser = ReaderT Env (StateT SymbolTable (Except T.Text))
 
 fromIdentType :: IdentType -> WType
 fromIdentType (FuncType wtype _ ) = wtype
@@ -27,7 +35,7 @@ fromIdentType (VarType wtype) = wtype
 fromIdentType (ArrType wtype x) = WArr wtype x
 fromIdentType (PairType wtype wtype') = WPair wtype wtype'
 
-getIdentType :: Ident -> SemanticAnalyser WType
+getIdentType :: Ident -> ScopedSemanticAnalyser WType
 getIdentType ident = do
   st <- get 
   return $ fromIdentType $ st ! ident
@@ -41,25 +49,27 @@ isPairType (WPair _ _) = True
 isPairType _ = False
 
 checkProg :: Program -> SemanticAnalyser ()
-checkProg (Program funcs stats) = checkFuncs funcs >> checkStats stats
+checkProg (Program funcs stats) = addFuncsToSymbolTable funcs >> checkFuncs funcs >> runReaderT (checkStats stats) Nothing
 
 checkFuncs :: [Func] -> SemanticAnalyser ()
 checkFuncs = mapM_ checkFunc
 
-checkFunc :: Func -> SemanticAnalyser ()
-checkFunc (Func wtype ident params stats pos) = do
-  let (_, paramIds) = unzip params
-  modify (M.insert ident (FuncType wtype paramIds))  
-  insertParams params
-  -- Give this a reader monad with wtype
-  checkStats stats
-  -- Check return statements everywhere 
-  return ()
+addFuncsToSymbolTable :: [Func] -> SemanticAnalyser ()
+addFuncsToSymbolTable = mapM_ addFuncToSymbolTable 
 
-checkStats :: Stats -> SemanticAnalyser ()
+addFuncToSymbolTable :: Func -> SemanticAnalyser ()
+addFuncToSymbolTable (Func wtype ident params _ _) = do
+  let (_, paramIds) = unzip params
+  modify (M.insert ident (FuncType wtype paramIds)) 
+  insertParams params
+
+checkFunc :: Func -> SemanticAnalyser ()
+checkFunc (Func wtype ident params stats pos) = runReaderT (checkStats stats) (Just wtype)
+
+checkStats :: Stats -> ScopedSemanticAnalyser ()
 checkStats = mapM_ checkStat
 
-checkStat :: Stat -> SemanticAnalyser ()
+checkStat :: Stat -> ScopedSemanticAnalyser ()
 checkStat (DecAssign wtype ident rval pos) = do
   insertAssign wtype ident
   wtype' <- checkRVal rval
@@ -76,7 +86,13 @@ checkStat (Free expr pos) = do
     WArr _ _ -> return ()
     _ -> throwError "Attempt to free a non-pair or non-array"
 
-checkStat (Return expr pos) = void $ checkExprType expr
+checkStat (Return expr pos) = do
+  rtype <- checkExprType expr
+  ftype <- ask
+  case ftype of
+    Nothing -> throwError "Attempting to return from main!"
+    Just wtype -> unless (areTypesCompatible wtype rtype) $ throwError "Return type does not match declared return type"
+  return ()
 
 checkStat (Exit expr pos) = do
   wtype <- checkExprType expr
@@ -95,7 +111,7 @@ checkStat (While expr stats pos) = do
 checkStat (Begin stats) = checkStats stats
 checkStat Skip = return ()
 
-checkRVal :: RVal -> SemanticAnalyser WType
+checkRVal :: RVal -> ScopedSemanticAnalyser WType
 checkRVal (RExpr expr) = checkExprType expr
 checkRVal (ArrayLiter [] pos) = return $ WArr WUnit 1
 checkRVal (ArrayLiter exprs pos) = do
@@ -122,12 +138,12 @@ checkRVal (Call ident exprs pos) = do
           else throwError "Argument types do not match parameter types"
     _ -> throwError "Calling an identifier that is not a function"
 
-checkLVal :: LVal -> SemanticAnalyser WType
+checkLVal :: LVal -> ScopedSemanticAnalyser WType
 checkLVal (LIdent ident) = getIdentType ident
 checkLVal (LArray al@(ArrayElem ident exprs position)) = getArrayElemBaseType al
 checkLVal (LPair pairElem) = checkPairElemType pairElem
 
-checkPairElemType :: PairElem -> SemanticAnalyser WType
+checkPairElemType :: PairElem -> ScopedSemanticAnalyser WType
 checkPairElemType (Fst (LIdent ident) pos) = do
   identType <- getIdentType ident
   case identType of
@@ -142,7 +158,7 @@ checkPairElemType (Snd (LIdent ident) pos) = do
 checkPairElemType (Snd lval@(LPair _) pos) = checkLVal lval
 checkPairElemType _ = throwError "Taking fst or snd of an array" 
 
-checkExprType :: Expr -> SemanticAnalyser WType
+checkExprType :: Expr -> ScopedSemanticAnalyser WType
 checkExprType (IntLiter _ _) = return WInt
 checkExprType (BoolLiter _ _) = return WBool
 checkExprType (CharLiter _ _) = return WChar
@@ -169,13 +185,13 @@ checkExprType ((:!=:) expr expr' pos) = checkBinOpType (==) WBool expr expr' pos
 checkExprType ((:&&:) expr expr' pos) = checkBinOpType isValidBooleanOperator WBool expr expr' pos
 checkExprType ((:||:) expr expr' pos) = checkBinOpType isValidBooleanOperator WBool expr expr' pos
 
-checkUnOpType :: (WType -> Bool) -> WType -> Expr -> Position -> SemanticAnalyser WType
+checkUnOpType :: (WType -> Bool) -> WType -> Expr -> Position -> ScopedSemanticAnalyser WType
 checkUnOpType p out expr pos = do
   wtype <- checkExprType expr
   unless (p wtype) $ throwError ("Unary operator applied to the wrong type" `T.append` T.pack (show pos))
   return out
 
-checkBinOpType :: (WType -> WType -> Bool) -> WType -> Expr -> Expr -> Position -> SemanticAnalyser WType
+checkBinOpType :: (WType -> WType -> Bool) -> WType -> Expr -> Expr -> Position -> ScopedSemanticAnalyser WType
 checkBinOpType p out expr1 expr2 pos = do
   wtype1 <- checkExprType expr1
   wtype2 <- checkExprType expr2
@@ -195,7 +211,7 @@ isValidBooleanOperator :: WType -> WType -> Bool
 isValidBooleanOperator WBool WBool = True
 isValidBooleanOperator _ _ = False
 
-insertAssign :: WType -> Ident -> SemanticAnalyser ()
+insertAssign :: WType -> Ident -> ScopedSemanticAnalyser ()
 insertAssign (WArr wtype x) ident = modify $ M.insert ident (ArrType wtype x)
 insertAssign (WPair wtype wtype') ident = modify $ M.insert ident (PairType wtype wtype')
 insertAssign wtype ident = modify $ M.insert ident (VarType wtype)
@@ -216,7 +232,7 @@ areTypesCompatible WUnit _ = True
 areTypesCompatible _ WUnit = True
 areTypesCompatible a b = a == b
 
-getArrayElemBaseType :: ArrayElem -> SemanticAnalyser WType
+getArrayElemBaseType :: ArrayElem -> ScopedSemanticAnalyser WType
 getArrayElemBaseType (ArrayElem ident exprs _) = do
   wtype <- getIdentType ident
   exprTypes <- mapM checkExprType exprs
