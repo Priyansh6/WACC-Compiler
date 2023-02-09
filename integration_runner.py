@@ -16,10 +16,10 @@ failed_list = []
 for test_entry, expected in tests:
     for fname in pathlib.Path(base + test_entry).rglob("*.wacc"):
         testname = f"{fname}"[17:-5]
-        print("\n\u001b[34m" + testname + "\u001b[0m")
+        print("\u001b[34m" + testname + "\u001b[0m")
         proc = subprocess.run(
             ["sh", "compile", fname],
-            # stdout=subprocess.DEVNULL
+            stdout=subprocess.DEVNULL
         )
 
         # Return code check
