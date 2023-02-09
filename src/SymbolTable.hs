@@ -78,7 +78,6 @@ checkStat (Assign lval rval pos) = do
   ltype <- checkLVal lval
   rtype <- checkRVal rval
   unless (areTypesCompatible ltype rtype) $ throwError $ T.pack ("Assignment types not compatible!" <> show ltype <> " " <> show rtype)
-
 checkStat (Read lval pos) = do 
   wtype <- checkLVal lval
   case wtype of 
@@ -139,9 +138,10 @@ checkRVal (Call ident exprs pos) = do
     FuncType funcType paramIdents -> do 
       exprTypes <- mapM checkExprType exprs
       paramTypes <- mapM getIdentType paramIdents
-      if paramTypes == exprTypes
+      -- if paramTypes == exprTypes
+      if length exprTypes == length paramTypes && all (uncurry areTypesCompatible) (zip exprTypes paramTypes)
           then return funcType
-          else throwError "Argument types do not match parameter types"
+          else throwError $ T.pack $ "Argument types do not match parameter types" <> show pos
     _ -> throwError "Calling an identifier that is not a function"
 
 erasePairType :: WType -> WType
