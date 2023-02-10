@@ -93,8 +93,8 @@ errorMessage semErr = case semErr of
     "The function "
       ++ func
       ++ if actual < expected
-        then " is missing " ++ bold (show (expected - actual)) ++ yellow ++ "arguments"
-        else " takes " ++ bold (show expected) ++ yellow ++ "arguments" ++ "but " ++ bold (show actual) ++ yellow ++ " were given"
+        then " is missing " ++ bold (show (expected - actual)) ++ yellow ++ " arguments"
+        else " takes " ++ bold (show expected) ++ yellow ++ " arguments but " ++ bold (show actual) ++ yellow ++ " were given"
     where
       func = bold (show i) ++ yellow
   IllegalReturn _ -> "Return statements outside of functions are not allowed\n" ++ reset
