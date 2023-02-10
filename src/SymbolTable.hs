@@ -3,11 +3,9 @@
 module SymbolTable (checkProg) where
 
 import AST
-import Control.Monad (void)
-
 import Control.Monad.Reader
 import Control.Monad.Except
-import Control.Monad.Trans.Writer
+import Control.Monad.Trans.Writer ()
 import Control.Monad.State
 import Data.Map ((!))
 import qualified Data.Map as M
@@ -126,7 +124,7 @@ checkRVal (ArrayLiter exprs pos) = do
     then case head wtypes of
       (WArr _ dim) -> return $ WArr (getArrayBaseType (head wtypes)) (dim + 1)
       _ -> return $ WArr (head wtypes) 1
-    else throwError $ IncompatibleTypes pos [head wtypes] (head (dropWhile (/= head wtypes) wtypes))
+    else throwError $ IncompatibleTypes pos [head wtypes] (head (dropWhile (== head wtypes) wtypes))
 checkRVal (NewPair e1 e2 pos) = do
   wtype1 <- checkExprType e1
   wtype2 <- checkExprType e2
@@ -150,7 +148,7 @@ checkRVal (Call ident exprs pos) = do
 
 compareParamsAndArguments :: Ident -> [WType] -> [WType] -> Position -> ScopedSemanticAnalyser WType
 compareParamsAndArguments ident ps as pos
-  | length ps /= length as = throwError $ WrongArguments pos ident (length ps) (length as)
+  | length ps /= length as = throwError (WrongArguments pos ident (length ps) (length as))
   | otherwise              = throwError $ IncompatibleTypes pos [pT] aT
   where
     (pT, aT) = head (dropWhile (uncurry (==)) (zip ps as))
@@ -179,7 +177,7 @@ checkPairElemType (Fst (LIdent ident) pos) = do
   identType <- getIdentType ident
   case identType of
     WPair t _ -> return t
-    actual -> throwError $ IncompatibleTypes pos [WPair WUnit WUnit] actual
+    actual -> throwError $ IncompatibleTypes pos [WPair (WPair WUnit WUnit) (WPair WUnit WUnit)] actual
 checkPairElemType (Fst lval@(LPair _) pos) = return WUnit
 checkPairElemType (Fst (LArray arrayElem) pos) = do
   baseType <- getArrayElemBaseType arrayElem
@@ -191,7 +189,7 @@ checkPairElemType (Snd (LIdent ident) pos) = do
   case identType of
     WPair _ t -> return t
     t -> throwError $ IncompatibleTypes pos [WPair (WPair WUnit WUnit) (WPair WUnit WUnit)] t
-checkPairElemType (Snd lval@(LPair _) pos) = return WUnit
+checkPairElemType (Snd lval@(LPair _) _) = return WUnit
 checkPairElemType (Snd (LArray arrayElem) pos) = do
   baseType <- getArrayElemBaseType arrayElem
   case baseType of
@@ -206,7 +204,7 @@ checkExprType (CharLiter _ _) = return WChar
 checkExprType (StrLiter _ _) = return WStr
 checkExprType (PairLiter _) = return $ WPair WUnit WUnit
 checkExprType (IdentExpr ident _) = getIdentType ident
-checkExprType (ArrayExpr al@(ArrayElem ident exprs pos) _) = getArrayElemBaseType al
+checkExprType (ArrayExpr al _) = getArrayElemBaseType al
 checkExprType (Not expr pos) = checkUnOpType (isValidEquality pos WBool) WBool expr
 checkExprType (Neg expr pos) = checkUnOpType (isValidEquality pos WInt) WInt expr
 checkExprType (Len expr pos) = checkUnOpType (isArrType pos) WInt expr
@@ -256,13 +254,11 @@ isValidBooleanOperator _ WBool WBool = return True
 isValidBooleanOperator pos t1 t2 = throwError (semanticError pos [WBool] t1 t2) >> return False
 
 isValidEquality :: Position -> WType -> WType -> ScopedSemanticAnalyser Bool
+isValidEquality _ (WPair _ _) (WPair _ _) = return True
 isValidEquality pos t1 t2
   | t1 == t2  = return True
   | otherwise = throwError (IncompatibleTypes pos [t1] t2) >> return False
 
-isValidEqualityOperator :: WType -> WType -> Bool
-isValidEqualityOperator (WPair _ _) (WPair _ _) = True
-isValidEqualityOperator x y = x == y
 
 insertAssign :: WType -> Ident -> ScopedSemanticAnalyser ()
 insertAssign (WArr wtype x) ident = modify $ M.insert ident (ArrType wtype x)
@@ -276,7 +272,7 @@ insertParam :: WType -> Ident -> SemanticAnalyser ()
 insertParam wtype ident = modify $ M.insert ident (VarType wtype)
 
 typeError :: Position -> WType -> WType -> SemanticError
-typeError pos exp = IncompatibleTypes pos [exp]
+typeError pos ex = IncompatibleTypes pos [ex]
 
 areTypesCompatible :: WType -> WType -> Position -> ScopedSemanticAnalyser Bool
 areTypesCompatible WUnit WUnit pos = throwError (IllegalPairExchange pos) >> return False
@@ -287,14 +283,17 @@ areTypesCompatible (WPair pt1 pt2) (WPair pt1' pt2') pos = do
   validP1 <- areTypesCompatible pt1 pt1' pos
   validP2 <- areTypesCompatible pt2 pt2' pos
   return $ validP1 && validP2
-areTypesCompatible exp@(WPair _ _) act pos = throwError (typeError pos exp act) >> return False
+areTypesCompatible ex@(WPair _ _) ac pos = throwError (typeError pos ex ac) >> return False
 areTypesCompatible WStr (WArr WChar _) _ = return True
-areTypesCompatible exp@(WArr t dim) act@(WArr t' dim') pos
-  | dim == dim' = areTypesCompatible (getArrayBaseType t) (getArrayBaseType t') pos
-  | otherwise   = throwError (typeError pos exp act) >> return False
-areTypesCompatible exp act pos
-  | exp == act = return True
-  | otherwise  = throwError (typeError pos exp act) >> return False
+areTypesCompatible ex@(WArr t dim) ac@(WArr t' dim') pos = do
+  isC <- areTypesCompatible (getArrayBaseType t) (getArrayBaseType t') pos
+  if isC && (dim == dim')
+    then return True
+    else throwError (typeError pos ex ac) >> return False
+  
+areTypesCompatible ex ac pos
+  | ex == ac = return True
+  | otherwise  = throwError (typeError pos ex ac) >> return False
 
 getArrayElemBaseType :: ArrayElem -> ScopedSemanticAnalyser WType
 getArrayElemBaseType (ArrayElem ident exprs pos) = do

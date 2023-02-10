@@ -4,9 +4,9 @@ import subprocess
 import sys
 
 tests = [
-    # ("invalid/syntaxErr/", 100),
-    ("invalid/semanticErr/", 200),
-    ("valid/", 0),
+    ("invalid/syntaxErr", 100),
+    ("invalid/semanticErr", 200),
+    ("valid", 0),
 ]
 
 base = "test/integration/"

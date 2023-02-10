@@ -27,6 +27,6 @@ main = do
       exitWith (ExitFailure 100)
     Right ast -> case rename ast of
       ((_, []), renamedAST) -> case runExcept $ runStateT (checkProg renamedAST) M.empty of
-        Left err -> printSemanticErrors contents [err] >> exitWith (ExitFailure 200)
+        Left err -> printSemanticErrors [err] contents fname >> exitWith (ExitFailure 200)
         Right _ -> exitSuccess
-      ((_, errs), _) -> printSemanticErrors contents errs >> exitWith (ExitFailure 200)
+      ((_, errs), _) -> printSemanticErrors errs contents fname >> exitWith (ExitFailure 200)
