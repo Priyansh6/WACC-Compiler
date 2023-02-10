@@ -65,7 +65,7 @@ printSemanticErrors errs contents fname = putStrLn $ concatMap printSemanticErro
         (row, _) = getPosition semErr
 
     previewCode :: Position -> String
-    previewCode (row, col) =
+    previewCode (row, _) =
       border
         ++ "...\n"
         ++ (if row > 2 then cyan ++ show (row - 2) ++ " | " ++ reset ++ getRow (row - 2) else "")

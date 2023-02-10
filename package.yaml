@@ -48,6 +48,7 @@ library:
   - src/parse
   - src/semanticAnalysis
   - src/semanticAnalysis/typeChecker
+  - src/semanticAnalysis/renamerFuncs
 
 executables:
   WACC40-exe:

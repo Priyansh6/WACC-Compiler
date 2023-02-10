@@ -3,7 +3,6 @@
 module Parsers.ExpressionSpec (spec) where
 
 import AST
-import Expressions
 import Parsers.Test
 import Test.Hspec
 import Test.Hspec.Megaparsec

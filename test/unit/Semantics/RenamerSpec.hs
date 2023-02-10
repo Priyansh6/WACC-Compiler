@@ -5,8 +5,12 @@ module Semantics.RenamerSpec (spec) where
 import AST
 import Data.Map
 import Renamer
+import RenameFunc
+import RenameStat
+import RenameRLValExpr
 import Test.Hspec
 import SemanticErrors
+import Scope
 
 xScopeAccum :: ScopeAccum
 xScopeAccum = initialScopeAccum {scopeMap = fromList [(0, [Ident "x-0" (0, 0)])]}
