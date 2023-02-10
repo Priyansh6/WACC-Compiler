@@ -1,13 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module SemanticAnalysis.Renamer (module SemanticAnalysis.Renamer) where
+module Renamer (module Renamer) where
 
 import AST
 import qualified Data.List as L
 import qualified Data.Map as M
 import Data.Maybe
 import qualified Data.Text as T
-import SemanticAnalysis.SemanticErrors
+import SemanticErrors
 
 type ScopeMap = M.Map Int [Ident]
 

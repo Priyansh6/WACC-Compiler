@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module SemanticAnalysis.SemanticErrors (module SemanticAnalysis.SemanticErrors) where
+module SemanticErrors (module SemanticErrors) where
 
 import AST
 import Data.List (intercalate)
@@ -102,3 +102,9 @@ getPosition (IncompatibleTypes pos _ _) = pos
 getPosition (WrongArguments pos _ _ _) = pos
 getPosition (IllegalReturn pos) = pos
 getPosition (IllegalPairExchange pos) = pos
+
+semanticError :: Position -> [WType] -> WType -> WType -> SemanticError
+semanticError pos validTypes t1 t2 = IncompatibleTypes pos validTypes $ if t1 `elem` validTypes then t2 else t1
+
+typeError :: Position -> WType -> WType -> SemanticError
+typeError pos ex = IncompatibleTypes pos [ex]

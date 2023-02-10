@@ -3,9 +3,9 @@
 module Main (main) where
 
 import Programs (pProgram)
-import SemanticAnalysis.Renamer (rename)
-import SemanticAnalysis.SymbolTable (checkProg)
-import SemanticAnalysis.SemanticErrors (printSemanticErrors)
+import Renamer (rename)
+import CheckTypes (checkProg)
+import SemanticErrors (printSemanticErrors)
 
 import Control.Monad.Except
 import Control.Monad.Trans.State

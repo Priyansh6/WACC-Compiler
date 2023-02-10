@@ -4,9 +4,9 @@ module Semantics.RenamerSpec (spec) where
 
 import AST
 import Data.Map
-import SemanticAnalysis.Renamer
+import Renamer
 import Test.Hspec
-import SemanticAnalysis.SemanticErrors
+import SemanticErrors
 
 xScopeAccum :: ScopeAccum
 xScopeAccum = initialScopeAccum {scopeMap = fromList [(0, [Ident "x-0" (0, 0)])]}

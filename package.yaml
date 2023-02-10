@@ -46,6 +46,8 @@ library:
   source-dirs: 
   - src
   - src/parse
+  - src/semanticAnalysis
+  - src/semanticAnalysis/typeChecker
 
 executables:
   WACC40-exe:
