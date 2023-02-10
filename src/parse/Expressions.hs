@@ -1,9 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Expressions
-  ( mkIdent,
-    pExpr,
-    mkArrayElem,
+  ( ident,
+    arrayElem,
+    expr
   )
 where
 
@@ -16,11 +16,11 @@ import Text.Megaparsec.Char (char)
 import qualified Data.Text as T
 import qualified Lexer as L
 
-mkIdent :: Parser AST.Ident
-mkIdent = liftPos1 AST.Ident L.ident 
+ident :: Parser AST.Ident
+ident = mkIdent L.ident
 
-mkArrayElem :: Parser AST.ArrayElem
-mkArrayElem = try $ liftPos2 AST.ArrayElem mkIdent (some (L.brackets pExpr))
+arrayElem :: Parser AST.ArrayElem
+arrayElem = mkArrayElem ident pArrayElemExprs
 
 pBool :: Parser Bool
 pBool = (True <$ "true") <|> (False <$ "false")
@@ -31,40 +31,25 @@ pChar = try $ between (char '\'') "\'" L.char
 pString :: Parser T.Text
 pString = try $ T.pack <$> between (char '"') "\"" (many L.char)
 
-mkIdentExpr :: Parser AST.Expr
-mkIdentExpr = liftPos1 AST.IdentExpr mkIdent 
+pPairLiter :: Parser ()
+pPairLiter = "null"
 
-mkArrayExpr :: Parser AST.Expr
-mkArrayExpr = liftPos1 AST.ArrayExpr mkArrayElem 
-
-mkBool :: Parser AST.Expr
-mkBool = liftPos1 AST.BoolLiter pBool 
-
-mkInt :: Parser AST.Expr
-mkInt = liftPos1 AST.IntLiter L.number 
-
-mkChar :: Parser AST.Expr
-mkChar = liftPos1 AST.CharLiter pChar 
-
-mkString :: Parser AST.Expr
-mkString = liftPos1 AST.StrLiter pString 
-
-mkPairLit :: Parser AST.Expr
-mkPairLit = getPosition <**> (AST.PairLiter <$ "null")
+pArrayElemExprs :: Parser [AST.Expr]
+pArrayElemExprs = try $ some $ L.brackets expr
 
 pTerm :: Parser AST.Expr
 pTerm = try $ choice 
-  [ mkInt,
-    mkBool,
-    mkChar,
-    mkString,
-    mkPairLit,
-    mkArrayExpr,
-    mkIdentExpr,
-    L.parens pExpr ]
+  [ mkInt L.number,
+    mkBool pBool,
+    mkChar pChar,
+    mkString pString,
+    mkPairLiter pPairLiter,
+    mkArrayExpr arrayElem,
+    mkIdentExpr ident,
+    L.parens expr ]
 
-pExpr :: Parser AST.Expr
-pExpr = makeExprParser pTerm operatorTable
+expr :: Parser AST.Expr
+expr = makeExprParser pTerm operatorTable
 
 operatorTable :: [[Operator Parser AST.Expr]]
 operatorTable = 
@@ -92,3 +77,31 @@ binary s c = InfixL (c <* s)
 
 prefix :: Parser () -> Parser (AST.Expr -> AST.Expr) -> Operator Parser AST.Expr
 prefix s c = Prefix (c <* s)
+
+-- Smart Constructors:
+mkIdent :: Parser T.Text -> Parser AST.Ident
+mkIdent = liftPos1 AST.Ident 
+
+mkArrayElem :: Parser AST.Ident -> Parser [AST.Expr] -> Parser AST.ArrayElem
+mkArrayElem = liftPos2 AST.ArrayElem 
+
+mkIdentExpr :: Parser AST.Ident -> Parser AST.Expr
+mkIdentExpr = liftPos1 AST.IdentExpr 
+
+mkArrayExpr :: Parser AST.ArrayElem -> Parser AST.Expr
+mkArrayExpr = liftPos1 AST.ArrayExpr 
+
+mkBool :: Parser Bool -> Parser AST.Expr
+mkBool = liftPos1 AST.BoolLiter
+
+mkInt :: Parser Integer -> Parser AST.Expr
+mkInt = liftPos1 AST.IntLiter 
+
+mkChar :: Parser Char -> Parser AST.Expr
+mkChar = liftPos1 AST.CharLiter 
+
+mkString :: Parser T.Text -> Parser AST.Expr
+mkString = liftPos1 AST.StrLiter 
+
+mkPairLiter :: Parser () -> Parser AST.Expr
+mkPairLiter p = getPosition <**> (AST.PairLiter <$ p)

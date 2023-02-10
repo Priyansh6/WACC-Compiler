@@ -2,10 +2,10 @@
 
 module Main (main) where
 
-import Programs (pProgram)
+import Programs (program)
+import SemanticErrors (printSemanticErrors)
 import Renamer (rename)
 import CheckTypes (checkProg)
-import SemanticErrors (printSemanticErrors)
 
 import Control.Monad.Except
 import Control.Monad.Trans.State
@@ -20,7 +20,7 @@ main :: IO ()
 main = do 
   (fname:_) <- getArgs
   contents <- TIO.readFile fname
-  let res = runParser (L.fully pProgram) fname contents
+  let res = runParser (L.fully program) fname contents
   case res of
     Left err -> do
       putStrLn (errorBundlePretty err)
