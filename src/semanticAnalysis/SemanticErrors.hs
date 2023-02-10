@@ -7,19 +7,22 @@ import Data.List (intercalate)
 import qualified Data.Text as T
 import System.FilePath
 
-esc :: Int -> String
-esc n = concat ["\ESC[", show n, "m"]
+showColour :: Bool
+showColour = False
+
+color :: Int -> String
+color n = if showColour then concat ["\ESC[", show n, "m"] else ""
 
 reset, red, green, yellow, blue, cyan :: String
-reset = esc 0
-red = esc 31
-green = esc 32
-yellow = esc 33
-blue = esc 34
-cyan = esc 36
+reset = color 0
+red = color 31
+green = color 32
+yellow = color 33
+blue = color 34
+cyan = color 36
 
 bold :: String -> String
-bold s = esc 1 ++ s ++ reset
+bold s = color 1 ++ s ++ reset
 
 pairErrorType :: WType
 pairErrorType = WPair (WPair WUnit WUnit) (WPair WUnit WUnit)
