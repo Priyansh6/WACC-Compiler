@@ -69,7 +69,7 @@ rename prog =
 
 addFuncName :: ScopeAccum -> Func -> ScopeAccum
 addFuncName scopeAccum (Func _ name@(Ident i pos) _ _ _)
-  | name `L.elem` getScopedVars scopeAccum 0 = scopeAccum {errors = SemanticError FunctionAlreadyDefined name : errors scopeAccum}
+  | name `L.elem` getScopedVars scopeAccum 0 = scopeAccum {errors = FunctionAlreadyDefined name : errors scopeAccum}
   | otherwise                                = scopeAccum'
   where
     scopeAccum' = scopeAccum {scopeMap = M.insert 0 (name : getScopedVars scopeAccum 0) (scopeMap scopeAccum)}
@@ -141,7 +141,7 @@ renameRVal scopeAccum (Call name exprs pos) =
     scopeAccum' =
       if name `L.elem` getScopedVars scopeAccum 0
         then scopeAccum
-        else scopeAccum {errors = SemanticError FunctionNotDefined name : errors scopeAccum}
+        else scopeAccum {errors = FunctionNotDefined name : errors scopeAccum}
 
 renameExpr :: ScopeAccum -> Expr -> (ScopeAccum, Expr)
 renameExpr scopeAccum (IdentExpr i pos) = mapSndFunc pos $ chain renameDeclaredIdent i (scopeAccum, IdentExpr)
@@ -203,7 +203,7 @@ renameUndeclaredIdent scopeAccum name =
     scopeAccum' = scopeAccum {scopeMap = M.insert s (name' : getScopedVars scopeAccum s) (scopeMap scopeAccum)}
     (scopeAccum'', name'') =
       if name' `L.elem` getScopedVars scopeAccum s
-        then (scopeAccum {errors = SemanticError VariableAlreadyDefined name : errors scopeAccum}, name)
+        then (scopeAccum {errors = VariableAlreadyDefined name : errors scopeAccum}, name)
         else (scopeAccum', name')
     name' = addScopeToIdent s name
 
@@ -212,7 +212,7 @@ renameDeclaredIdent scopeAccum name =
   (scopeAccum', fromMaybe name name')
   where
     name' = findInScopeStack (scopeStack scopeAccum) name
-    scopeAccum' = if isNothing name' then scopeAccum {errors = SemanticError VariableNotDefined name : errors scopeAccum} else scopeAccum
+    scopeAccum' = if isNothing name' then scopeAccum {errors = VariableNotDefined name : errors scopeAccum} else scopeAccum
 
     findInScopeStack :: [Int] -> Ident -> Maybe Ident
     findInScopeStack [] _ = Nothing

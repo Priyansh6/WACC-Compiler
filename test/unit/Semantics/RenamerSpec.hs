@@ -70,7 +70,7 @@ spec = do
                      { scopeMap = fromList [(0, [Ident "func" (0, 0)])],
                        scopeStack = [0],
                        scopeCounter = 2,
-                       errors = [SemanticError FunctionAlreadyDefined (Ident "func" (0, 0))]
+                       errors = [FunctionAlreadyDefined (Ident "func" (0, 0))]
                      },
                    Program [Func WInt (Ident "func" (0, 0)) [] [] (0, 0)] []
                  )
@@ -103,7 +103,7 @@ spec = do
                      { scopeMap = fromList [(0, [Ident "x-0" (0, 0)])],
                        scopeStack = [0],
                        scopeCounter = 0,
-                       errors = [SemanticError VariableAlreadyDefined (Ident "x" (0, 0))]
+                       errors = [VariableAlreadyDefined (Ident "x" (0, 0))]
                      },
                    DecAssign WInt (Ident "x" (0, 0)) (RExpr (IntLiter 1 (0, 0))) (0, 0)
                  )
@@ -129,7 +129,7 @@ spec = do
 
   it "can't rename non-declaration assignments if variable is not defined in scope" $
     renameStat initialScopeAccum (Assign (LIdent (Ident "x" (0, 0))) (RExpr (IntLiter 1 (0, 0))) (0, 0))
-      `shouldBe` (initialScopeAccum {errors = [SemanticError VariableNotDefined (Ident "x" (0, 0))]}, Assign (LIdent (Ident "x" (0, 0))) (RExpr (IntLiter 1 (0, 0))) (0, 0))
+      `shouldBe` (initialScopeAccum {errors = [VariableNotDefined (Ident "x" (0, 0))]}, Assign (LIdent (Ident "x" (0, 0))) (RExpr (IntLiter 1 (0, 0))) (0, 0))
 
   it "renames read statements" $
     renameStat xScopeAccum (Read (LIdent (Ident "x" (0, 0))) (0, 0))
@@ -233,7 +233,7 @@ spec = do
                      { scopeMap = fromList [(0, [Ident "x-0" (0, 0)])],
                        scopeStack = [0],
                        scopeCounter = 0,
-                       errors = [SemanticError FunctionNotDefined (Ident "func" (0, 0))]
+                       errors = [FunctionNotDefined (Ident "func" (0, 0))]
                      },
                    Call (Ident "func" (0, 0)) [IdentExpr (Ident "x-0" (0, 0)) (0, 0)] (0, 0)
                  )
@@ -272,7 +272,7 @@ spec = do
 
   it "can't rename undeclared ident if it has already been declared in the current scope" $
     renameUndeclaredIdent xScopeAccum (Ident "x" (0, 0))
-      `shouldBe` (xScopeAccum {errors = [SemanticError VariableAlreadyDefined (Ident "x" (0, 0))]}, Ident "x" (0, 0))
+      `shouldBe` (xScopeAccum {errors = [VariableAlreadyDefined (Ident "x" (0, 0))]}, Ident "x" (0, 0))
 
   it "renames declared idents" $
     renameDeclaredIdent xScopeAccum (Ident "x" (0, 0))
@@ -288,7 +288,7 @@ spec = do
                      { scopeMap = fromList [],
                        scopeStack = [0],
                        scopeCounter = 0,
-                       errors = [SemanticError VariableNotDefined (Ident "x" (0, 0))]
+                       errors = [VariableNotDefined (Ident "x" (0, 0))]
                      },
                    Ident "x" (0, 0)
                  )
@@ -299,7 +299,7 @@ spec = do
                      { scopeMap = fromList [(0, [Ident "x-0" (0, 0)])],
                        scopeStack = [3, 2, 1],
                        scopeCounter = 0,
-                       errors = [SemanticError VariableNotDefined (Ident "x" (0, 0))]
+                       errors = [VariableNotDefined (Ident "x" (0, 0))]
                      },
                    Ident "x" (0, 0)
                  )
