@@ -91,13 +91,13 @@ areTypesCompatible (WPair pt1 pt2) (WPair pt1' pt2') pos = do
   return $ validP1 && validP2
 areTypesCompatible ex@(WPair _ _) ac pos = throwError (IncompatibleTypes pos [ex] ac) >> return False
 areTypesCompatible WStr (WArr WChar _) _ = return True
-areTypesCompatible ex@(WArr t dim) ac@(WArr t' dim') pos = do {
+areTypesCompatible ex@(WArr t dim) (WArr t' dim') pos = do {
   isC <- areTypesCompatible (getArrayBaseType t) (getArrayBaseType t') pos;
   if isC && (dim == dim')
     then return True
     else throwTypeError >> return False } `catchError` const throwTypeError
   where
-    throwTypeError = throwError $ IncompatibleTypes pos [ex] ac
+    throwTypeError = throwError $ IncompatibleTypes pos [ex] (getArrayErrorType dim' $ getArrayBaseType t')
 areTypesCompatible ex ac pos
   | ex == ac = return True
   | otherwise  = throwError (IncompatibleTypes pos [ex] ac) >> return False
