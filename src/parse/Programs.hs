@@ -8,33 +8,18 @@ where
 
 import Control.Monad.Combinators
 import Expressions (ident) 
-import Parser (Parser, liftPos4)
-import Text.Megaparsec
+import Parser (Parser)
+import ProgramConstructors
 import Statements (stats, wtype)
+
 import qualified AST 
 import qualified Lexer as L
 
 program :: Parser AST.Program
-program = AST.Program <$> ("begin" *> many func) <*> (stats <* "end")
+program = mkProgram ("begin" *> many func) (stats <* "end")
 
 func :: Parser AST.Func
 func = mkFunc wtype ident (L.parens pParamList) ("is" *> stats <* "end")
-
-mkFunc :: Parser AST.WType -> Parser AST.Ident -> Parser [(AST.WType, AST.Ident)] -> Parser AST.Stats -> Parser AST.Func
-mkFunc t i pl xs = try $ liftPos4 AST.Func t i pl xs >>= isValidFunc
-  where
-    isValidFunc :: AST.Func -> Parser AST.Func
-    isValidFunc f@(AST.Func _ _ _ ys _)
-      | validThroughAllPaths (last ys) = pure f
-      | otherwise = fail "All paths through function must end with either a return or exit"
-
-    validThroughAllPaths :: AST.Stat -> Bool
-    validThroughAllPaths (AST.Return _ _) = True
-    validThroughAllPaths (AST.Exit _ _) = True
-    validThroughAllPaths (AST.If _ ys ys' _) = validThroughAllPaths (last ys) && validThroughAllPaths (last ys')
-    validThroughAllPaths (AST.While _ ys _) = validThroughAllPaths (last ys)
-    validThroughAllPaths (AST.Begin ys) = validThroughAllPaths (last ys)
-    validThroughAllPaths _ = False
 
 pParamList :: Parser [(AST.WType, AST.Ident)]
 pParamList = pParam `sepBy` ","
