@@ -142,7 +142,7 @@ checkRVal (Call ident exprs pos) = do
       exprTypes <- mapM checkExprType exprs
       paramTypes <- mapM getIdentType paramIdents
       -- if paramTypes == exprTypes
-      if length exprTypes == length paramTypes && all (uncurry areTypesCompatible) (zip exprTypes paramTypes)
+      if length exprTypes == length paramTypes && all (\(a, b) -> areTypesCompatible a b pos) (zip exprTypes paramTypes)
           then return funcType
           else compareParamsAndArguments ident paramTypes exprTypes pos
     _ -> throwError $ FunctionNotDefined ident
@@ -184,7 +184,7 @@ checkPairElemType (Fst (LArray arrayElem) pos) = do
   baseType <- getArrayElemBaseType arrayElem
   case baseType of
     WPair t _ -> return t 
-    _ -> throwError $ IncompatibleTypes pos [WPair (WPair WUnit WUnit) (WPair WUnit WUnit)] t
+    t -> throwError $ IncompatibleTypes pos [WPair (WPair WUnit WUnit) (WPair WUnit WUnit)] t
 checkPairElemType (Snd (LIdent ident) pos) = do
   identType <- getIdentType ident
   case identType of
@@ -195,7 +195,7 @@ checkPairElemType (Snd (LArray arrayElem) pos) = do
   baseType <- getArrayElemBaseType arrayElem
   case baseType of
     WPair _ t -> return t
-    _ -> throwError $ IncompatibleTypes pos [WPair (WPair WUnit WUnit) (WPair WUnit WUnit)] t
+    t -> throwError $ IncompatibleTypes pos [WPair (WPair WUnit WUnit) (WPair WUnit WUnit)] t
 
 
 checkExprType :: Expr -> ScopedSemanticAnalyser WType
