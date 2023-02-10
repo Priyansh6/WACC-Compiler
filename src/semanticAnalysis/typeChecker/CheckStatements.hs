@@ -38,7 +38,7 @@ checkStat (Free expr pos) = do
   case wtype of
     WPair _ _ -> return ()
     WArr _ _ -> return ()
-    _ -> throwError $ IncompatibleTypes pos [WPair (WPair WUnit WUnit) (WPair WUnit WUnit), WArr WUnit 0] wtype
+    _ -> throwError $ IncompatibleTypes pos [pairErrorType, arrayErrorType] wtype
 checkStat (Return expr pos) = do
   rtype <- checkExprType expr
   ftype <- ask
