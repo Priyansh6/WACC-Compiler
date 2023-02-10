@@ -75,9 +75,7 @@ printSemanticErrors errs contents fname = putStrLn $ concatMap printSemanticErro
         ++ " | "
         ++ getRow row
         ++ border
-        ++ replicate (col - 1) ' '
-        ++ red
-        ++ "^\n"
+        ++ "\n"
         ++ reset
       where
         line = show row
