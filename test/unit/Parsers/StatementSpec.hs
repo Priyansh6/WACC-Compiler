@@ -4,7 +4,7 @@ module Parsers.StatementSpec (spec) where
 
 import AST
 import Parsers.Test
-import Statements (pSkip, pDecAssign, pFree, pReturn, pExit, pPrint, pCall, rval, lval, stat, stats)
+import Statements (pSkip, pDecAssign, pFree, pReturn, pExit, pPrint, pCall, rval, stat, stats)
 import Test.Hspec
 import Test.Hspec.Megaparsec
 
