@@ -3,7 +3,7 @@
 module Parsers.TypeSpec (spec) where
 
 import AST
-import Statements
+import Statements (wtype, pBaseType, pPairType, pArrType)
 import Parsers.Test
 import Test.Hspec
 import Test.Hspec.Megaparsec
@@ -87,19 +87,19 @@ spec = do
 
   describe "All Types" $ do
     it "type of int" $
-      test pWType "int" `shouldParse` WInt
+      test wtype "int" `shouldParse` WInt
     
     it "type of array" $
-      test pWType "bool[]" `shouldParse` WArr WBool 1
+      test wtype "bool[]" `shouldParse` WArr WBool 1
     
     it "type of pairs" $
-      test pWType "pair(int, int)" `shouldParse` WPair WInt WInt
+      test wtype "pair(int, int)" `shouldParse` WPair WInt WInt
     
     it "type with whitespace" $
-      test pWType "int [] [] " `shouldParse` WArr WInt 2
+      test wtype "int [] [] " `shouldParse` WArr WInt 2
 
     it "fails on nested pairs" $
-      test pWType `shouldFailOn` "pair(pair(pair(pair, int), int), int)"
+      test wtype `shouldFailOn` "pair(pair(pair(pair, int), int), int)"
     
     it "fails on invalid types" $
-      test pWType `shouldFailOn` "dave[]"
+      test wtype `shouldFailOn` "dave[]"
