@@ -74,7 +74,7 @@ checkStat :: Stat -> ScopedSemanticAnalyser ()
 checkStat (DecAssign ltype ident rval pos) = do
   insertAssign ltype ident
   rtype <- checkRVal rval
-  _ <- (areTypesCompatible ltype rtype pos)
+  _ <- areTypesCompatible ltype rtype pos
   return ()
 checkStat (Assign lval rval pos) = do
   ltype <- checkLVal lval
@@ -142,7 +142,8 @@ checkRVal (Call ident exprs pos) = do
       exprTypes <- mapM checkExprType exprs
       paramTypes <- mapM getIdentType paramIdents
       -- if paramTypes == exprTypes
-      if length exprTypes == length paramTypes && all (\(a, b) -> areTypesCompatible a b pos) (zip exprTypes paramTypes)
+      m <- mapM (\(a, b) -> areTypesCompatible a b pos) (zip exprTypes paramTypes)
+      if length exprTypes == length paramTypes && and m
           then return funcType
           else compareParamsAndArguments ident paramTypes exprTypes pos
     _ -> throwError $ FunctionNotDefined ident
@@ -183,7 +184,7 @@ checkPairElemType (Fst lval@(LPair _) pos) = return WUnit
 checkPairElemType (Fst (LArray arrayElem) pos) = do
   baseType <- getArrayElemBaseType arrayElem
   case baseType of
-    WPair t _ -> return t 
+    WPair t _ -> return t
     t -> throwError $ IncompatibleTypes pos [WPair (WPair WUnit WUnit) (WPair WUnit WUnit)] t
 checkPairElemType (Snd (LIdent ident) pos) = do
   identType <- getIdentType ident
@@ -191,7 +192,7 @@ checkPairElemType (Snd (LIdent ident) pos) = do
     WPair _ t -> return t
     t -> throwError $ IncompatibleTypes pos [WPair (WPair WUnit WUnit) (WPair WUnit WUnit)] t
 checkPairElemType (Snd lval@(LPair _) pos) = return WUnit
-checkPairElemType (Snd (LArray arrayElem) pos) = do 
+checkPairElemType (Snd (LArray arrayElem) pos) = do
   baseType <- getArrayElemBaseType arrayElem
   case baseType of
     WPair _ t -> return t
