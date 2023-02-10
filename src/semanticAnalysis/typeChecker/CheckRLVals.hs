@@ -80,10 +80,6 @@ compareParamsAndArguments ident ps as pos
   where
     (pT, aT) = head (dropWhile (uncurry (==)) (zip ps as))
 
-getArrayBaseType :: WType -> WType
-getArrayBaseType (WArr wtype _) = getArrayBaseType wtype
-getArrayBaseType wtype = wtype
-
 areTypesCompatible :: WType -> WType -> Position -> ScopedSemanticAnalyser Bool
 areTypesCompatible WUnit WUnit pos = throwError (IllegalPairExchange pos) >> return False
 areTypesCompatible WUnit _ _ = return True

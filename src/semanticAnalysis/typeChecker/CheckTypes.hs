@@ -4,12 +4,9 @@ module CheckTypes (checkProg) where
 
 import AST
 import Control.Monad.Reader
-import Control.Monad.Except
 import Control.Monad.Trans.Writer ()
 import Control.Monad.State
-import Data.Map ((!))
 import qualified Data.Map as M
-import SemanticErrors
 import CheckStatements 
 import SymbolTable
 

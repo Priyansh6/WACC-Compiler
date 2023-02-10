@@ -6,7 +6,6 @@ import AST
 import SymbolTable
 import CheckExpressions
 import CheckRLVals
-import Data.Map ((!))
 import qualified Data.Map as M
 import SemanticErrors
 import Control.Monad.Reader

@@ -1,11 +1,10 @@
-module CheckExpressions (checkExprType, getArrayElemBaseType) where
+module CheckExpressions (checkExprType, getArrayElemBaseType, getArrayBaseType) where
 
-import SymbolTable
 import AST
-import SemanticErrors
-import Control.Monad.Reader
 import Control.Monad.Except
 import Control.Monad.Trans.Writer ()
+import SemanticErrors
+import SymbolTable
 
 checkExprType :: Expr -> ScopedSemanticAnalyser WType
 checkExprType (IntLiter _ _) = return WInt
@@ -63,8 +62,12 @@ isValidBooleanOperator pos t1 t2 = throwError (semanticError pos [WBool] t1 t2) 
 isValidEquality :: Position -> WType -> WType -> ScopedSemanticAnalyser Bool
 isValidEquality _ (WPair _ _) (WPair _ _) = return True
 isValidEquality pos t1 t2
-  | t1 == t2  = return True
+  | t1 == t2 = return True
   | otherwise = throwError (IncompatibleTypes pos [t1] t2) >> return False
+
+getArrayBaseType :: WType -> WType
+getArrayBaseType (WArr wtype _) = getArrayBaseType wtype
+getArrayBaseType wtype = wtype
 
 getArrayElemBaseType :: ArrayElem -> ScopedSemanticAnalyser WType
 getArrayElemBaseType (ArrayElem ident exprs pos) = do
@@ -72,14 +75,15 @@ getArrayElemBaseType (ArrayElem ident exprs pos) = do
   exprTypes <- mapM checkExprType exprs
   unless (all (== WInt) exprTypes) $ throwError $ IncompatibleTypes pos [WInt] wtype
   case wtype of
-    (WArr baseType dim) -> let dim' = dim - length exprs in
-                            if dim' < 0
-                              then throwError $ IncompatibleTypes pos [WArr baseType (length exprs)] wtype
-                              else if dim' == 0
-                                then return baseType
-                                else return $ WArr baseType (dim - length exprs)
-    _ -> throwError (IncompatibleTypes pos [WArr (head exprTypes) 0] wtype)
-
+    ex@(WArr baseType dim) ->
+      let dim' = dim - length exprs
+       in if dim' < 0
+            then throwError $ IncompatibleTypes pos [ex] (getArrayErrorType (length exprs) $ getArrayBaseType baseType)
+            else
+              if dim' == 0
+                then return baseType
+                else return $ WArr baseType (dim - length exprs)
+    _ -> throwError (IncompatibleTypes pos [arrayErrorType] wtype)
 
 isArrType :: Position -> WType -> ScopedSemanticAnalyser Bool
 isArrType _ (WArr _ _) = return True

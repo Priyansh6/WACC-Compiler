@@ -21,6 +21,17 @@ cyan = esc 36
 bold :: String -> String
 bold s = esc 1 ++ s ++ reset
 
+pairErrorType :: WType
+pairErrorType = WPair (WPair WUnit WUnit) (WPair WUnit WUnit)
+
+arrayErrorType :: WType
+arrayErrorType = WArr WUnit 0
+
+-- Creates a nested array type with given dimensionality
+getArrayErrorType :: Int -> WType -> WType
+getArrayErrorType 0 t = t
+getArrayErrorType n t = WArr (getArrayErrorType (n - 1) t) 0
+
 type Expectation = [WType]
 
 type Actual = WType
@@ -52,11 +63,19 @@ printSemanticErrors errs contents fname = putStrLn $ concatMap printSemanticErro
 
     previewCode :: Position -> String
     previewCode (row, col) =
-      border ++ "...\n"
+      border
+        ++ "...\n"
         ++ (if row > 2 then cyan ++ show (row - 2) ++ " | " ++ reset ++ getRow (row - 2) else "")
         ++ (if row > 1 then cyan ++ show (row - 1) ++ " | " ++ reset ++ getRow (row - 1) else "")
-        ++ red ++ line ++ " | " ++ getRow row
-        ++ border ++ replicate (col - 1) ' ' ++ red ++ "^\n" ++ reset
+        ++ red
+        ++ line
+        ++ " | "
+        ++ getRow row
+        ++ border
+        ++ replicate (col - 1) ' '
+        ++ red
+        ++ "^\n"
+        ++ reset
       where
         line = show row
         border = cyan ++ replicate (length line) ' ' ++ " | " ++ reset
@@ -89,7 +108,7 @@ showWType t = case t of
   WChar -> "Character"
   WStr -> "String"
   (WArr WUnit _) -> "any Array"
-  (WArr wt _) -> "Array of " ++ showWType wt ++ "s"
+  (WArr wt _) -> showWType wt ++ "[]"
   (WPair (WPair _ _) (WPair _ _)) -> "any Pair"
   (WPair f s) -> "(" ++ showWType f ++ ", " ++ showWType s ++ ")"
 
