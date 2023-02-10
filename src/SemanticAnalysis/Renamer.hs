@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module SemanticAnalysis.Renamer (module SemanticAnalysis.Renamer) where
 
 import AST
@@ -190,7 +192,7 @@ renamePairElem scopeAccum (Snd lVal pos) = mapSndFunc pos $ chain renameLVal lVa
 
 addScopeToIdent :: Int -> Ident -> Ident
 addScopeToIdent scope (Ident i pos) =
-  Ident ((T.append i . T.append (T.singleton '-') . T.pack . show) scope) pos
+  Ident (T.append (T.snoc i '-') (T.pack (show scope))) pos
 
 getOriginalIdent :: Ident -> Ident
 getOriginalIdent (Ident i pos) = Ident (T.takeWhile ('-' /=) i) pos
