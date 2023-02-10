@@ -87,4 +87,4 @@ getArrayElemBaseType (ArrayElem ident exprs pos) = do
 
 isArrType :: Position -> WType -> ScopedSemanticAnalyser Bool
 isArrType _ (WArr _ _) = return True
-isArrType pos t = throwError (IncompatibleTypes pos [WArr WUnit 0] t) >> return False
+isArrType pos t = throwError (IncompatibleTypes pos [arrayErrorType] t) >> return False

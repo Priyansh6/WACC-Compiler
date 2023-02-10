@@ -54,24 +54,24 @@ checkPairElemType (Fst (LIdent ident) pos) = do
   identType <- getIdentType ident
   case identType of
     WPair t _ -> return t
-    actual -> throwError $ IncompatibleTypes pos [WPair (WPair WUnit WUnit) (WPair WUnit WUnit)] actual
+    actual -> throwError $ IncompatibleTypes pos [pairErrorType] actual
 checkPairElemType (Fst (LPair _) _) = return WUnit
 checkPairElemType (Fst (LArray arrayElem) pos) = do
   baseType <- getArrayElemBaseType arrayElem
   case baseType of
     WPair t _ -> return t
-    t -> throwError $ IncompatibleTypes pos [WPair (WPair WUnit WUnit) (WPair WUnit WUnit)] t
+    t -> throwError $ IncompatibleTypes pos [pairErrorType] t
 checkPairElemType (Snd (LIdent ident) pos) = do
   identType <- getIdentType ident
   case identType of
     WPair _ t -> return t
-    t -> throwError $ IncompatibleTypes pos [WPair (WPair WUnit WUnit) (WPair WUnit WUnit)] t
+    t -> throwError $ IncompatibleTypes pos [pairErrorType] t
 checkPairElemType (Snd (LPair _) _) = return WUnit
 checkPairElemType (Snd (LArray arrayElem) pos) = do
   baseType <- getArrayElemBaseType arrayElem
   case baseType of
     WPair _ t -> return t
-    t -> throwError $ IncompatibleTypes pos [WPair (WPair WUnit WUnit) (WPair WUnit WUnit)] t
+    t -> throwError $ IncompatibleTypes pos [pairErrorType] t
 
 compareParamsAndArguments :: Ident -> [WType] -> [WType] -> Position -> ScopedSemanticAnalyser WType
 compareParamsAndArguments ident ps as pos
@@ -89,14 +89,15 @@ areTypesCompatible (WPair pt1 pt2) (WPair pt1' pt2') pos = do
   validP1 <- areTypesCompatible pt1 pt1' pos
   validP2 <- areTypesCompatible pt2 pt2' pos
   return $ validP1 && validP2
-areTypesCompatible ex@(WPair _ _) ac pos = throwError (typeError pos ex ac) >> return False
+areTypesCompatible ex@(WPair _ _) ac pos = throwError (IncompatibleTypes pos [ex] ac) >> return False
 areTypesCompatible WStr (WArr WChar _) _ = return True
-areTypesCompatible ex@(WArr t dim) ac@(WArr t' dim') pos = do
-  isC <- areTypesCompatible (getArrayBaseType t) (getArrayBaseType t') pos
+areTypesCompatible ex@(WArr t dim) ac@(WArr t' dim') pos = do {
+  isC <- areTypesCompatible (getArrayBaseType t) (getArrayBaseType t') pos;
   if isC && (dim == dim')
     then return True
-    else throwError (typeError pos ex ac) >> return False
-
+    else throwTypeError >> return False } `catchError` const throwTypeError
+  where
+    throwTypeError = throwError $ IncompatibleTypes pos [ex] ac
 areTypesCompatible ex ac pos
   | ex == ac = return True
-  | otherwise  = throwError (typeError pos ex ac) >> return False
+  | otherwise  = throwError (IncompatibleTypes pos [ex] ac) >> return False

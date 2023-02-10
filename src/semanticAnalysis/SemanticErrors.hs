@@ -124,6 +124,3 @@ getPosition (IllegalPairExchange pos) = pos
 
 semanticError :: Position -> [WType] -> WType -> WType -> SemanticError
 semanticError pos validTypes t1 t2 = IncompatibleTypes pos validTypes $ if t1 `elem` validTypes then t2 else t1
-
-typeError :: Position -> WType -> WType -> SemanticError
-typeError pos ex = IncompatibleTypes pos [ex]
