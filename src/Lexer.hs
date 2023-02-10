@@ -41,7 +41,7 @@ ident = token $ do
   c <- C.char '_' <|> C.letterChar
   cs <- many (C.char '_' <|> C.alphaNumChar)
   if (c:cs) `elem` keywords 
-    then fail "ident is a keyword!"
+    then fail $ c:cs ++ " is a reserved keyword"
     else return (T.pack (c:cs))
 
 number :: Parser Integer
@@ -50,8 +50,9 @@ number
   where
     validWACCInteger :: Integer -> Parser Integer
     validWACCInteger x
-      | x <= biggestWaccInt && x >= smallestWaccInt = pure x
-      | otherwise = fail "Int literal outside of valid bounds!"
+      | x > biggestWaccInt = fail "Integer is too big (more than 2^31)"
+      | x < smallestWaccInt = fail "Integer is too small (less than -2^31)"
+      | otherwise = pure x
 
     biggestWaccInt = 2 ^ (31 :: Integer) 
     smallestWaccInt = -(2 ^ (31 :: Integer))

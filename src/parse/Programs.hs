@@ -23,7 +23,7 @@ mkFunc = try $ liftPos4 AST.Func pWType mkIdent (L.parens pParamList) ("is" *> p
     vFunc :: AST.Func -> Parser AST.Func
     vFunc f@(AST.Func _ _ _ xs _)
       | validThroughAllPaths (last xs) = pure f
-      | otherwise = fail "All paths through function must end with either a return or exit statement!"
+      | otherwise = fail "All paths through function must end with either a return or exit"
 
     validThroughAllPaths :: AST.Stat -> Bool
     validThroughAllPaths (AST.Return _ _) = True
