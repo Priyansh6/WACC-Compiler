@@ -95,9 +95,13 @@ areTypesCompatible ex@(WArr t dim) (WArr t' dim') pos = do {
   isC <- areTypesCompatible (getArrayBaseType t) (getArrayBaseType t') pos;
   if isC && (dim == dim')
     then return True
-    else throwTypeError >> return False } `catchError` const throwTypeError
+    else throwError typeError >> return False } `catchError` arrayCompatibilityHandler typeError
   where
-    throwTypeError = throwError $ IncompatibleTypes pos [ex] (getArrayErrorType dim' $ getArrayBaseType t')
+   typeError = IncompatibleTypes pos [ex] (getArrayErrorType dim' $ getArrayBaseType t')
 areTypesCompatible ex ac pos
   | ex == ac = return True
   | otherwise  = throwError (IncompatibleTypes pos [ex] ac) >> return False
+
+arrayCompatibilityHandler :: SemanticError -> SemanticError -> ScopedSemanticAnalyser Bool
+arrayCompatibilityHandler _ e@(IllegalPairExchange _) = throwError e
+arrayCompatibilityHandler e _ = throwError e
