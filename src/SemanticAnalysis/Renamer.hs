@@ -1,11 +1,11 @@
-module Renamer (module Renamer) where
+module SemanticAnalysis.Renamer (module SemanticAnalysis.Renamer) where
 
 import AST
 import qualified Data.List as L
 import qualified Data.Map as M
 import Data.Maybe
 import qualified Data.Text as T
-import SemanticErrors
+import SemanticAnalysis.SemanticErrors
 
 type ScopeMap = M.Map Int [Ident]
 
@@ -68,7 +68,7 @@ rename prog =
   mapFst (\sa -> (scopeMap sa, reverse $ errors sa)) (renameProg initialScopeAccum prog)
 
 addFuncName :: ScopeAccum -> Func -> ScopeAccum
-addFuncName scopeAccum (Func _ name@(Ident i pos) _ _ _)
+addFuncName scopeAccum (Func _ name@(Ident _ _) _ _ _)
   | name `L.elem` getScopedVars scopeAccum 0 = scopeAccum {errors = FunctionAlreadyDefined name : errors scopeAccum}
   | otherwise                                = scopeAccum'
   where

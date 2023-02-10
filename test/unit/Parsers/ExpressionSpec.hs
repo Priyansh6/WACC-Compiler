@@ -7,7 +7,6 @@ import Expressions
 import Parsers.Test
 import Test.Hspec
 import Test.Hspec.Megaparsec
-import Expressions (pExpr)
 
 spec :: Spec
 spec = do

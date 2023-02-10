@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module SymbolTable (checkProg) where
+module SemanticAnalysis.SymbolTable (checkProg) where
 
 import AST
 import Control.Monad.Reader
@@ -9,18 +9,16 @@ import Control.Monad.Trans.Writer ()
 import Control.Monad.State
 import Data.Map ((!))
 import qualified Data.Map as M
-import qualified Data.Text as T
-import SemanticErrors
+-- import qualified Data.Text as T
+import SemanticAnalysis.SemanticErrors
 
--------------------
 type Env = Maybe WType
--------------------
 
 type SymbolTable = M.Map Ident IdentType
 
 data IdentType =  FuncType WType [Ident]
                 | VarType WType
-                | ParamType WType
+               -- | ParamType WType
                 | ArrType WType Int
                 | PairType WType WType
                 deriving(Show, Eq)
@@ -43,9 +41,9 @@ isArrType :: Position -> WType -> ScopedSemanticAnalyser Bool
 isArrType _ (WArr _ _) = return True
 isArrType pos t = throwError (IncompatibleTypes pos [WArr WUnit 0] t) >> return False
 
-isPairType :: WType -> Bool
-isPairType (WPair _ _) = True
-isPairType _ = False
+-- isPairType :: WType -> Bool
+-- isPairType (WPair _ _) = True
+-- isPairType _ = False
 
 checkProg :: Program -> SemanticAnalyser ()
 checkProg (Program funcs stats) = addFuncsToSymbolTable funcs >> checkFuncs funcs >> runReaderT (checkStats stats) Nothing
@@ -63,7 +61,7 @@ addFuncToSymbolTable (Func wtype ident params _ _) = do
   insertParams params
 
 checkFunc :: Func -> SemanticAnalyser ()
-checkFunc (Func wtype ident params stats pos) = runReaderT (checkStats stats) (Just wtype)
+checkFunc (Func wtype _ _ stats _) = runReaderT (checkStats stats) (Just wtype)
 
 checkStats :: Stats -> ScopedSemanticAnalyser ()
 checkStats = mapM_ checkStat
@@ -117,7 +115,7 @@ checkStat Skip = return ()
 
 checkRVal :: RVal -> ScopedSemanticAnalyser WType
 checkRVal (RExpr expr) = checkExprType expr
-checkRVal (ArrayLiter [] pos) = return $ WArr WUnit 1
+checkRVal (ArrayLiter [] _) = return $ WArr WUnit 1
 checkRVal (ArrayLiter exprs pos) = do
   wtypes <- mapM checkExprType exprs
   if all (== head wtypes) wtypes
@@ -125,7 +123,7 @@ checkRVal (ArrayLiter exprs pos) = do
       (WArr _ dim) -> return $ WArr (getArrayBaseType (head wtypes)) (dim + 1)
       _ -> return $ WArr (head wtypes) 1
     else throwError $ IncompatibleTypes pos [head wtypes] (head (dropWhile (== head wtypes) wtypes))
-checkRVal (NewPair e1 e2 pos) = do
+checkRVal (NewPair e1 e2 _) = do
   wtype1 <- checkExprType e1
   wtype2 <- checkExprType e2
   let wtype1' = erasePairType wtype1
@@ -178,7 +176,7 @@ checkPairElemType (Fst (LIdent ident) pos) = do
   case identType of
     WPair t _ -> return t
     actual -> throwError $ IncompatibleTypes pos [WPair (WPair WUnit WUnit) (WPair WUnit WUnit)] actual
-checkPairElemType (Fst lval@(LPair _) pos) = return WUnit
+checkPairElemType (Fst (LPair _) _) = return WUnit
 checkPairElemType (Fst (LArray arrayElem) pos) = do
   baseType <- getArrayElemBaseType arrayElem
   case baseType of
@@ -189,7 +187,7 @@ checkPairElemType (Snd (LIdent ident) pos) = do
   case identType of
     WPair _ t -> return t
     t -> throwError $ IncompatibleTypes pos [WPair (WPair WUnit WUnit) (WPair WUnit WUnit)] t
-checkPairElemType (Snd lval@(LPair _) _) = return WUnit
+checkPairElemType (Snd (LPair _) _) = return WUnit
 checkPairElemType (Snd (LArray arrayElem) pos) = do
   baseType <- getArrayElemBaseType arrayElem
   case baseType of

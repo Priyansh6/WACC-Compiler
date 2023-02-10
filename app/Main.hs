@@ -3,8 +3,9 @@
 module Main (main) where
 
 import Programs (pProgram)
-import Renamer (rename)
-import SymbolTable (checkProg)
+import SemanticAnalysis.Renamer (rename)
+import SemanticAnalysis.SymbolTable (checkProg)
+import SemanticAnalysis.SemanticErrors (printSemanticErrors)
 
 import Control.Monad.Except
 import Control.Monad.Trans.State
@@ -14,7 +15,6 @@ import System.Exit
 import qualified Data.Map as M
 import qualified Data.Text.IO as TIO
 import qualified Lexer as L
-import SemanticErrors
 
 main :: IO ()
 main = do 

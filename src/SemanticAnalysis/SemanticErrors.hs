@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module SemanticErrors (module SemanticErrors) where
+module SemanticAnalysis.SemanticErrors (module SemanticAnalysis.SemanticErrors) where
 
 import AST
 import Data.List (intercalate)
