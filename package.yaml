@@ -22,10 +22,14 @@ description:         Please see the README on GitHub at <https://github.com/gith
 dependencies:
 - base >= 4.7 && < 5
 - text
+- containers
 - megaparsec
 - hspec-megaparsec
 - parser-combinators
 - hspec
+- transformers
+- mtl
+- filepath
 
 ghc-options:
 - -Wall
@@ -42,6 +46,8 @@ library:
   source-dirs: 
   - src
   - src/parse
+  - src/semanticAnalysis
+  - src/semanticAnalysis/typeChecker
 
 executables:
   WACC40-exe:

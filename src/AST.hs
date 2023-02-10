@@ -79,7 +79,13 @@ data Expr
   | (:||:) Expr Expr Position
   deriving (Show, Eq)
 
-data Ident = Ident T.Text Position deriving (Show, Eq)
+data Ident = Ident T.Text Position deriving (Show)
+
+instance Ord Ident where
+  compare (Ident t _) (Ident t' _) = compare t t'
+
+instance Eq Ident where
+  (Ident t _) == (Ident t' _) = t == t'
 
 data ArrayElem = ArrayElem Ident [Expr] Position deriving (Show, Eq)
 

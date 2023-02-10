@@ -2,65 +2,37 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Statements 
-  ( pStats
-  , pStat
-  , pWType
-  , pSkip
-  , mkDecAssign
-  , mkAssign
-  , mkRead
-  , pBaseType
-  , pArrType
-  , pPairType
-  , pLVal
-  , pRVal
-  , mkFree
-  , mkReturn
-  , mkCall
-  , pPrint
-  , mkExit
-  ) where
+  ( wtype,
+    pBaseType,
+    pArrType,
+    pPairType,
+    stats,
+    stat,
+    pSkip,
+    pDecAssign,
+    pAssign,
+    pRead,
+    lval,
+    rval,
+    pFree,
+    pReturn,
+    pCall,
+    pPrint,
+    pExit,
+  ) 
+where
 
-import Expressions (pExpr, mkArrayElem, mkIdent)
-import Parser (Parser, liftPos1, liftPos2, liftPos3) 
+import Expressions (expr, arrayElem, ident)
+import Parser (Parser)
+import StatementConstructors
 import Text.Megaparsec
+
 import qualified AST 
 import qualified Lexer as L
 
-pStats :: Parser AST.Stats
-pStats = pStat `sepBy1` ";"
-
-pStat :: Parser AST.Stat
-pStat = choice 
-  [
-    pSkip,
-    mkDecAssign,
-    mkAssign,
-    mkRead,
-    mkFree,
-    mkReturn,
-    mkExit,
-    pPrint,
-    pPrintln,
-    mkIf,
-    pWhile,
-    pBegin
-  ]
-
-pSkip :: Parser AST.Stat
-pSkip = AST.Skip <$ "skip"
-
-mkDecAssign :: Parser AST.Stat
-mkDecAssign = liftPos3 AST.DecAssign pWType mkIdent ("=" *> pRVal)
-
-mkAssign :: Parser AST.Stat
-mkAssign = liftPos2 AST.Assign pLVal ("=" *> pRVal)
-
-mkRead :: Parser AST.Stat
-mkRead = liftPos1 AST.Read ("read" *> pLVal)
-
-pWType :: Parser AST.WType
-pWType = pArrType <|> pPairType <|> pBaseType 
+-- Type Parsers
+wtype :: Parser AST.WType
+wtype = pArrType <|> pPairType <|> pBaseType 
 
 pBaseType :: Parser AST.WType 
 pBaseType = choice 
@@ -80,94 +52,89 @@ pPairType :: Parser AST.WType
 pPairType = AST.WPair <$> ("pair" *> "(" *> pPairElemType) <*> ("," *> pPairElemType <* ")")
   where
     pPairElemType :: Parser AST.WType
-    pPairElemType = pArrType <|> (AST.WUnit <$ "pair") <|> pBaseType 
+    pPairElemType = pArrType <|> (AST.WPair AST.WUnit AST.WUnit <$ "pair") <|> pBaseType 
 
-pLVal :: Parser AST.LVal 
-pLVal = (AST.LArray <$> mkArrayElem) <|> (AST.LPair <$> pPairElem) <|> (AST.LIdent <$> mkIdent)
+-- Statement Parsers
+stats :: Parser AST.Stats
+stats = stat `sepBy1` ";"
 
-pRVal :: Parser AST.RVal
-pRVal = choice 
-  [ AST.RExpr <$> pExpr
-  , mkArrLiter
-  , mkNewPair
-  , AST.RPair <$> pPairElem
-  , mkCall
+stat :: Parser AST.Stat
+stat = choice 
+  [
+    pSkip,
+    pDecAssign,
+    pAssign,
+    pRead,
+    pFree,
+    pReturn,
+    pExit,
+    pPrint,
+    pPrintln,
+    pIf, 
+    pWhile,
+    pBegin
   ]
 
-pArrLiter :: Parser [AST.Expr]
-pArrLiter = L.brackets (pExpr `sepBy` ",")
+pSkip :: Parser AST.Stat
+pSkip = AST.Skip <$ "skip"
 
-mkArrLiter :: Parser AST.RVal
-mkArrLiter = liftPos1 AST.ArrayLiter pArrLiter
+pDecAssign :: Parser AST.Stat
+pDecAssign = mkDecAssign wtype ident ("=" *> rval)
 
-pNewPairFstExpr :: Parser AST.Expr
-pNewPairFstExpr = "newpair" *> "(" *> pExpr
+pAssign :: Parser AST.Stat
+pAssign = mkAssign lval ("=" *> rval)
 
-pNewPairSndExpr :: Parser AST.Expr
-pNewPairSndExpr = "," *> pExpr <* ")"
+pRead :: Parser AST.Stat
+pRead = mkRead $ "read" *> lval
 
-mkNewPair :: Parser AST.RVal
-mkNewPair = liftPos2 AST.NewPair pNewPairFstExpr pNewPairSndExpr
+pFree :: Parser AST.Stat
+pFree = mkFree $ "free" *> expr
 
-pPairElem :: Parser AST.PairElem
-pPairElem = mkPairFst <|> mkPairSnd
+pReturn :: Parser AST.Stat
+pReturn = mkReturn $ "return" *> expr
 
-mkPairFst :: Parser AST.PairElem
-mkPairFst = liftPos1 AST.Fst ("fst" *> pLVal)
-
-mkPairSnd :: Parser AST.PairElem
-mkPairSnd = liftPos1 AST.Snd ("snd" *> pLVal)
-
-mkCall :: Parser AST.RVal
-mkCall = liftPos2 AST.Call ("call" *> mkIdent) (L.parens pArgsList)
-
-pArgsList :: Parser [AST.Expr]
-pArgsList = pExpr `sepBy` ","
-
-pFree :: Parser AST.Expr
-pFree = "free" *> pExpr
-
-mkFree :: Parser AST.Stat
-mkFree = liftPos1 AST.Free pFree
-
-pReturn :: Parser AST.Expr
-pReturn = "return" *> pExpr
-
-mkReturn :: Parser AST.Stat
-mkReturn = liftPos1 AST.Return pReturn
-
-pExit :: Parser AST.Expr
-pExit = "exit" *> pExpr
-
-mkExit :: Parser AST.Stat
-mkExit = liftPos1 AST.Exit pExit
+pExit :: Parser AST.Stat
+pExit = mkExit $ "exit" *> expr
 
 pPrint :: Parser AST.Stat
-pPrint = AST.Print <$> ("print" *> pExpr)
+pPrint = AST.Print <$> ("print" *> expr)
 
 pPrintln :: Parser AST.Stat
-pPrintln = AST.Println <$> ("println" *> pExpr)
+pPrintln = AST.Println <$> ("println" *> expr)
 
-pIfExpr :: Parser AST.Expr
-pIfExpr = "if" *> pExpr
-
-pIfBranchA :: Parser AST.Stats
-pIfBranchA = "then" *> pStats
-
-pIfBranchB :: Parser AST.Stats
-pIfBranchB = "else" *> pStats <* "fi"
-
-mkIf :: Parser AST.Stat
-mkIf = liftPos3 AST.If pIfExpr pIfBranchA pIfBranchB
-
-pWhileExpr :: Parser AST.Expr
-pWhileExpr = "while" *> pExpr
-
-pWhileBody :: Parser AST.Stats
-pWhileBody = "do" *> pStats <* "done"
+pIf :: Parser AST.Stat
+pIf = mkIf ("if" *> expr) ("then" *> stats) ("else" *> stats <* "fi")
 
 pWhile :: Parser AST.Stat
-pWhile = liftPos2 AST.While pWhileExpr pWhileBody
+pWhile = mkWhile ("while" *> expr) ("do" *> stats <* "done")
 
 pBegin :: Parser AST.Stat
-pBegin = AST.Begin <$> ("begin" *> pStats <* "end")
+pBegin = AST.Begin <$> ("begin" *> stats <* "end")
+
+-- LVal Parsers
+lval :: Parser AST.LVal 
+lval = (AST.LArray <$> arrayElem) <|> (AST.LPair <$> pPairElem) <|> (AST.LIdent <$> ident)
+
+-- pPairElem is common to both LVals and RVals
+
+pPairElem :: Parser AST.PairElem
+pPairElem = mkPairElem ("fst" *> lval) ("snd" *> lval)
+
+-- RVal Parsers
+rval :: Parser AST.RVal
+rval = choice 
+  [ AST.RExpr <$> expr
+  , pArrLiter
+  , pNewPair
+  , AST.RPair <$> pPairElem
+  , pCall
+  ]
+
+pArrLiter :: Parser AST.RVal
+pArrLiter = mkArrLiter (L.brackets (expr `sepBy` ","))
+
+pNewPair :: Parser AST.RVal
+pNewPair = mkNewPair ("newpair" *> "(" *> expr) ("," *> expr <* ")")
+
+pCall :: Parser AST.RVal
+pCall = mkCall ("call" *> ident) (L.parens (expr `sepBy` ","))
