@@ -25,7 +25,7 @@ bold :: String -> String
 bold s = color 1 ++ s ++ reset
 
 pairErrorType :: WType
-pairErrorType = WPair (WPair WUnit WUnit) (WPair WUnit WUnit)
+pairErrorType = WPair (WPair WInt WInt) (WPair WInt WInt)
 
 arrayErrorType :: WType
 arrayErrorType = WArr WUnit 0
@@ -96,8 +96,8 @@ errorMessage semErr = case semErr of
     "The function "
       ++ func
       ++ if actual < expected
-        then " is missing " ++ bold (show (expected - actual)) ++ yellow ++ "arguments"
-        else " takes " ++ bold (show expected) ++ yellow ++ "arguments" ++ "but " ++ bold (show actual) ++ yellow ++ " were given"
+        then " is missing " ++ bold (show (expected - actual)) ++ yellow ++ " arguments"
+        else " takes " ++ bold (show expected) ++ yellow ++ " arguments but " ++ bold (show actual) ++ yellow ++ " were given"
     where
       func = bold (show i) ++ yellow
   IllegalReturn _ -> "Return statements outside of functions are not allowed\n" ++ reset
@@ -105,14 +105,15 @@ errorMessage semErr = case semErr of
 
 showWType :: WType -> String
 showWType t = case t of
-  WUnit -> "Pair"
+  WUnit -> ""
   WInt -> "Integer"
   WBool -> "Boolean"
   WChar -> "Character"
   WStr -> "String"
   (WArr WUnit _) -> "any Array"
   (WArr wt _) -> showWType wt ++ "[]"
-  (WPair (WPair _ _) (WPair _ _)) -> "any Pair"
+  (WPair (WPair WInt WInt) (WPair WInt WInt)) -> "any Pair"
+  (WPair WUnit WUnit) -> "Pair"
   (WPair f s) -> "(" ++ showWType f ++ ", " ++ showWType s ++ ")"
 
 getPosition :: SemanticError -> Position
