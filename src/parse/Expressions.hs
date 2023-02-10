@@ -20,7 +20,7 @@ ident :: Parser AST.Ident
 ident = mkIdent L.ident
 
 arrayElem :: Parser AST.ArrayElem
-arrayElem = mkArrayElem ident pArrayElemExprs
+arrayElem = try $ mkArrayElem ident pArrayElemExprs
 
 pBool :: Parser Bool
 pBool = (True <$ "true") <|> (False <$ "false")
