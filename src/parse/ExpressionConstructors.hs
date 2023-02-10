@@ -1,5 +1,6 @@
 module ExpressionConstructors
-  ( mkIdent,
+  ( mkExpr,
+    mkIdent,
     mkArrayElem,
     mkIdentExpr,
     mkArrayExpr,
@@ -17,6 +18,9 @@ import Text.Megaparsec (label)
 
 import qualified AST
 import qualified Data.Text as T
+
+mkExpr :: Parser AST.Expr -> Parser AST.Expr
+mkExpr = label "expression"
 
 mkIdent :: Parser T.Text -> Parser AST.Ident
 mkIdent = label "identifier" . liftPos1 AST.Ident 
