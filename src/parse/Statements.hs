@@ -76,7 +76,7 @@ stat = choice
   ]
 
 pSkip :: Parser AST.Stat
-pSkip = AST.Skip <$ "skip"
+pSkip = mkSkip "skip"
 
 pDecAssign :: Parser AST.Stat
 pDecAssign = mkDecAssign wtype ident ("=" *> rval)
@@ -97,10 +97,10 @@ pExit :: Parser AST.Stat
 pExit = mkExit $ "exit" *> expr
 
 pPrint :: Parser AST.Stat
-pPrint = AST.Print <$> ("print" *> expr)
+pPrint = mkPrint ("print" *> expr)
 
 pPrintln :: Parser AST.Stat
-pPrintln = AST.Println <$> ("println" *> expr)
+pPrintln = mkPrintln ("println" *> expr)
 
 pIf :: Parser AST.Stat
 pIf = mkIf ("if" *> expr) ("then" *> stats) ("else" *> stats <* "fi")
@@ -109,7 +109,7 @@ pWhile :: Parser AST.Stat
 pWhile = mkWhile ("while" *> expr) ("do" *> stats <* "done")
 
 pBegin :: Parser AST.Stat
-pBegin = AST.Begin <$> ("begin" *> stats <* "end")
+pBegin = mkBegin ("begin" *> stats <* "end")
 
 -- LVal Parsers
 lval :: Parser AST.LVal 

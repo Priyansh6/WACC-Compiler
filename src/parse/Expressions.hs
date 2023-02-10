@@ -50,7 +50,7 @@ pTerm = try $ choice
     L.parens expr ]
 
 expr :: Parser AST.Expr
-expr = makeExprParser pTerm operatorTable
+expr = mkExpr $ makeExprParser pTerm operatorTable 
 
 operatorTable :: [[Operator Parser AST.Expr]]
 operatorTable = 
@@ -74,7 +74,7 @@ operatorTable =
   , [ binary "||"  (deferLiftPos2 (AST.:||:)) ]]
 
 binary :: Parser () -> Parser (AST.Expr -> AST.Expr -> AST.Expr) -> Operator Parser AST.Expr
-binary s c = InfixL (c <* s)
+binary s c = InfixL (c <* s <?> "binary operator")
 
 prefix :: Parser () -> Parser (AST.Expr -> AST.Expr) -> Operator Parser AST.Expr
-prefix s c = Prefix (c <* s)
+prefix s c = Prefix (c <* s <?> "unary operator")
