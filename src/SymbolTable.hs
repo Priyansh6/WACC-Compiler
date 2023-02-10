@@ -271,9 +271,6 @@ insertParams = mapM_ (uncurry insertParam)
 insertParam :: WType -> Ident -> SemanticAnalyser ()
 insertParam wtype ident = modify $ M.insert ident (VarType wtype)
 
-typeError :: Position -> WType -> WType -> SemanticError
-typeError pos ex = IncompatibleTypes pos [ex]
-
 areTypesCompatible :: WType -> WType -> Position -> ScopedSemanticAnalyser Bool
 areTypesCompatible WUnit WUnit pos = throwError (IllegalPairExchange pos) >> return False
 areTypesCompatible WUnit _ _ = return True
@@ -283,17 +280,16 @@ areTypesCompatible (WPair pt1 pt2) (WPair pt1' pt2') pos = do
   validP1 <- areTypesCompatible pt1 pt1' pos
   validP2 <- areTypesCompatible pt2 pt2' pos
   return $ validP1 && validP2
-areTypesCompatible ex@(WPair _ _) ac pos = throwError (typeError pos ex ac) >> return False
+areTypesCompatible ex@(WPair _ _) ac pos = throwError (IncompatibleTypes pos [ex] ac) >> return False
 areTypesCompatible WStr (WArr WChar _) _ = return True
 areTypesCompatible ex@(WArr t dim) ac@(WArr t' dim') pos = do
   isC <- areTypesCompatible (getArrayBaseType t) (getArrayBaseType t') pos
   if isC && (dim == dim')
     then return True
-    else throwError (typeError pos ex ac) >> return False
-  
+    else throwError (IncompatibleTypes pos [ex] ac) >> return False
 areTypesCompatible ex ac pos
   | ex == ac = return True
-  | otherwise  = throwError (typeError pos ex ac) >> return False
+  | otherwise  = throwError (IncompatibleTypes pos [ex] ac) >> return False
 
 getArrayElemBaseType :: ArrayElem -> ScopedSemanticAnalyser WType
 getArrayElemBaseType (ArrayElem ident exprs pos) = do
@@ -307,7 +303,7 @@ getArrayElemBaseType (ArrayElem ident exprs pos) = do
                               else if dim' == 0
                                 then return baseType
                                 else return $ WArr baseType (dim - length exprs)
-    _ -> throwError (IncompatibleTypes pos [WArr (head exprTypes) 0] wtype)
+    _ -> throwError (IncompatibleTypes pos [WArr WUnit 0] wtype)
 
 getArrayBaseType :: WType -> WType
 getArrayBaseType (WArr wtype _) = getArrayBaseType wtype
