@@ -153,7 +153,7 @@ mkNewPair :: Parser AST.Expr -> Parser AST.Expr -> Parser AST.RVal
 mkNewPair = liftPos2 AST.NewPair 
 
 mkPairElem :: Parser AST.LVal -> Parser AST.LVal -> Parser AST.PairElem
-mkPairElem l r = liftPos1 AST.Fst l <|> liftPos1 AST.Fst r
+mkPairElem l r = liftPos1 AST.Fst l <|> liftPos1 AST.Snd r
 
 mkCall :: Parser AST.Ident -> Parser [AST.Expr] -> Parser AST.RVal
 mkCall = liftPos2 AST.Call 
