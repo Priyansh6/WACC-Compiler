@@ -1,17 +1,92 @@
-FULL_COMPILATION = True
 VIEW_HASKELL_OUTPUT = False
 TESTS = [
 	"invalid/semanticErr",
 	"invalid/syntaxErr",
 	"valid",
 ]
-SKIP_OUTPUT_TESTS_FOR_VALID = True
 
+from os import path as os_path, remove
+from pathlib import Path
 import subprocess
-import argparse
-from sys import argv, exit as sys_exit
-from os import path as os_path
-import pathlib
+from sys import argv
+
+SKIP_OUTPUT_TESTS = True # len(argv) < 2 or argv[1] != "-o"
+
+BLUE = "\033[0;34m"
+GREEN = "\033[0;32m"
+LIGHT_RED = "\033[1;31m"
+RED = "\033[0;31m"
+YELLOW = "\033[1;33m"
+BOLD = "\033[1m"
+END = "\033[0m"
+
+PASSED = GREEN + "." + END
+FAILED_EXIT = RED + "E" + END
+FAILED_OUTPUT = RED + "O" + END
+SKIPPED = YELLOW + "-" + END
+
+failedTests = []
+
+def integrationTests():
+	print(PASSED, "passed")
+	print(FAILED_EXIT, "wrong exit code")
+	print(FAILED_OUTPUT, "wrong output")
+	print(SKIPPED, "skipped")
+	testSummary = ""
+	skippedTests = totalTests = 0
+	for testDir in TESTS:
+		print("\n" + testDir)
+		for waccFilename in Path("./test/integration/" + testDir).rglob("*.wacc"):
+			totalTests += 1
+			result = subprocess.run(
+				["sh", "compile", waccFilename],
+				stdout=None if VIEW_HASKELL_OUTPUT else subprocess.DEVNULL
+			)
+
+			expectedExit = getExpectedExit(waccFilename)
+			actualExit = result.returncode
+			if expectedExit != actualExit:
+				testSummary += addTestResult(FAILED_EXIT, waccFilename, f"Exit code: {expectedExit}", f"Exit code: {actualExit}")
+				continue
+			if expectedExit != 0:
+				testSummary += addTestResult(PASSED)
+				continue
+
+			basename = os_path.splitext(os_path.basename(waccFilename))[0]
+
+			if SKIP_OUTPUT_TESTS:
+				testSummary += addTestResult(SKIPPED)
+				skippedTests += 1
+				remove(basename + ".s")
+				continue
+
+			expectedInput, expectedOutput = getWaccFileIO(waccFilename)
+			actualOutput = getActualOutput(basename, expectedInput)
+
+			testSummary += addTestResult(PASSED if actualOutput == expectedOutput else FAILED_OUTPUT, waccFilename, expectedOutput, actualOutput)
+
+	print()
+	for testname, expectedOutput, actualOutput in failedTests:
+		print(LIGHT_RED, "--> Failed " + f"{testname}"[17:-5])
+		print(BLUE, "\t", "Expected:", YELLOW)
+		for line in expectedOutput.split("\n"):
+			print("\t\t" + line)
+		print(BLUE, "\t", "Actual:", YELLOW)
+		for line in actualOutput.split("\n"):
+			print("\t\t" + line)
+
+	passedTests = totalTests - len(failedTests)
+	if passedTests != totalTests:
+		print("\n" + PASSED, "passed")
+		print(FAILED_EXIT, "wrong exit code")
+		print(FAILED_OUTPUT, "wrong output")
+		print(SKIPPED, "skipped")
+		print(testSummary)
+
+	print(BOLD, GREEN, "\n", passedTests, "passed," + RED, len(failedTests), "failed," + YELLOW, skippedTests, "skipped.", END)
+
+	exit(0 if len(failedTests) == 0 else 1)
+
 
 def extract(text, startText, endText=None):
 	start = text.find(startText)
@@ -27,88 +102,38 @@ def getExpectedExit(waccFilename):
 		return 100
 	return 200
 
+def getWaccFileIO(waccFilename):
+	waccCode = open(f"{waccFilename}", 'r').read()
+	waccFileOutputRaw = extract(waccCode, "# Output:", "\n\n")
+	expectedInput = extract(waccCode, "Input: ", "\n")
+	expectedOutput = '\n'.join(line[2:] for line in waccFileOutputRaw.split("\n")) if waccFileOutputRaw else ""
+	if expectedOutput:
+		if expectedOutput[0] == '\n':
+			expectedOutput = expectedOutput[1:]
+		if expectedOutput[-1] == '\n':
+			expectedOutput = expectedOutput[:-1]
+	return expectedInput, expectedOutput
 
-PASSED = "\033[0;32m.\033[0m"
-FAILED_EXIT = "\033[0;31mE\033[0m"
-FAILED_OUTPUT = "\033[0;31mO\033[0m"
-SKIP = "\033[1;33m-\033[0m"
-
-testSummary = ""
-failedTests = []
-skippedTests = 0
+def getActualOutput(basename, waccInput):
+	result1 = subprocess.run(
+		["arm-linux-gnueabi-gcc", "-o", basename, "-mcpu=arm1176jzf-s", "-mtune=arm1176jzf-s", basename + ".s"],
+	)
+	remove(basename + ".s")
+	result2 = subprocess.run(
+		["qemu-arm", "-L", "/usr/arm-linux-gnueabi/", basename],
+		input=(waccInput or '') + '\n',
+		capture_output=True,
+		text=True
+	)
+	return result2.stdout
 
 def addTestResult(result, testname='', expected='', actual=''):
 	print(result, end='', flush=True)
-	if result not in [PASSED, SKIP]:
+	if result not in [PASSED, SKIPPED]:
 		failedTests.append((testname, expected, actual))
 	return result
 
-totalTests = 0
-
-print(PASSED, "passed")
-print(FAILED_EXIT, "wrong exit code")
-print(FAILED_OUTPUT, "wrong output")
-print(SKIP, "skipped")
-
-for testDir in TESTS:
-	print("\n" + testDir)
-	for waccFilename in pathlib.Path("./test/integration/" + testDir).rglob("*.wacc"):
-		totalTests += 1
-
-		expectedExit = getExpectedExit(waccFilename)
-		if FULL_COMPILATION:
-			proc = subprocess.run(
-				["sh", "compile", waccFilename],
-				stdout=None if VIEW_HASKELL_OUTPUT else subprocess.DEVNULL
-			)
-			actualExit = proc.returncode
-			if expectedExit != actualExit:
-				testSummary += addTestResult(FAILED_EXIT, waccFilename, "Exit code: " + str(expectedExit), "Exit code: " + str(actualExit))
-				continue
-
-		if expectedExit != 0:
-			testSummary += addTestResult(PASSED)
-			continue
-
-		if SKIP_OUTPUT_TESTS_FOR_VALID and testDir == "valid":
-			testSummary += addTestResult(SKIP)
-			skippedTests += 1
-			continue
-		waccCode = open(f"{waccFilename}", 'r').read()
-		waccFileOutputRaw = extract(waccCode, "# Output:", "\n\n")
-
-		expectedInput = extract(waccCode, "Input: ", "\n")
-		expectedOutput = '\n'.join(line[2:] for line in waccFileOutputRaw.split("\n")) if waccFileOutputRaw else ""
-		if expectedOutput:
-			if expectedOutput[0] == '\n':
-				expectedOutput = expectedOutput[1:]
-			if expectedOutput[-1] == '\n':
-				expectedOutput = expectedOutput[:-1]
-		actualOutput = "awobobobob"
-
-		testSummary += addTestResult(PASSED if actualOutput == expectedOutput else FAILED_OUTPUT, waccFilename, expectedOutput, actualOutput)
-
-print()
-for testname, expectedOutput, actualOutput in failedTests:
-	print("\033[1;31m--> Failed " + f"{testname}"[17:-5])
-	print("\t\u001b[34mExpected:\033[1;33m")
-	for line in expectedOutput.split("\n"):
-		print("\t\t" + line)
-	print("\t\u001b[34mActual:\033[1;33m")
-	for line in actualOutput.split("\n"):
-		print("\t\t" + line)
-
-passedTests = totalTests - len(failedTests)
-if passedTests != totalTests:
-	print("\n" + PASSED, "passed")
-	print(FAILED_EXIT, "wrong exit code")
-	print(FAILED_OUTPUT, "wrong output")
-	print(SKIP, "skipped")
-	print(testSummary)
-print("\n\033[1m\033[0;32m", passedTests, "passed,\033[0;31m", len(failedTests), "failed,\033[1;33m", skippedTests, "skipped." )
-
-print("\033[0m(with" + ("" if FULL_COMPILATION else "out") + " full compilation)\n")
-sys_exit(0 if len(failedTests) == 0 else 1)
+integrationTests()
 
 # result = subprocess.run(
 # 	["./test/integration/refCompile", "-a", "-x", waccFilename],

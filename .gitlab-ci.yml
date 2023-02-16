@@ -1,4 +1,4 @@
-build-job:
+build:
   stage: build
   artifacts: 
     paths: 
@@ -11,18 +11,18 @@ build-job:
     refs:
       - master
 
-integration-test-job:
+unit-test:
   stage: test
   script:
-    - python3 integration_runner.py
+    - stack test
   only:
     refs:
       - master
 
-unit-test-job:
+integration-test:
   stage: test
   script:
-    - stack test
+    - python3 integration_runner.py -o
   only:
     refs:
       - master

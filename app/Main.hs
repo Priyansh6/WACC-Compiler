@@ -12,9 +12,14 @@ import Control.Monad.Trans.State
 import Text.Megaparsec
 import System.Environment
 import System.Exit
+import System.FilePath ( takeBaseName )
 import qualified Data.Map as M
+import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import qualified Lexer as L
+
+defaultOutput :: T.Text
+defaultOutput = ".data\n.text\n.global main\nmain:\n"
 
 main :: IO ()
 main = do 
@@ -28,5 +33,5 @@ main = do
     Right ast -> case rename ast of
       ((_, []), renamedAST) -> case runExcept $ runStateT (checkProg renamedAST) M.empty of
         Left err -> printSemanticErrors [err] contents fname >> exitWith (ExitFailure 200)
-        Right _ -> exitSuccess
+        Right _ -> TIO.writeFile (takeBaseName fname ++ ".s") defaultOutput >> exitSuccess
       ((_, errs), _) -> printSemanticErrors errs contents fname >> exitWith (ExitFailure 200)
