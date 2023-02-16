@@ -21,7 +21,7 @@ renameProg scopeAccum (Program funcs stats) =
     scopeAccum' = foldl addFuncName scopeAccum funcs
 
 addFuncName :: ScopeAccum -> Func -> ScopeAccum
-addFuncName scopeAccum (Func _ name@(Ident _ _) _ _ _)
+addFuncName scopeAccum (Func _ name@(Ident _ _) _ _ _ _)
   | name `L.elem` getScopedVars scopeAccum 0 = scopeAccum {errors = FunctionAlreadyDefined name : errors scopeAccum}
   | otherwise                                = scopeAccum'
   where

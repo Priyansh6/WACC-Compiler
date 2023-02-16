@@ -8,9 +8,10 @@ import RenameStat
 import qualified Data.List as L
 
 renameFunc :: ScopeAccum -> Func -> (ScopeAccum, Func)
-renameFunc scopeAccum (Func t name params stats pos) =
+renameFunc scopeAccum (Func t name params stats _ pos) =
   mapSndFunc pos $
     ( chainResetScope scopeAccum
+        . chainAddScope
         . chainNewScope (L.mapAccumL renameStat) stats
         . chainNewScope (L.mapAccumL renameParam) params
     )

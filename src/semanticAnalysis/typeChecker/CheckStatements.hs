@@ -51,16 +51,16 @@ checkStat (Exit expr pos) = do
   unless (wtype == WInt) $ throwError $ IncompatibleTypes pos [WInt] wtype
 checkStat (Print expr) = void $ checkExprType expr
 checkStat (Println expr) = void $ checkExprType expr
-checkStat (If expr stats1 stats2 pos) = do
+checkStat (If expr stats1 _ stats2 _ pos) = do
   checkStats stats1
   checkStats stats2
   wtype <- checkExprType expr
   unless (wtype == WBool) $ throwError $ IncompatibleTypes pos [WBool] wtype
-checkStat (While expr stats pos) = do
+checkStat (While expr stats _ pos) = do
   checkStats stats
   wtype <- checkExprType expr
   unless (wtype == WBool) $ throwError $ IncompatibleTypes pos [WBool] wtype
-checkStat (Begin stats) = checkStats stats
+checkStat (Begin stats _) = checkStats stats
 checkStat Skip = return ()
 
 insertAssign :: WType -> Ident -> ScopedSemanticAnalyser ()
