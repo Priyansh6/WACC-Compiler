@@ -1,11 +1,11 @@
 FULL_COMPILATION = True
+VIEW_HASKELL_OUTPUT = False
 TESTS = [
 	"invalid/semanticErr",
 	"invalid/syntaxErr",
 	"valid",
 ]
-SKIP_TESTS = "valid"
-VIEW_HASKELL_OUTPUT = False
+SKIP_OUTPUT_TESTS_FOR_VALID = True
 
 import subprocess
 import argparse
@@ -54,10 +54,7 @@ for testDir in TESTS:
 	print("\n" + testDir)
 	for waccFilename in pathlib.Path("./test/integration/" + testDir).rglob("*.wacc"):
 		totalTests += 1
-		if testDir in SKIP_TESTS:
-			testSummary += addTestResult(SKIP)
-			skippedTests += 1
-			continue
+
 		expectedExit = getExpectedExit(waccFilename)
 		if FULL_COMPILATION:
 			proc = subprocess.run(
@@ -73,6 +70,10 @@ for testDir in TESTS:
 			testSummary += addTestResult(PASSED)
 			continue
 
+		if SKIP_OUTPUT_TESTS_FOR_VALID and testDir == "valid":
+			testSummary += addTestResult(SKIP)
+			skippedTests += 1
+			continue
 		waccCode = open(f"{waccFilename}", 'r').read()
 		waccFileOutputRaw = extract(waccCode, "# Output:", "\n\n")
 
