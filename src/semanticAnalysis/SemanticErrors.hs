@@ -8,7 +8,7 @@ import qualified Data.Text as T
 import System.FilePath
 
 showColour :: Bool
-showColour = False
+showColour = True
 
 color :: Int -> String
 color n = if showColour then concat ["\ESC[", show n, "m"] else ""
