@@ -18,7 +18,7 @@ module StatementConstructors
   ) 
 where
 
-import Parser (Parser, liftPos1, liftPos2, liftPos3)
+import Parser (Parser, liftPos1, liftPos2, liftPos3, liftPosScopeIf, liftPosScopeWhile, liftScopeBegin)
 import Text.Megaparsec ((<|>), (<?>), label)
 
 import qualified AST
@@ -63,10 +63,10 @@ mkPrintln :: Parser AST.Expr -> Parser AST.Stat
 mkPrintln e = label "statement" $ AST.Println <$> e
 
 mkIf :: Parser AST.Expr -> Parser AST.Stats -> Parser AST.Stats -> Parser AST.Stat
-mkIf c b1 b2 = label "statement" $ liftPos3 AST.If (c <?> "condition") (b1 <?> "branch") -1 (b2 <?> "branch") -1
+mkIf c b1 b2 = label "statement" $ liftPosScopeIf AST.If (c <?> "condition") (b1 <?> "branch") (b2 <?> "branch")
 
 mkWhile :: Parser AST.Expr -> Parser AST.Stats -> Parser AST.Stat
-mkWhile c b = label "statement" $ liftPos2 AST.While (c <?> "condition") (b <?> "body") -1
+mkWhile c b = label "statement" $ liftPosScopeWhile AST.While (c <?> "condition") (b <?> "body")
 
 mkBegin :: Parser AST.Stats -> Parser AST.Stat
-mkBegin ss = label "statement" $ AST.Begin <$> ss -1
+mkBegin = label "statement" . liftScopeBegin AST.Begin

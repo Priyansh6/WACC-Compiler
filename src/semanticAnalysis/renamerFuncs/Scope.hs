@@ -43,7 +43,7 @@ resetScope :: ScopeAccum -> ScopeAccum -> ScopeAccum
 resetScope oldScopeAccum scopeAccum =
   scopeAccum {scopeStack = scopeStack oldScopeAccum}
 
-chainAddScope :: (ScopeAccum, Position -> x) -> (ScopeAccum, x)
+chainAddScope :: (ScopeAccum, Scope -> x) -> (ScopeAccum, x)
 chainAddScope (acc, f) =
   (acc, f (getCurrentScope acc))
 

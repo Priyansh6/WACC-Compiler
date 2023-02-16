@@ -4,6 +4,9 @@ module Parser
   , liftPos2
   , liftPos3
   , liftPos4
+  , liftPosScopeIf
+  , liftPosScopeWhile
+  , liftScopeBegin
   , deferLiftPos1
   , deferLiftPos2
   , deferLiftPos3
@@ -11,7 +14,7 @@ module Parser
   )
 where
 
-import AST (Position)
+import AST (Position, Scope)
 import Control.Applicative ((<**>))
 import Data.Functor ((<&>))
 import Data.Void (Void)
@@ -30,8 +33,14 @@ liftPos2 cons p1 p2 = getPosition <**> (cons <$> p1 <*> p2)
 liftPos3 :: (a -> b -> c -> Position -> d) -> Parser a -> Parser b -> Parser c -> Parser d
 liftPos3 cons p1 p2 p3 = getPosition <**> (cons <$> p1 <*> p2 <*> p3)
 
-liftPos4 :: (a -> b -> c -> d -> Position -> e) -> Parser a -> Parser b -> Parser c -> Parser d -> Parser e
-liftPos4 cons p1 p2 p3 p4 = getPosition <**> (cons <$> p1 <*> p2 <*> p3 <*> p4)
+liftPos4 :: (a -> b -> c -> d -> Scope -> Position -> e) -> Parser a -> Parser b -> Parser c -> Parser d -> Parser e
+liftPos4 cons p1 p2 p3 p4 = getPosition <**> (cons <$> p1 <*> p2 <*> p3 <*> p4 <*> pure (-1))
+
+liftPosScopeIf :: (a -> b -> Scope -> c -> Scope -> Position -> d) -> Parser a -> Parser b -> Parser c -> Parser d
+liftPosScopeIf cons p1 p2 p3 = getPosition <**> (cons <$> p1 <*> p2 <*> pure (-1) <*> p3 <*> pure (-1))
+
+liftPosScopeWhile :: (a -> b -> Scope -> Position -> c) -> Parser a -> Parser b -> Parser c
+liftPosScopeWhile cons p1 p2 = getPosition <**> (cons <$> p1 <*> p2 <*> pure (-1))
 
 deferLiftPos1 :: (a -> Position -> b) -> Parser (a -> b)
 deferLiftPos1 cons = flip cons <$> getPosition
@@ -41,6 +50,9 @@ deferLiftPos2 cons = (\c a b -> cons a b c) <$> getPosition
 
 deferLiftPos3 :: (a -> b -> c -> Position -> d) -> Parser (a -> b -> c -> d)
 deferLiftPos3 cons = (\d a b c -> cons a b c d) <$> getPosition
+
+liftScopeBegin :: (a -> Scope -> b) -> Parser a -> Parser b
+liftScopeBegin cons p1 = (cons <$> p1 <*> pure (-1))
 
 toPosition :: SourcePos -> Position
 toPosition SourcePos {sourceLine=line, sourceColumn=col}
