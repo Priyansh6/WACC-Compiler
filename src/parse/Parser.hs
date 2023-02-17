@@ -1,9 +1,10 @@
 module Parser
   ( Parser
+  , noScope
   , liftPos1
   , liftPos2
   , liftPos3
-  , liftPos4
+  , liftPosScopeFunc
   , liftPosScopeIf
   , liftPosScopeWhile
   , liftScopeBegin
@@ -24,6 +25,9 @@ import qualified Data.Text as T
 
 type Parser = Parsec Void T.Text
 
+noScope :: Scope
+noScope = - 1
+
 liftPos1 :: (a -> Position -> c) -> Parser a -> Parser c
 liftPos1 cons p = getPosition <**> (cons <$> p)
 
@@ -33,14 +37,14 @@ liftPos2 cons p1 p2 = getPosition <**> (cons <$> p1 <*> p2)
 liftPos3 :: (a -> b -> c -> Position -> d) -> Parser a -> Parser b -> Parser c -> Parser d
 liftPos3 cons p1 p2 p3 = getPosition <**> (cons <$> p1 <*> p2 <*> p3)
 
-liftPos4 :: (a -> b -> c -> d -> Scope -> Position -> e) -> Parser a -> Parser b -> Parser c -> Parser d -> Parser e
-liftPos4 cons p1 p2 p3 p4 = getPosition <**> (cons <$> p1 <*> p2 <*> p3 <*> p4 <*> pure (-1))
+liftPosScopeFunc :: (a -> b -> c -> d -> Scope -> Position -> e) -> Parser a -> Parser b -> Parser c -> Parser d -> Parser e
+liftPosScopeFunc cons p1 p2 p3 p4 = getPosition <**> (cons <$> p1 <*> p2 <*> p3 <*> p4 <*> pure noScope)
 
 liftPosScopeIf :: (a -> b -> Scope -> c -> Scope -> Position -> d) -> Parser a -> Parser b -> Parser c -> Parser d
-liftPosScopeIf cons p1 p2 p3 = getPosition <**> (cons <$> p1 <*> p2 <*> pure (-1) <*> p3 <*> pure (-1))
+liftPosScopeIf cons p1 p2 p3 = getPosition <**> (cons <$> p1 <*> p2 <*> pure noScope <*> p3 <*> pure noScope)
 
 liftPosScopeWhile :: (a -> b -> Scope -> Position -> c) -> Parser a -> Parser b -> Parser c
-liftPosScopeWhile cons p1 p2 = getPosition <**> (cons <$> p1 <*> p2 <*> pure (-1))
+liftPosScopeWhile cons p1 p2 = getPosition <**> (cons <$> p1 <*> p2 <*> pure noScope)
 
 deferLiftPos1 :: (a -> Position -> b) -> Parser (a -> b)
 deferLiftPos1 cons = flip cons <$> getPosition
@@ -52,7 +56,7 @@ deferLiftPos3 :: (a -> b -> c -> Position -> d) -> Parser (a -> b -> c -> d)
 deferLiftPos3 cons = (\d a b c -> cons a b c d) <$> getPosition
 
 liftScopeBegin :: (a -> Scope -> b) -> Parser a -> Parser b
-liftScopeBegin cons p1 = (cons <$> p1 <*> pure (-1))
+liftScopeBegin cons p1 = cons <$> p1 <*> pure noScope
 
 toPosition :: SourcePos -> Position
 toPosition SourcePos {sourceLine=line, sourceColumn=col}

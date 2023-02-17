@@ -4,7 +4,7 @@ module ProgramConstructors
   ) 
 where
 
-import Parser (Parser, liftPos4)
+import Parser (Parser, liftPosScopeFunc)
 import Text.Megaparsec ((<?>), label, try)
 
 import qualified AST
@@ -13,7 +13,7 @@ mkProgram :: Parser [AST.Func] -> Parser AST.Stats -> Parser AST.Program
 mkProgram funcs stats = AST.Program <$> funcs <*> stats
 
 mkFunc :: Parser AST.WType -> Parser AST.Ident -> Parser [(AST.WType, AST.Ident)] -> Parser AST.Stats -> Parser AST.Func
-mkFunc t i pl xs = label "function" $ try $ liftPos4 AST.Func (t <?> "return type") i (pl <?> "parameter list") (xs <?> "function body") >>= isValidFunc
+mkFunc t i pl xs = label "function" $ try $ liftPosScopeFunc AST.Func (t <?> "return type") i (pl <?> "parameter list") (xs <?> "function body") >>= isValidFunc
   where
     isValidFunc :: AST.Func -> Parser AST.Func
     isValidFunc f@(AST.Func _ _ _ ys _ _)
