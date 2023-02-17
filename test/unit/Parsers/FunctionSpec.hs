@@ -4,6 +4,7 @@ module Parsers.FunctionSpec (spec) where
 
 import AST
 import Programs (func)
+import Parser (noScope)
 import Parsers.Test
 import Test.Hspec
 import Test.Hspec.Megaparsec

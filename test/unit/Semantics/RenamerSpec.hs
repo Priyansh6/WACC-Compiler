@@ -4,6 +4,7 @@ module Semantics.RenamerSpec (spec) where
 
 import AST
 import Data.Map
+import Parser (noScope)
 import Renamer
 import RenameFunc
 import RenameStat
@@ -28,12 +29,12 @@ spec = do
                        scopeCounter = 2,
                        errors = []
                      },
-                   Program [Func WInt (Ident "func" (0, 0)) [(WInt, Ident "x-1" (0, 0))] [] noScope (0, 0)] [] 
+                   Program [Func WInt (Ident "func" (0, 0)) [(WInt, Ident "x-1" (0, 0))] [] 2 (0, 0)] [] 
                  )
 
   it "renames program body " $
-    renameProg initialScopeAccum (Program [] [DecAssign WInt (Ident "x" (0, 0)) (RExpr (IntLiter 1 (0, 0))) noScope (0, 0)])
-      `shouldBe` (xScopeAccum, Program [] [DecAssign WInt (Ident "x-0" (0, 0)) (RExpr (IntLiter 1 (0, 0))) noScope (0, 0)])
+    renameProg initialScopeAccum (Program [] [DecAssign WInt (Ident "x" (0, 0)) (RExpr (IntLiter 1 (0, 0))) (0, 0)])
+      `shouldBe` (xScopeAccum, Program [] [DecAssign WInt (Ident "x-0" (0, 0)) (RExpr (IntLiter 1 (0, 0))) (0, 0)])
 
   it "renaming program adds functions to scope map" $
     renameProg initialScopeAccum (Program [Func WInt (Ident "func" (0, 0)) [] [] noScope (0, 0)] [])
@@ -43,7 +44,7 @@ spec = do
                        scopeCounter = 2, 
                        errors = []
                      },
-                   Program [Func WInt (Ident "func" (0,0)) [] [] noScope (0,0)] []
+                   Program [Func WInt (Ident "func" (0,0)) [] [] 2 (0,0)] []
                  )
 
   it "renames function parameters" $
@@ -54,7 +55,7 @@ spec = do
                        scopeCounter = 2,
                        errors = []
                      },
-                   Func WInt (Ident "func" (0, 0)) [(WInt, Ident "x-1" (0, 0)), (WInt, Ident "y-1" (0, 0))] [] noScope (0, 0)
+                   Func WInt (Ident "func" (0, 0)) [(WInt, Ident "x-1" (0, 0)), (WInt, Ident "y-1" (0, 0))] [] 2 (0, 0)
                  )
 
   it "renames function body" $
@@ -65,7 +66,7 @@ spec = do
                        scopeCounter = 2,
                        errors = []
                      },
-                   Func WInt (Ident "func" (0, 0)) [(WInt, Ident "x-1" (0, 0))] [DecAssign WInt (Ident "x-2" (0, 0)) (RExpr (IdentExpr (Ident "x-1" (0, 0)) (0, 0))) (0, 0)] noScope (0, 0)
+                   Func WInt (Ident "func" (0, 0)) [(WInt, Ident "x-1" (0, 0))] [DecAssign WInt (Ident "x-2" (0, 0)) (RExpr (IdentExpr (Ident "x-1" (0, 0)) (0, 0))) (0, 0)] 2 (0, 0)
                  )
 
   it "can't rename already defined function" $
@@ -76,7 +77,7 @@ spec = do
                        scopeCounter = 2,
                        errors = [FunctionAlreadyDefined (Ident "func" (0, 0))]
                      },
-                   Program [Func WInt (Ident "func" (0, 0)) [] [] noScope (0, 0)] []
+                   Program [Func WInt (Ident "func" (0, 0)) [] [] 2 (0, 0)] []
                  )
   
   it "renames functions that are mutually recursive" $
@@ -87,7 +88,7 @@ spec = do
                        scopeCounter = 4, 
                        errors = []
                      },
-                   Program [Func WInt (Ident "func1" (0,0)) [] [DecAssign WInt (Ident "x-2" (0,0)) (Call (Ident "func2" (0,0)) [] (0,0)) (0,0)] noScope (0,0),Func WInt (Ident "func2" (0,0)) [] [DecAssign WInt (Ident "x-4" (0,0)) (Call (Ident "func1" (0,0)) [] (0,0)) (0,0)] noScope (0,0)] [])
+                   Program [Func WInt (Ident "func1" (0,0)) [] [DecAssign WInt (Ident "x-2" (0,0)) (Call (Ident "func2" (0,0)) [] (0,0)) (0,0)] 2 (0,0),Func WInt (Ident "func2" (0,0)) [] [DecAssign WInt (Ident "x-4" (0,0)) (Call (Ident "func1" (0,0)) [] (0,0)) (0,0)] 4 (0,0)] [])
 
   it "renames parameters" $
     renameParam initialScopeAccum (WInt, Ident "x" (0, 0))
@@ -167,7 +168,7 @@ spec = do
                        scopeCounter = 2,
                        errors = []
                      },
-                   If (IdentExpr (Ident "x-0" (0, 0)) (0, 0)) [DecAssign WInt (Ident "x-1" (0, 0)) (RExpr (IntLiter 1 (0, 0))) (0, 0)] noScope [DecAssign WInt (Ident "x-2" (0, 0)) (RExpr (IntLiter 1 (0, 0))) (0, 0)] noScope (0, 0)
+                   If (IdentExpr (Ident "x-0" (0, 0)) (0, 0)) [DecAssign WInt (Ident "x-1" (0, 0)) (RExpr (IntLiter 1 (0, 0))) (0, 0)] 1 [DecAssign WInt (Ident "x-2" (0, 0)) (RExpr (IntLiter 1 (0, 0))) (0, 0)] 2 (0, 0)
                  )
 
   it "renames while statements" $
@@ -178,18 +179,18 @@ spec = do
                        scopeCounter = 1,
                        errors = []
                      },
-                   While (IdentExpr (Ident "x-0" (0, 0)) (0, 0)) [DecAssign WInt (Ident "x-1" (0, 0)) (RExpr (IntLiter 1 (0, 0))) (0, 0)] noScope (0, 0)
+                   While (IdentExpr (Ident "x-0" (0, 0)) (0, 0)) [DecAssign WInt (Ident "x-1" (0, 0)) (RExpr (IntLiter 1 (0, 0))) (0, 0)] 1 (0, 0)
                  )
 
   it "renames begin statements" $
-    renameStat initialScopeAccum (Begin [DecAssign WInt (Ident "x" (0, 0)) (RExpr (IntLiter 1 (0, 0))) noScope (0, 0)])
+    renameStat initialScopeAccum (Begin [DecAssign WInt (Ident "x" (0, 0)) (RExpr (IntLiter 1 (0, 0))) (0, 0)] noScope)
       `shouldBe` ( ScopeAccum
                      { scopeMap = fromList [(1, [Ident "x-1" (0, 0)])],
                        scopeStack = [0],
                        scopeCounter = 1,
                        errors = []
                      },
-                   Begin [DecAssign WInt (Ident "x-1" (0, 0)) (RExpr (IntLiter 1 (0, 0))) noScope (0, 0)]
+                   Begin [DecAssign WInt (Ident "x-1" (0, 0)) (RExpr (IntLiter 1 (0, 0))) (0, 0)] 1
                  )
 
   it "renames lidents" $
