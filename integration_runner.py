@@ -34,12 +34,18 @@ def integrationTests():
 	print(SKIPPED, "skipped")
 	testSummary = ""
 	skippedTests = totalTests = 0
+	
+	wacc40exe = next(Path("./.stack-work/dist").rglob("build/WACC40-exe/WACC40-exe"), None)
+	if not wacc40exe:
+		print(RED + "\nWACC40-exe not found - did you", BOLD + "stack build" + END + RED + "?", END)
+		exit(1)
+
 	for testDir in TESTS:
 		print("\n" + testDir)
 		for waccFilename in Path("./test/integration/" + testDir).rglob("*.wacc"):
 			totalTests += 1
 			result = subprocess.run(
-				["sh", "compile", waccFilename],
+				[str(wacc40exe), waccFilename],
 				stdout=None if VIEW_HASKELL_OUTPUT else subprocess.DEVNULL
 			)
 
@@ -68,10 +74,10 @@ def integrationTests():
 	print()
 	for testname, expectedOutput, actualOutput in failedTests:
 		print(LIGHT_RED, "--> Failed " + f"{testname}"[17:-5])
-		print(BLUE, "\t", "Expected:", YELLOW)
+		print(YELLOW, "\t", "Expected:", END)
 		for line in expectedOutput.split("\n"):
 			print("\t\t" + line)
-		print(BLUE, "\t", "Actual:", YELLOW)
+		print(YELLOW, "\t", "Actual:", END)
 		for line in actualOutput.split("\n"):
 			print("\t\t" + line)
 

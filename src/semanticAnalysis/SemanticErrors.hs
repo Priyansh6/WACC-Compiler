@@ -56,7 +56,7 @@ printSemanticErrors errs contents fname = putStrLn $ concatMap printSemanticErro
     file = T.lines contents
 
     printSemanticError :: SemanticError -> String
-    printSemanticError semErr = previewLocation semErr ++ previewCode (getPosition semErr) ++ yellow ++ errorMessage semErr ++ reset
+    printSemanticError semErr = "\n" ++ previewLocation semErr ++ previewCode (getPosition semErr) ++ yellow ++ errorMessage semErr ++ reset
 
     previewLocation :: SemanticError -> String
     previewLocation semErr =
@@ -94,8 +94,8 @@ errorMessage semErr = case semErr of
     "The function "
       ++ func
       ++ if actual < expected
-        then " is missing " ++ bold (show (expected - actual)) ++ yellow ++ " arguments"
-        else " takes " ++ bold (show expected) ++ yellow ++ " arguments but " ++ bold (show actual) ++ yellow ++ " were given"
+        then " is missing " ++ bold (show (expected - actual)) ++ yellow ++ " arguments\n"
+        else " takes " ++ bold (show expected) ++ yellow ++ " arguments but " ++ bold (show actual) ++ yellow ++ " were given\n"
     where
       func = bold (show i) ++ yellow
   IllegalReturn _ -> "Return statements outside of functions are not allowed\n" ++ reset
