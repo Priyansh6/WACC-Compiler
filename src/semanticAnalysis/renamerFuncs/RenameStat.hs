@@ -21,24 +21,27 @@ renameStat scopeAccum (Return expr pos) = mapSndFunc pos $ chain renameExpr expr
 renameStat scopeAccum (Exit expr pos) = mapSndFunc pos $ chain renameExpr expr (scopeAccum, Exit)
 renameStat scopeAccum (Print expr) = chain renameExpr expr (scopeAccum, Print)
 renameStat scopeAccum (Println expr) = chain renameExpr expr (scopeAccum, Println)
-renameStat scopeAccum (If expr stats1 stats2 pos) =
+renameStat scopeAccum (If expr stats1 _ stats2 _ pos) =
   mapSndFunc pos $
     ( chainResetScope scopeAccum
+        . chainAddScope
         . chainNewScope (L.mapAccumL renameStat) stats2
         . chainResetScope scopeAccum
+        . chainAddScope
         . chainNewScope (L.mapAccumL renameStat) stats1
         . chain renameExpr expr
     )
       (scopeAccum, If)
-renameStat scopeAccum (While expr stats pos) =
+renameStat scopeAccum (While expr stats _ pos) =
   mapSndFunc pos $
     ( chainResetScope scopeAccum
+        . chainAddScope
         . chainNewScope (L.mapAccumL renameStat) stats
         . chain renameExpr expr
     )
       (scopeAccum, While)
-renameStat scopeAccum (Begin stats) =
-  (chainResetScope scopeAccum . chainNewScope (L.mapAccumL renameStat) stats) (scopeAccum, Begin)
+renameStat scopeAccum (Begin stats _) =
+  (chainResetScope scopeAccum . chainAddScope . chainNewScope (L.mapAccumL renameStat) stats) (scopeAccum, Begin)
 
 renameUndeclaredIdent :: ScopeAccum -> Ident -> (ScopeAccum, Ident)
 renameUndeclaredIdent scopeAccum name =

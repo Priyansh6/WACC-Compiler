@@ -4,9 +4,11 @@ import qualified Data.Text as T
 
 type Position = (Int, Int)
 
+type Scope = Maybe Int 
+
 data Program = Program [Func] Stats deriving (Show, Eq)
 
-data Func = Func WType Ident [(WType, Ident)] Stats Position deriving (Show, Eq)
+data Func = Func WType Ident [(WType, Ident)] Stats Scope Position deriving (Show, Eq)
 
 type Stats = [Stat]
 
@@ -20,9 +22,9 @@ data Stat
   | Exit Expr Position
   | Print Expr
   | Println Expr
-  | If Expr Stats Stats Position
-  | While Expr Stats Position
-  | Begin Stats 
+  | If Expr Stats Scope Stats Scope Position 
+  | While Expr Stats Scope Position
+  | Begin Stats Scope
   deriving (Show, Eq)
 
 -- An AST node representing all possible WACC types

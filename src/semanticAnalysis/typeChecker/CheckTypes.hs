@@ -20,13 +20,13 @@ addFuncsToSymbolTable :: [Func] -> SemanticAnalyser ()
 addFuncsToSymbolTable = mapM_ addFuncToSymbolTable
 
 addFuncToSymbolTable :: Func -> SemanticAnalyser ()
-addFuncToSymbolTable (Func wtype ident params _ _) = do
+addFuncToSymbolTable (Func wtype ident params _ _ _) = do
   let (_, paramIds) = unzip params
   modify (M.insert ident (FuncType wtype paramIds))
   insertParams params
 
 checkFunc :: Func -> SemanticAnalyser ()
-checkFunc (Func wtype _ _ stats _) = runReaderT (checkStats stats) (Just wtype)
+checkFunc (Func wtype _ _ stats _ _) = runReaderT (checkStats stats) (Just wtype)
 
 insertParams :: [(WType, Ident)] -> SemanticAnalyser ()
 insertParams = mapM_ (uncurry insertParam)
