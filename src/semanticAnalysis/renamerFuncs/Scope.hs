@@ -45,7 +45,7 @@ resetScope oldScopeAccum scopeAccum =
 
 chainAddScope :: (ScopeAccum, Scope -> x) -> (ScopeAccum, x)
 chainAddScope (acc, f) =
-  (acc, f (getCurrentScope acc))
+  (acc, f $ Just $ getCurrentScope acc)
 
 chainNewScope :: (ScopeAccum -> x -> (ScopeAccum, x)) -> x -> (ScopeAccum, x -> y) -> (ScopeAccum, y)
 chainNewScope accFunc x (acc, f) =

@@ -1,6 +1,5 @@
 module Parser
   ( Parser
-  , noScope
   , liftPos1
   , liftPos2
   , liftPos3
@@ -25,9 +24,6 @@ import qualified Data.Text as T
 
 type Parser = Parsec Void T.Text
 
-noScope :: Scope
-noScope = - 1
-
 liftPos1 :: (a -> Position -> c) -> Parser a -> Parser c
 liftPos1 cons p = getPosition <**> (cons <$> p)
 
@@ -38,13 +34,13 @@ liftPos3 :: (a -> b -> c -> Position -> d) -> Parser a -> Parser b -> Parser c -
 liftPos3 cons p1 p2 p3 = getPosition <**> (cons <$> p1 <*> p2 <*> p3)
 
 liftPosScopeFunc :: (a -> b -> c -> d -> Scope -> Position -> e) -> Parser a -> Parser b -> Parser c -> Parser d -> Parser e
-liftPosScopeFunc cons p1 p2 p3 p4 = getPosition <**> (cons <$> p1 <*> p2 <*> p3 <*> p4 <*> pure noScope)
+liftPosScopeFunc cons p1 p2 p3 p4 = getPosition <**> (cons <$> p1 <*> p2 <*> p3 <*> p4 <*> pure Nothing)
 
 liftPosScopeIf :: (a -> b -> Scope -> c -> Scope -> Position -> d) -> Parser a -> Parser b -> Parser c -> Parser d
-liftPosScopeIf cons p1 p2 p3 = getPosition <**> (cons <$> p1 <*> p2 <*> pure noScope <*> p3 <*> pure noScope)
+liftPosScopeIf cons p1 p2 p3 = getPosition <**> (cons <$> p1 <*> p2 <*> pure Nothing <*> p3 <*> pure Nothing)
 
 liftPosScopeWhile :: (a -> b -> Scope -> Position -> c) -> Parser a -> Parser b -> Parser c
-liftPosScopeWhile cons p1 p2 = getPosition <**> (cons <$> p1 <*> p2 <*> pure noScope)
+liftPosScopeWhile cons p1 p2 = getPosition <**> (cons <$> p1 <*> p2 <*> pure Nothing)
 
 deferLiftPos1 :: (a -> Position -> b) -> Parser (a -> b)
 deferLiftPos1 cons = flip cons <$> getPosition
@@ -56,7 +52,7 @@ deferLiftPos3 :: (a -> b -> c -> Position -> d) -> Parser (a -> b -> c -> d)
 deferLiftPos3 cons = (\d a b c -> cons a b c d) <$> getPosition
 
 liftScopeBegin :: (a -> Scope -> b) -> Parser a -> Parser b
-liftScopeBegin cons p1 = cons <$> p1 <*> pure noScope
+liftScopeBegin cons p1 = cons <$> p1 <*> pure Nothing
 
 toPosition :: SourcePos -> Position
 toPosition SourcePos {sourceLine=line, sourceColumn=col}

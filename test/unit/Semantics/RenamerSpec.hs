@@ -4,7 +4,6 @@ module Semantics.RenamerSpec (spec) where
 
 import AST
 import Data.Map
-import Parser (noScope)
 import Renamer
 import RenameFunc
 import RenameStat
@@ -22,14 +21,14 @@ funcScopeAccum = initialScopeAccum {scopeMap = fromList [(0, [Ident "func" (0, 0
 spec :: Spec
 spec = do
   it "renames program functions" $
-    renameProg initialScopeAccum (Program [Func WInt (Ident "func" (0, 0)) [(WInt, Ident "x" (0, 0))] [] noScope (0, 0)] [])
+    renameProg initialScopeAccum (Program [Func WInt (Ident "func" (0, 0)) [(WInt, Ident "x" (0, 0))] [] Nothing (0, 0)] [])
       `shouldBe` ( ScopeAccum
                      { scopeMap = fromList [(0, [Ident "func" (0, 0)]), (1, [Ident "x-1" (0, 0)])],
                        scopeStack = [0],
                        scopeCounter = 2,
                        errors = []
                      },
-                   Program [Func WInt (Ident "func" (0, 0)) [(WInt, Ident "x-1" (0, 0))] [] 2 (0, 0)] [] 
+                   Program [Func WInt (Ident "func" (0, 0)) [(WInt, Ident "x-1" (0, 0))] [] (Just 2) (0, 0)] [] 
                  )
 
   it "renames program body " $
@@ -37,58 +36,58 @@ spec = do
       `shouldBe` (xScopeAccum, Program [] [DecAssign WInt (Ident "x-0" (0, 0)) (RExpr (IntLiter 1 (0, 0))) (0, 0)])
 
   it "renaming program adds functions to scope map" $
-    renameProg initialScopeAccum (Program [Func WInt (Ident "func" (0, 0)) [] [] noScope (0, 0)] [])
+    renameProg initialScopeAccum (Program [Func WInt (Ident "func" (0, 0)) [] [] Nothing (0, 0)] [])
       `shouldBe` ( ScopeAccum 
                      { scopeMap = fromList [(0,[Ident "func" (0,0)])], 
                        scopeStack = [0], 
                        scopeCounter = 2, 
                        errors = []
                      },
-                   Program [Func WInt (Ident "func" (0,0)) [] [] 2 (0,0)] []
+                   Program [Func WInt (Ident "func" (0,0)) [] [] (Just 2) (0,0)] []
                  )
 
   it "renames function parameters" $
-    renameFunc initialScopeAccum (Func WInt (Ident "func" (0, 0)) [(WInt, Ident "x" (0, 0)), (WInt, Ident "y" (0, 0))] [] noScope (0, 0))
+    renameFunc initialScopeAccum (Func WInt (Ident "func" (0, 0)) [(WInt, Ident "x" (0, 0)), (WInt, Ident "y" (0, 0))] [] Nothing (0, 0))
       `shouldBe` ( ScopeAccum
                      { scopeMap = fromList [(1, [Ident "y-1" (0, 0), Ident "x-1" (0, 0)])],
                        scopeStack = [0],
                        scopeCounter = 2,
                        errors = []
                      },
-                   Func WInt (Ident "func" (0, 0)) [(WInt, Ident "x-1" (0, 0)), (WInt, Ident "y-1" (0, 0))] [] 2 (0, 0)
+                   Func WInt (Ident "func" (0, 0)) [(WInt, Ident "x-1" (0, 0)), (WInt, Ident "y-1" (0, 0))] [] (Just 2) (0, 0)
                  )
 
   it "renames function body" $
-    renameFunc initialScopeAccum (Func WInt (Ident "func" (0, 0)) [(WInt, Ident "x" (0, 0))] [DecAssign WInt (Ident "x" (0, 0)) (RExpr (IdentExpr (Ident "x" (0, 0)) (0, 0))) (0, 0)] noScope (0, 0))
+    renameFunc initialScopeAccum (Func WInt (Ident "func" (0, 0)) [(WInt, Ident "x" (0, 0))] [DecAssign WInt (Ident "x" (0, 0)) (RExpr (IdentExpr (Ident "x" (0, 0)) (0, 0))) (0, 0)] Nothing (0, 0))
       `shouldBe` ( ScopeAccum
                      { scopeMap = fromList [(1, [Ident "x-1" (0, 0)]), (2, [Ident "x-2" (0, 0)])],
                        scopeStack = [0],
                        scopeCounter = 2,
                        errors = []
                      },
-                   Func WInt (Ident "func" (0, 0)) [(WInt, Ident "x-1" (0, 0))] [DecAssign WInt (Ident "x-2" (0, 0)) (RExpr (IdentExpr (Ident "x-1" (0, 0)) (0, 0))) (0, 0)] 2 (0, 0)
+                   Func WInt (Ident "func" (0, 0)) [(WInt, Ident "x-1" (0, 0))] [DecAssign WInt (Ident "x-2" (0, 0)) (RExpr (IdentExpr (Ident "x-1" (0, 0)) (0, 0))) (0, 0)] (Just 2) (0, 0)
                  )
 
   it "can't rename already defined function" $
-    renameProg funcScopeAccum (Program [Func WInt (Ident "func" (0, 0)) [] [] noScope (0, 0)] [])
+    renameProg funcScopeAccum (Program [Func WInt (Ident "func" (0, 0)) [] [] Nothing (0, 0)] [])
       `shouldBe` ( ScopeAccum
                      { scopeMap = fromList [(0, [Ident "func" (0, 0)])],
                        scopeStack = [0],
                        scopeCounter = 2,
                        errors = [FunctionAlreadyDefined (Ident "func" (0, 0))]
                      },
-                   Program [Func WInt (Ident "func" (0, 0)) [] [] 2 (0, 0)] []
+                   Program [Func WInt (Ident "func" (0, 0)) [] [] (Just 2) (0, 0)] []
                  )
   
   it "renames functions that are mutually recursive" $
-    renameProg initialScopeAccum (Program [Func WInt (Ident "func1" (0, 0)) [] [DecAssign WInt (Ident "x" (0, 0)) (Call (Ident "func2" (0, 0)) [] (0, 0)) (0, 0)] noScope (0, 0), Func WInt (Ident "func2" (0,0)) [] [DecAssign WInt (Ident "x" (0,0)) (Call (Ident "func1" (0,0)) [] (0,0)) (0,0)] noScope (0,0)] [])
+    renameProg initialScopeAccum (Program [Func WInt (Ident "func1" (0, 0)) [] [DecAssign WInt (Ident "x" (0, 0)) (Call (Ident "func2" (0, 0)) [] (0, 0)) (0, 0)] Nothing (0, 0), Func WInt (Ident "func2" (0,0)) [] [DecAssign WInt (Ident "x" (0,0)) (Call (Ident "func1" (0,0)) [] (0,0)) (0,0)] Nothing (0,0)] [])
       `shouldBe` ( ScopeAccum 
                      { scopeMap = fromList [(0,[Ident "func2" (0,0),Ident "func1" (0,0)]),(2,[Ident "x-2" (0,0)]),(4,[Ident "x-4" (0,0)])], 
                        scopeStack = [0], 
                        scopeCounter = 4, 
                        errors = []
                      },
-                   Program [Func WInt (Ident "func1" (0,0)) [] [DecAssign WInt (Ident "x-2" (0,0)) (Call (Ident "func2" (0,0)) [] (0,0)) (0,0)] 2 (0,0),Func WInt (Ident "func2" (0,0)) [] [DecAssign WInt (Ident "x-4" (0,0)) (Call (Ident "func1" (0,0)) [] (0,0)) (0,0)] 4 (0,0)] [])
+                   Program [Func WInt (Ident "func1" (0,0)) [] [DecAssign WInt (Ident "x-2" (0,0)) (Call (Ident "func2" (0,0)) [] (0,0)) (0,0)] (Just 2) (0,0),Func WInt (Ident "func2" (0,0)) [] [DecAssign WInt (Ident "x-4" (0,0)) (Call (Ident "func1" (0,0)) [] (0,0)) (0,0)] (Just 4) (0,0)] [])
 
   it "renames parameters" $
     renameParam initialScopeAccum (WInt, Ident "x" (0, 0))
@@ -161,36 +160,36 @@ spec = do
       `shouldBe` (xScopeAccum, Println (IdentExpr (Ident "x-0" (0, 0)) (0, 0)))
 
   it "renames if statements" $
-    renameStat xScopeAccum (If (IdentExpr (Ident "x" (0, 0)) (0, 0)) [DecAssign WInt (Ident "x" (0, 0)) (RExpr (IntLiter 1 (0, 0))) (0, 0)] noScope [DecAssign WInt (Ident "x" (0, 0)) (RExpr (IntLiter 1 (0, 0))) (0, 0)] noScope (0, 0))
+    renameStat xScopeAccum (If (IdentExpr (Ident "x" (0, 0)) (0, 0)) [DecAssign WInt (Ident "x" (0, 0)) (RExpr (IntLiter 1 (0, 0))) (0, 0)] Nothing [DecAssign WInt (Ident "x" (0, 0)) (RExpr (IntLiter 1 (0, 0))) (0, 0)] Nothing (0, 0))
       `shouldBe` ( ScopeAccum
                      { scopeMap = fromList [(0, [Ident "x-0" (0, 0)]), (1, [Ident "x-1" (0, 0)]), (2, [Ident "x-2" (0, 0)])],
                        scopeStack = [0],
                        scopeCounter = 2,
                        errors = []
                      },
-                   If (IdentExpr (Ident "x-0" (0, 0)) (0, 0)) [DecAssign WInt (Ident "x-1" (0, 0)) (RExpr (IntLiter 1 (0, 0))) (0, 0)] 1 [DecAssign WInt (Ident "x-2" (0, 0)) (RExpr (IntLiter 1 (0, 0))) (0, 0)] 2 (0, 0)
+                   If (IdentExpr (Ident "x-0" (0, 0)) (0, 0)) [DecAssign WInt (Ident "x-1" (0, 0)) (RExpr (IntLiter 1 (0, 0))) (0, 0)] (Just 1) [DecAssign WInt (Ident "x-2" (0, 0)) (RExpr (IntLiter 1 (0, 0))) (0, 0)] (Just 2) (0, 0)
                  )
 
   it "renames while statements" $
-    renameStat xScopeAccum (While (IdentExpr (Ident "x" (0, 0)) (0, 0)) [DecAssign WInt (Ident "x" (0, 0)) (RExpr (IntLiter 1 (0, 0))) (0, 0)] noScope (0, 0))
+    renameStat xScopeAccum (While (IdentExpr (Ident "x" (0, 0)) (0, 0)) [DecAssign WInt (Ident "x" (0, 0)) (RExpr (IntLiter 1 (0, 0))) (0, 0)] Nothing (0, 0))
       `shouldBe` ( ScopeAccum
                      { scopeMap = fromList [(0, [Ident "x-0" (0, 0)]), (1, [Ident "x-1" (0, 0)])],
                        scopeStack = [0],
                        scopeCounter = 1,
                        errors = []
                      },
-                   While (IdentExpr (Ident "x-0" (0, 0)) (0, 0)) [DecAssign WInt (Ident "x-1" (0, 0)) (RExpr (IntLiter 1 (0, 0))) (0, 0)] 1 (0, 0)
+                   While (IdentExpr (Ident "x-0" (0, 0)) (0, 0)) [DecAssign WInt (Ident "x-1" (0, 0)) (RExpr (IntLiter 1 (0, 0))) (0, 0)] (Just 1) (0, 0)
                  )
 
   it "renames begin statements" $
-    renameStat initialScopeAccum (Begin [DecAssign WInt (Ident "x" (0, 0)) (RExpr (IntLiter 1 (0, 0))) (0, 0)] noScope)
+    renameStat initialScopeAccum (Begin [DecAssign WInt (Ident "x" (0, 0)) (RExpr (IntLiter 1 (0, 0))) (0, 0)] Nothing)
       `shouldBe` ( ScopeAccum
                      { scopeMap = fromList [(1, [Ident "x-1" (0, 0)])],
                        scopeStack = [0],
                        scopeCounter = 1,
                        errors = []
                      },
-                   Begin [DecAssign WInt (Ident "x-1" (0, 0)) (RExpr (IntLiter 1 (0, 0))) (0, 0)] 1
+                   Begin [DecAssign WInt (Ident "x-1" (0, 0)) (RExpr (IntLiter 1 (0, 0))) (0, 0)] (Just 1)
                  )
 
   it "renames lidents" $

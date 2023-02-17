@@ -4,7 +4,7 @@ import qualified Data.Text as T
 
 type Position = (Int, Int)
 
-type Scope = Int
+type Scope = Maybe Int 
 
 data Program = Program [Func] Stats deriving (Show, Eq)
 
