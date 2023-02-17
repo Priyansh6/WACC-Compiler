@@ -1,23 +1,10 @@
 name:                WACC40
 version:             0.1.0.0
-github:              "githubuser/WACC40"
-license:             BSD3
-author:              "Author name here"
-maintainer:          "example@example.com"
-copyright:           "2023 Author name here"
+git:                 "https://gitlab.doc.ic.ac.uk/lab2223_spring/WACC_40"
+author:              Hamish Mccreanor <hwm21@ic.ac.uk>, Priyansh Mahajan <pm521@ic.ac.uk>, Seyhan Khan <sk2721@ic.ac.uk>, Kelan Benson <kjb121@ic.ac.uk>
 
 extra-source-files:
 - README.md
-- CHANGELOG.md
-
-# Metadata used when publishing your package
-# synopsis:            Short description of your package
-# category:            Web
-
-# To avoid duplicated efforts in documentation and dealing with the
-# complications of embedding Haddock markup inside cabal files, it is
-# common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/githubuser/WACC40#readme>
 
 dependencies:
 - base >= 4.7 && < 5
