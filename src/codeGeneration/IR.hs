@@ -6,33 +6,36 @@ where
 
 import qualified Data.Text as T
 
-type Instrs = [Instr]
+data IRReg = TmpReg Int 
+data ArmReg = R0 | R1 | R2 | R3 | R4 | R5 | R6 | R7 | R8 | R9 | R10 | R11 | R12 | SP | LR | PC
 
-newtype IRReg = TmpReg Int 
+type ArmInstr = Instr ArmReg
+type IRInstr = Instr IRReg
+type Instrs a = [Instr a]
 
-data Instr = Define Label Bool   -- if bool is true then this is a .global label
-           | StringData Label T.Text -- creates a .data section with a string constant
-           | Load Operand Operand 
-           | Store Operand Operand 
-           | Mov Operand Operand
-           | Add Operand Operand Operand
-           | Sub Operand Operand Operand
-           | Mul Operand Operand Operand
-           | Div Operand Operand Operand
-           | Cmp Operand Operand 
-           | Jmp Label -- Jump to generic label
-           | Jsr Label -- Jump to subroutine (updates LR)
-           | Jlt Label
-           | Jgt Label
-           | Jle Label
-           | Jge Label
-           | Push Operand
-           | Pop Operand
-           | Comment T.Text
+data Instr a = Define Label Bool   -- If bool is true then this is a .global label
+             | StringData Label T.Text -- Creates a .data section with a string constant
+             | Load (Operand a) (Operand a)
+             | Store (Operand a) (Operand a)
+             | Mov (Operand a) (Operand a)
+             | Add (Operand a) (Operand a) (Operand a)
+             | Sub (Operand a) (Operand a) (Operand a)
+             | Mul (Operand a) (Operand a) (Operand a)
+             | Div (Operand a) (Operand a) (Operand a)
+             | Cmp (Operand a) (Operand a)
+             | Jmp Label -- Jump to generic label
+             | Jsr Label -- Jump to subroutine (updates LR)
+             | Jlt Label
+             | Jgt Label
+             | Jle Label
+             | Jge Label
+             | Push (Operand a)
+             | Pop (Operand a)
+             | Comment T.Text -- Creates a comment in the assembly file
 
 type Label = T.Text
 
-data Operand = Reg IRReg
-             | Imm Int   
-             | Abs Label    
-             | Ind IRReg  -- register indirect
+data Operand a = Reg a
+               | Imm Int   
+               | Abs Label    
+               | Ind IRReg  -- register indirect
