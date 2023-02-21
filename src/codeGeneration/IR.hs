@@ -32,8 +32,8 @@ data Instr a = Define Label Bool   -- If bool is true then this is a .global lab
              | Cmp (Operand a) (Operand a)
              | Jmp Label -- Jump to generic label
              | Jsr Label -- Jump to subroutine (updates LR)
-             | Jlt Label
-             | Jgt Label
+             | Jl Label
+             | Jg Label
              | Jle Label
              | Jge Label
              | Push (Operand a)
