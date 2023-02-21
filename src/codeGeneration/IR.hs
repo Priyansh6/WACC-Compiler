@@ -46,6 +46,6 @@ data Operand a = Reg a
                | Regs [a] -- for Push and Pop
                | Imm Int   
                | Abs Label    
-               | Ind IRReg  -- register indirect
+               | Ind a  -- register indirect
 
 type FPOffsets = M.Map Ident Int
