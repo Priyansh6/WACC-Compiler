@@ -1,13 +1,4 @@
-module CodeGeneration.IR 
-  ( Instrs, 
-    Instr,
-    IRReg,
-    IRInstr,
-    IRInstrs,
-    Ident,
-    FPOffsets
-  )
-where
+module CodeGeneration.IR (module CodeGeneration.IR) where
 
 import qualified Data.Map as M
 import qualified Data.Text as T
