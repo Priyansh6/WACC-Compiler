@@ -1,17 +1,23 @@
 module IR 
   ( Instrs, 
-    Instr 
+    Instr,
+    IRReg,
+    IRInstr,
+    IRInstrs,
+    Ident,
+    FPOffsets
   )
 where
 
 import qualified Data.Text as T
 
 data IRReg = TmpReg Int | IRFP | IRSP | IRLR | IRPC 
-data ArmReg = R0 | R1 | R2 | R3 | R4 | R5 | R6 | R7 | R8 | R9 | R10 | FP | R12 | SP | LR | PC
 
-type ArmInstr = Instr ArmReg
-type IRInstr = Instr IRReg
 type Instrs a = [Instr a]
+type IRInstr = Instr IRReg
+type IRInstrs = Instrs IRInstr
+
+data Ident = T.Text
 
 data Instr a = Define Label Bool   -- If bool is true then this is a .global label
              | StringData Label T.Text -- Creates a .data section with a string constant
@@ -39,3 +45,5 @@ data Operand a = Reg a
                | Imm Int   
                | Abs Label    
                | Ind IRReg  -- register indirect
+
+type FPOffsets = Data.Map Ident Int
