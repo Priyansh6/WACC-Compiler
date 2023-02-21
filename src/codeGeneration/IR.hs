@@ -43,6 +43,7 @@ data Instr a = Define Label Bool   -- If bool is true then this is a .global lab
 type Label = T.Text
 
 data Operand a = Reg a
+               | Regs [a] -- for Push and Pop
                | Imm Int   
                | Abs Label    
                | Ind IRReg  -- register indirect
