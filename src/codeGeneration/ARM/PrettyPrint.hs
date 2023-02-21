@@ -14,7 +14,7 @@ showArm intrs =
       ".global main",
       "main:"
     ]
-      ++ map ((`T.snoc` '\t') . T.unwords . showInstr) intrs
+      ++ map (("\t" <>) . T.unwords . showInstr) intrs
 
 showInstr :: ArmInstr -> [T.Text]
 showInstr (Define l b) = [] -- If bool is true then this is a .global label
@@ -37,14 +37,14 @@ showInstr (Push o) = ["PUSH", showOp o]
 showInstr (Pop o) = ["POP", showOp o]
 showInstr (Comment t) = ["@", t]
 
+showOps :: [Operand ArmReg] -> [T.Text]
+showOps = map ((<> ",") . showOp)
+
 showOp :: Operand ArmReg -> T.Text
 showOp (Reg r) = showArmReg r
 showOp (Regs rs) = "{" <> T.intercalate ", " (map showArmReg rs) <> "}"
 showOp (Imm i) = "#" <> T.pack (show i)
 showOp (Ind r) = "[" <> showArmReg r <> "]"
-
-showOps :: [Operand ArmReg] -> [T.Text]
-showOps = map showOp
 
 showArmReg :: ArmReg -> T.Text
 showArmReg = T.toLower . T.pack . show

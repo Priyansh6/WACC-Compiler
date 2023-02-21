@@ -3,6 +3,7 @@
 module Main (main) where
 
 import qualified Lexer as L
+import CodeGeneration.ARM.PrettyPrint (showArm)
 import Syntax.Program (program)
 import Semantic.Errors (printSemanticErrors)
 import Semantic.Rename.Program (rename)
@@ -18,9 +19,6 @@ import System.Exit
 import System.FilePath ( takeBaseName )
 import Text.Megaparsec
 
-defaultOutput :: T.Text
-defaultOutput = ".data\n.text\n.global main\nmain:\n"
-
 main :: IO ()
 main = do 
   (fname:_) <- getArgs
@@ -33,5 +31,5 @@ main = do
     Right ast -> case rename ast of
       ((_, []), renamedAST) -> case runExcept $ runStateT (checkProg renamedAST) M.empty of
         Left err -> printSemanticErrors [err] contents fname >> exitWith (ExitFailure 200)
-        Right _ -> TIO.writeFile (takeBaseName fname ++ ".s") defaultOutput >> exitSuccess
+        Right _ -> TIO.writeFile (takeBaseName fname ++ ".s") (showArm []) >> exitSuccess
       ((_, errs), _) -> printSemanticErrors errs contents fname >> exitWith (ExitFailure 200)
