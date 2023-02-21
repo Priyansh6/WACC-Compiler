@@ -4,6 +4,7 @@ import Control.Monad.Reader
 import Control.Monad.State
 
 import CodeGeneration.IR (IRReg, Instrs, IRInstrs, IRInstr, FPOffsets)
+import CodeGeneration.Utils ((<++>), (<++), (++>))
 import Semantic.Rename.Scope (ScopeMap)
 import Semantic.Type.SymbolTable (SymbolTable)
 
@@ -20,9 +21,7 @@ transStat (DecAssign t i r _) = undefined
 transStat (Assign l r _) = undefined
 transStat (Read l _) = undefined
 transStat (Free e _) = undefined
-transStat (Return e _) = do 
-  xs <- transExp e 
-  return xs ++ [Pop (TmpReg 0)]
+transStat (Return e _) = transExp e ++> [Pop (TmpReg 0)]
 transStat (Exit e _) = undefined
 transStat (Print e) = undefined
 transStat (Println e) = undefined
@@ -57,6 +56,3 @@ transExp ((:==:) e e' _) = undefined
 transExp ((:!=:) e e' _) = undefined
 transExp ((:&&:) e e' _) = undefined
 transExp ((:||:) e e' _) = undefined
-
-(<++>) :: m [a] -> m [a] -> m [a]
-a <++> b = (++) <$> a <*> b
