@@ -1,4 +1,9 @@
-module PrettyPrint (showArm) where
+module CodeGeneration.ARM.PrettyPrint (showArm) where
 
-showArm :: Instrs ArmReg -> T.Text
+import CodeGeneration.ARM.Registers (ArmInstrs)
+import CodeGeneration.IR (Instrs)
+
+import qualified Data.Text as T
+
+showArm :: ArmInstrs -> T.Text
 showArm = undefined

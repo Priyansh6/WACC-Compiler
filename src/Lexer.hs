@@ -4,12 +4,12 @@ module Lexer (ident, number, char, brackets, parens, fully) where
 
 import Data.Maybe
 import Data.String
-import Parser (Parser)
-import Text.Megaparsec hiding (token)
-
 import qualified Data.Text as T
+import Text.Megaparsec hiding (token)
 import qualified Text.Megaparsec.Char as C
 import qualified Text.Megaparsec.Char.Lexer as L
+
+import Syntax.Parser
 
 sc :: Parser ()
 sc = L.space C.space1 (L.skipLineComment "#") empty

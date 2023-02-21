@@ -1,4 +1,4 @@
-module IR 
+module CodeGeneration.IR 
   ( Instrs, 
     Instr,
     IRReg,
@@ -9,6 +9,7 @@ module IR
   )
 where
 
+import qualified Data.Map as M
 import qualified Data.Text as T
 
 data IRReg = TmpReg Int | IRFP | IRSP | IRLR | IRPC 
@@ -17,7 +18,7 @@ type Instrs a = [Instr a]
 type IRInstr = Instr IRReg
 type IRInstrs = Instrs IRInstr
 
-data Ident = T.Text
+data Ident = Ident T.Text
 
 data Instr a = Define Label Bool   -- If bool is true then this is a .global label
              | StringData Label T.Text -- Creates a .data section with a string constant
@@ -46,4 +47,4 @@ data Operand a = Reg a
                | Abs Label    
                | Ind IRReg  -- register indirect
 
-type FPOffsets = Data.Map Ident Int
+type FPOffsets = M.Map Ident Int

@@ -1,14 +1,24 @@
-module Helpers (generateHelperFuncs) where
+module CodeGeneration.Helpers (generateHelperFuncs) where
 
+import Control.Monad.Reader
+import Data.Set (Set)
+
+import CodeGeneration.IR (IRInstrs)
+import Semantic.Rename.Scope (ScopeMap)
+import Semantic.Type.SymbolTable (SymbolTable)
 import qualified AST
 
--- Generates code for print, println, read etc.
--- should maybe (definitely) mangle names for these so these aren't renamed variables
-generateHelperFuncs :: AST.Program -> Reader (SymbolTable, ScopeMap) Instrs IRReg
-generateHelpersFuncs = scanHelperFuncs >>= generateHelperFuncs' 
-    where
-        generateHelperFuncs' :: Set (HelperFunc, Type) -> Reader (SymbolTable, ScopeMap) Instrs IRReg
-        generateHelperFuncs' = undefined
+data HelperFunc = Print | Println | Read 
+data FormatType = FInt | FStr 
 
-scanHelperFuncs :: AST.Program -> Set (HelperFunc, Type)
+-- Generates code for print, println, read etc.
+-- should mayb (definitely) mangle names for these so these aren't renamed variables
+generateHelperFuncs :: AST.Program -> Reader (SymbolTable, ScopeMap) IRInstrs
+generateHelperFuncs = undefined
+-- generateHelperFuncs = scanHelperFuncs >>= generateHelperFuncs' 
+--     where
+--         generateHelperFuncs' :: Set (HelperFunc, FormatType) -> Reader (SymbolTable, ScopeMap) IRInstrs
+--         generateHelperFuncs' = undefined
+
+scanHelperFuncs :: AST.Program -> Set (HelperFunc, FormatType)
 scanHelperFuncs = undefined

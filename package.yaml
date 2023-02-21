@@ -32,12 +32,6 @@ ghc-options:
 library:
   source-dirs: 
   - src
-  - src/parse
-  - src/codeGeneration
-  - src/codeGeneration/ARM
-  - src/semanticAnalysis
-  - src/semanticAnalysis/typeChecker
-  - src/semanticAnalysis/renamerFuncs
 
 executables:
   WACC40-exe:
@@ -53,7 +47,7 @@ executables:
 tests:
   WACC40-test:
     main:                Spec.hs
-    source-dirs:         test/unit
+    source-dirs:         test
     ghc-options:
     - -threaded
     - -rtsopts

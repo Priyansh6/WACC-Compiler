@@ -54,8 +54,8 @@ def integrationTests():
 			if expectedExit != actualExit:
 				testSummary += addTestResult(FAILED_EXIT, waccFilename, f"Exit code: {expectedExit}", f"Exit code: {actualExit}")
 				continue
+			testSummary += addTestResult(PASSED)
 			if expectedExit != 0:
-				testSummary += addTestResult(PASSED)
 				continue
 
 			basename = os_path.splitext(os_path.basename(waccFilename))[0]

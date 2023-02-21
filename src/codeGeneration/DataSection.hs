@@ -1,6 +1,12 @@
-module DataSection (generateDataSection) where
+module CodeGeneration.DataSection (generateDataSection) where
 
-generateDataSection :: AST.Stats -> Reader (SymbolTable, ScopeMap) Instrs IRReg
+import Control.Monad.Reader (Reader)
+import CodeGeneration.IR (IRInstrs)
+import Semantic.Type.SymbolTable (SymbolTable)
+import Semantic.Rename.Scope (ScopeMap)
+import qualified AST
+
+generateDataSection :: AST.Stats -> Reader (SymbolTable, ScopeMap) IRInstrs
 generateDataSection = undefined
 -- generateDataSection ss = map generateDataSection' ss
 --     where

@@ -2,21 +2,21 @@
 
 module Main (main) where
 
-import Programs (program)
-import SemanticErrors (printSemanticErrors)
-import Renamer (rename)
-import CheckTypes (checkProg)
+import qualified Lexer as L
+import Syntax.Program (program)
+import Semantic.Errors (printSemanticErrors)
+import Semantic.Rename.Program (rename)
+import Semantic.Type.CheckTypes (checkProg)
 
 import Control.Monad.Except
 import Control.Monad.Trans.State
-import Text.Megaparsec
-import System.Environment
-import System.Exit
-import System.FilePath ( takeBaseName )
 import qualified Data.Map as M
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
-import qualified Lexer as L
+import System.Environment
+import System.Exit
+import System.FilePath ( takeBaseName )
+import Text.Megaparsec
 
 defaultOutput :: T.Text
 defaultOutput = ".data\n.text\n.global main\nmain:\n"
