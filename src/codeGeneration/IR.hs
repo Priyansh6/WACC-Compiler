@@ -3,7 +3,7 @@ module CodeGeneration.IR (module CodeGeneration.IR) where
 import qualified Data.Map as M
 import qualified Data.Text as T
 
-data IRReg = TmpReg Int | IRFP | IRSP | IRLR | IRPC 
+data IRReg = TmpReg Int | FP | SP | LR | PC 
 
 type Instrs a = [Instr a]
 type IRInstr = Instr IRReg
@@ -36,7 +36,6 @@ type Label = T.Text
 data Operand a = Reg a
                | Regs [a] -- for Push and Pop
                | Imm Int   
-               | Abs Label    
-               | Ind IRReg  -- register indirect
+               | Ind a  -- register indirect
 
 type FPOffsets = M.Map Ident Int
