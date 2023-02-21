@@ -33,6 +33,7 @@ library:
   source-dirs: 
   - src
   - src/parse
+  - src/codeGeneration
   - src/semanticAnalysis
   - src/semanticAnalysis/typeChecker
   - src/semanticAnalysis/renamerFuncs
