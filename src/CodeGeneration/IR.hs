@@ -12,17 +12,18 @@ where
 import qualified Data.Map as M
 import qualified Data.Text as T
 
+type Program a = [Section a]
+data Section a = Section Label [Data] [Instr a]
+data Data = StringData Label T.Text
+
 data IRReg = TmpReg Int | IRFP | IRSP | IRLR | IRPC 
 
 type Instrs a = [Instr a]
-type IRInstr = Instr IRReg
-type IRInstrs = Instrs IRInstr
+type IRInstrs = Instrs IRReg
 
 data Ident = Ident T.Text
 
-data Instr a = Define Label Bool   -- If bool is true then this is a .global label
-             | StringData Label T.Text -- Creates a .data section with a string constant
-             | Load (Operand a) (Operand a)
+data Instr a = Load (Operand a) (Operand a)
              | Store (Operand a) (Operand a)
              | Mov (Operand a) (Operand a)
              | Add (Operand a) (Operand a) (Operand a)
