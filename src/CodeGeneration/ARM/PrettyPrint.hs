@@ -44,6 +44,7 @@ showOp :: Operand ArmReg -> T.Text
 showOp (Reg r) = showArmReg r
 showOp (Regs rs) = "{" <> T.intercalate ", " (map showArmReg rs) <> "}"
 showOp (Imm i) = "#" <> T.pack (show i)
+showOp (Abs i) = "=" <> i
 showOp (Ind r) = "[" <> showArmReg r <> "]"
 
 showArmReg :: ArmReg -> T.Text
