@@ -5,11 +5,15 @@ import qualified Data.Text as T
 
 type Program a = [Section a]
 
-data Section a = Section Label [Data] [Instr a]
+data Section a = Section [Data] [Function a]
+
+data Function a = Function Label Global [Instr a]
+
+type Global = Bool
 
 data Data = StringData Label T.Text
 
-data IRReg = TmpReg Int | FP | SP | LR | PC
+data IRReg = TmpReg Int | IRFP | IRSP | IRLR | IRPC
 
 type Instrs a = [Instr a]
 
@@ -28,6 +32,7 @@ data Instr a
   | Cmp (Operand a) (Operand a)
   | Jmp Label -- Jump to generic label
   | Jsr Label -- Jump to subroutine (updates LR)
+  | Je Label
   | Jl Label
   | Jg Label
   | Jle Label
@@ -44,5 +49,6 @@ data Operand a
   | Imm Int
   | Abs Label
   | Ind a -- register indirect
+  | ImmOffset a Int -- for addressing mode 2
 
 type FPOffsets = M.Map Ident Int

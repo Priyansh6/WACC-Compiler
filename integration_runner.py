@@ -21,7 +21,7 @@ BOLD = "\033[1m"
 END = "\033[0m"
 
 PASSED = GREEN + "." + END
-FAILED_EXIT = RED + "E" + END
+FAILED_EXIT = RED + "C" + END
 FAILED_OUTPUT = RED + "O" + END
 SKIPPED = YELLOW + "-" + END
 
@@ -29,7 +29,7 @@ failedTests = []
 
 def integrationTests():
 	print(PASSED, "passed")
-	print(FAILED_EXIT, "wrong exit code")
+	print(FAILED_EXIT, "failed compilation")
 	print(FAILED_OUTPUT, "wrong output")
 	print(SKIPPED, "skipped")
 	testSummary = ""
@@ -41,7 +41,7 @@ def integrationTests():
 		exit(1)
 
 	for testDir in TESTS:
-		print("\n" + testDir)
+		print("\n" + testDir + "\t(tests compilation" + (" + output" if testDir == "valid" else "") +  ")")
 		for waccFilename in Path("./test/integration/" + testDir).rglob("*.wacc"):
 			totalTests += 1
 			result = subprocess.run(
@@ -52,7 +52,7 @@ def integrationTests():
 			expectedExit = getExpectedExit(waccFilename)
 			actualExit = result.returncode
 			if expectedExit != actualExit:
-				testSummary += addTestResult(FAILED_EXIT, waccFilename, f"Exit code: {expectedExit}", f"Exit code: {actualExit}")
+				testSummary += addTestResult(FAILED_EXIT, waccFilename, f"Exit code: {expectedExit}", f"Exit code: {actualExit} (toggle VIEW_HASKELL_OUTPUT for more info)")
 				continue
 			testSummary += addTestResult(PASSED)
 			if expectedExit != 0:
@@ -84,7 +84,7 @@ def integrationTests():
 	passedTests = totalTests - len(failedTests)
 	if passedTests != totalTests:
 		print("\n" + PASSED, "passed")
-		print(FAILED_EXIT, "wrong exit code")
+		print(FAILED_EXIT, "failed compilation")
 		print(FAILED_OUTPUT, "wrong output")
 		print(SKIPPED, "skipped")
 		print(testSummary)
