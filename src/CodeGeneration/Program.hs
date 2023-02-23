@@ -21,8 +21,11 @@ transProg (AST.Program fs ss) = do
 transMain :: AST.Stats -> (Reader (SymbolTable, ScopeMap)) (Section IRReg)
 transMain ss = do 
   let unlimitedRegs = map TmpReg [0..]
-  instrs <- evalStateT (transStats ss) (Aux {available = unlimitedRegs}) 
-  return $ Section [] [Function "main" True instrs]
+  bodyInstrs <- evalStateT (transStats ss) (Aux {available = unlimitedRegs}) 
+  return $ Section [] [Function "main" True (wrapSectionBody bodyInstrs)]
 
 transFunc :: AST.Func -> (Reader (SymbolTable, ScopeMap)) (Section IRReg)
 transFunc _ = return $ Section [] []
+
+wrapSectionBody :: IRInstrs -> IRInstrs
+wrapSectionBody ss = [Push (Regs [IRFP, IRLR]), Mov (Reg IRFP) (Reg IRSP)] ++ ss ++ [Pop (Regs [IRFP, IRPC])]
