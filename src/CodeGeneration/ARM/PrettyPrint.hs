@@ -6,46 +6,60 @@ import CodeGeneration.ARM.Registers
 import CodeGeneration.IR
 import qualified Data.Text as T
 
-showArm :: ArmInstrs -> T.Text
-showArm intrs =
-  T.unlines $
-    [ ".data",
-      ".text",
-      ".global main",
-      "main:"
-    ]
-      ++ map (("\t" <>) . T.unwords . showInstr) intrs
+showArm :: Program ArmReg -> T.Text
+showArm = T.intercalate "\n" . map showSection
+
+showSection :: Section ArmReg -> T.Text
+showSection (Section ds fs) =
+  T.intercalate "\n" $
+    ([".data" | not (null ds)])
+      ++ showData ds
+      ++ ([".text" | not (null fs)])
+      ++ map showFunction fs
+      ++ [""]
+
+showData :: [Data] -> [T.Text]
+showData = map (\(StringData l v) -> l <> ":\n\t.asciz \"" <> v <> "\"")
+
+showFunction :: Function ArmReg -> T.Text
+showFunction (Function l g instrs) =
+  T.intercalate
+    "\n"
+    ( [".global " <> l | g]
+        ++ [l <> ":"]
+        ++ map (("\t" <>) . T.unwords . showInstr) instrs
+    )
 
 showInstr :: ArmInstr -> [T.Text]
-showInstr (Define l b) = [] -- If bool is true then this is a .global label
-showInstr (StringData l t) = [] -- Creates a .data section with a string constant
-showInstr (Load rd a) = "LDR" : showOps [rd, a]
-showInstr (Store rd a) = "STR" : showOps [rd, a]
-showInstr (Mov rd o2) = "MOV" : showOps [rd, o2]
-showInstr (Add rd rn o2) = "ADD" : showOps [rd, rn, o2]
-showInstr (Sub rd rn o2) = "SUB" : showOps [rd, rn, o2]
-showInstr (Mul rd rm rs) = "MUL" : showOps [rd, rm, rs]
-showInstr (Div _ _ _) = []
-showInstr (Cmp rn o2) = "CMP" : showOps [rn, o2]
-showInstr (Jmp l) = ["B", l]
-showInstr (Jsr l) = ["BL", l]
-showInstr (Jl l) = ["BLT", l]
-showInstr (Jg l) = ["BGT", l]
-showInstr (Jle l) = ["BLE", l]
-showInstr (Jge l) = ["BGE", l]
-showInstr (Push o) = ["PUSH", showOp o]
-showInstr (Pop o) = ["POP", showOp o]
+showInstr (Load rd a) = ["ldr", showOps [rd, a]]
+showInstr (Store rd a) = ["str", showOps [rd, a]]
+showInstr (Mov rd o2) = ["mov", showOps [rd, o2]]
+showInstr (Add rd rn o2) = ["add", showOps [rd, rn, o2]]
+showInstr (Sub rd rn o2) = ["sub", showOps [rd, rn, o2]]
+showInstr (Mul rd rm rs) = ["mul", showOps [rd, rm, rs]]
+showInstr (Div {}) = ["@ div"]
+showInstr (Cmp rn o2) = ["cmp", showOps [rn, o2]]
+showInstr (Jmp l) = ["b", l]
+showInstr (Jsr l) = ["bl", l]
+showInstr (Je l) = ["beq", l]
+showInstr (Jl l) = ["blt", l]
+showInstr (Jg l) = ["bgt", l]
+showInstr (Jle l) = ["ble", l]
+showInstr (Jge l) = ["bge", l]
+showInstr (Push o) = ["push", showOp o]
+showInstr (Pop o) = ["pop", showOp o]
 showInstr (Comment t) = ["@", t]
 
-showOps :: [Operand ArmReg] -> [T.Text]
-showOps = map ((<> ",") . showOp)
+showOps :: [Operand ArmReg] -> T.Text
+showOps = T.intercalate ", " . map showOp
 
 showOp :: Operand ArmReg -> T.Text
 showOp (Reg r) = showArmReg r
 showOp (Regs rs) = "{" <> T.intercalate ", " (map showArmReg rs) <> "}"
 showOp (Imm i) = "#" <> T.pack (show i)
 showOp (Abs i) = "=" <> i
-showOp (Ind r) = "[" <> showArmReg r <> "]"
+showOp (Ind r) = "[" <> showOp (Reg r) <> "]"
+showOp (ImmOffset r i) = "[" <> showOp (Reg r) <> ", " <> showOp (Imm i) <> "]"
 
 showArmReg :: ArmReg -> T.Text
 showArmReg = T.toLower . T.pack . show

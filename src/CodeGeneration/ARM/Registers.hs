@@ -1,10 +1,4 @@
-module CodeGeneration.ARM.Registers 
-  ( allocRegisters, 
-    ArmInstr,
-    ArmInstrs,
-    ArmReg
-  ) 
-where
+module CodeGeneration.ARM.Registers (module CodeGeneration.ARM.Registers) where
 
 import CodeGeneration.IR (Instr, Instrs, IRReg)
 
