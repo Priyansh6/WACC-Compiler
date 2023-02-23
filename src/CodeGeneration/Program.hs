@@ -1,25 +1,28 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module CodeGeneration.Program (transProg) where
 
 import Control.Monad.Reader 
 import Control.Monad.State
 
-import CodeGeneration.IR (IRInstrs, FPOffsets)
+import CodeGeneration.IR 
+import CodeGeneration.Statements (transStats, Aux(Aux, available))
 import Semantic.Rename.Scope (ScopeMap)
 import Semantic.Type.SymbolTable (SymbolTable)
 
 import qualified AST
 
-transProg :: AST.Program -> Reader (SymbolTable, ScopeMap) IRInstrs
--- transProg p@(Program fs ss) = transMain ss ++ transFunc fs ++ generateHelperFuncs p
-transProg = undefined
+transProg :: AST.Program -> Reader (SymbolTable, ScopeMap) (Program IRReg)
+transProg (AST.Program fs ss) = do
+  mainSection <- transMain ss
+  otherSections <- mapM transFunc fs
+  return $ otherSections ++ [mainSection]
 
--- generate a .data section (potentially) as well as a .text with function body
--- also marches stack pointer
--- calls transStats
-transMain :: AST.Stats -> StateT FPOffsets (Reader (SymbolTable, ScopeMap)) IRInstrs
--- transMain m = generalMainSetupStuff ++ generateDataSection m ++ transStats m
-transMain = undefined
+transMain :: AST.Stats -> (Reader (SymbolTable, ScopeMap)) (Section IRReg)
+transMain ss = do 
+  let unlimitedRegs = map TmpReg [0..]
+  instrs <- evalStateT (transStats ss) (Aux {available = unlimitedRegs}) 
+  return $ Section [] [Function "main" True instrs]
 
-transFunc :: AST.Func -> IRInstrs
--- transFunc (AST.Func t x params ss) = generalFuncSetupStuff ++ generateDataSection ss ++ transStats ss
-transFunc = undefined
+transFunc :: AST.Func -> (Reader (SymbolTable, ScopeMap)) (Section IRReg)
+transFunc _ = return $ Section [] []

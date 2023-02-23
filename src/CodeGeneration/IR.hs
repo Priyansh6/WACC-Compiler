@@ -13,10 +13,9 @@ type Global = Bool
 
 data Data = StringData Label T.Text
 
-data IRReg = TmpReg Int | IRFP | IRSP | IRLR | IRPC
+data IRReg = TmpReg Int | IRFP | IRSP | IRLR | IRPC | IRRet
 
 type Instrs a = [Instr a]
-
 type IRInstrs = Instrs IRReg
 
 data Ident = Ident T.Text
@@ -48,6 +47,7 @@ data Operand a
   | Regs [a] -- for Push and Pop
   | Imm Int
   | Abs Label
+  | Var Ident
   | Ind a -- register indirect
   | ImmOffset a Int -- for addressing mode 2
 
