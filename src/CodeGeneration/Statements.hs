@@ -94,8 +94,30 @@ transExp ((:<:) e e' _) dst = transCmpOp Jl e e' dst
 transExp ((:<=:) e e' _) dst = transCmpOp Jle e e' dst
 transExp ((:==:) e e' _) dst = transCmpOp Je e e' dst
 transExp ((:!=:) e e' _) dst = transCmpOp Jne e e' dst
-transExp ((:&&:) e e' _) dst = return []
-transExp ((:||:) e e' _) dst = return []
+transExp ((:&&:) e e' _) dst = do
+  cmpReg <- nextFreeReg 
+  failLabel <- nextLabel
+  endLabel <- nextLabel
+  r <- nextFreeReg
+  eInstrs <- transExp e r
+  r' <- nextFreeReg
+  eInstrs' <- transExp e' r'
+  let successCase = [Cmp (Reg r) (Imm 1), Jne failLabel, Cmp (Reg r') (Imm 1), Jne failLabel, Mov (Reg cmpReg) (Imm 1), Jmp endLabel]
+      failCase = [Define failLabel, Mov (Reg cmpReg) (Imm 0)] 
+      end = [Define endLabel, Mov (Reg dst) (Reg cmpReg)]
+  return $ eInstrs ++ eInstrs' ++ successCase ++ failCase ++ end
+transExp ((:||:) e e' _) dst = do
+  cmpReg <- nextFreeReg 
+  successLabel <- nextLabel
+  endLabel <- nextLabel
+  r <- nextFreeReg
+  eInstrs <- transExp e r
+  r' <- nextFreeReg
+  eInstrs' <- transExp e' r'
+  let failCase = [Cmp (Reg r) (Imm 1), Jne successLabel, Cmp (Reg r') (Imm 1), Je successLabel, Mov (Reg cmpReg) (Imm 0), Jmp endLabel]
+      successCase = [Define successLabel, Mov (Reg cmpReg) (Imm 1)] 
+      end = [Define endLabel, Mov (Reg dst) (Reg cmpReg)]
+  return $ eInstrs ++ eInstrs' ++ failCase ++ successCase ++ end
 
 type NumInstrCons a = Operand a -> Operand a -> Operand a -> Instr a
 type BranchInstrCons a = Label -> Instr a
