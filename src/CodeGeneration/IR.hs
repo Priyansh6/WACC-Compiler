@@ -32,6 +32,7 @@ data Instr a
   | Jmp Label -- Jump to generic label
   | Jsr Label -- Jump to subroutine (updates LR)
   | Je Label
+  | Jne Label
   | Jl Label
   | Jg Label
   | Jle Label
