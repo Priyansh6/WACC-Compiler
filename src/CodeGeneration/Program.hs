@@ -19,7 +19,9 @@ transMain :: AST.Stats -> IRSectionGenerator (Section IRReg)
 transMain ss = do 
   let unlimitedRegs = map TmpReg [0..]
   bodyInstrs <- evalStateT (transStats ss) (Aux {available = unlimitedRegs, labelId = 0}) 
-  return $ Section [] [Function "main" True (wrapSectionBody bodyInstrs)]
+  case bodyInstrs of
+    [] -> return $ Section [] [Function "main" True (wrapSectionBody [Mov (Reg IRRet) (Imm 0)])] 
+    _ -> return $ Section [] [Function "main" True (wrapSectionBody bodyInstrs)]
 
 transFunc :: AST.Func -> IRSectionGenerator (Section IRReg)
 transFunc _ = return $ Section [] []
