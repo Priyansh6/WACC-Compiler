@@ -61,7 +61,7 @@ transExp (Neg e _) dst = do
   exprInstrs <- transExp e dst 
   return $ exprInstrs ++ [Sub (Reg dst) (Reg dst) (Imm 0)]
 transExp (Len e _) dst = return []
-transExp (Ord e _) dst = return []
+transExp (Ord e _) dst = transExp e dst
 transExp (Chr e _) dst = return []
 transExp ((:*:) e e' _) dst = do 
   r <- nextFreeReg
