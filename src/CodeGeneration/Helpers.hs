@@ -17,15 +17,34 @@ data FormatType = FInt | FStr
 
 type HelperGenerator = Reader (SymbolTable, ScopeMap) IRInstrs
 
+printfLabel :: Label
+printfLabel = "printf"
+
+fflushLabel :: Label
+fflushLabel = "fflush"
+
 -- Generates code for print, println, read etc.
 -- should mayb (definitely) mangle names for these so these aren't renamed variables
-generateHelperFunc :: HelperFunc -> IRInstrs
-generateHelperFunc (Print hType)
-  = [ StringData (showStrLabel (Print hType) 0) (showHelperOption hType), 
-      Define (showHelperLabel (Print hType)) False,
-      Push (Reg IRLR),
-      Mov (Reg (TmpReg))
+generateHelperFunc :: HelperFunc -> Section IRReg
+generateHelperFunc (Print hType) 
+  = Section 
+      [ StringData (strLabel) (showHelperOption hType) ] 
+      [ Function funcLabel False 
+        [ 
+          Define (showHelperLabel (Print hType)) False,
+          Push (Reg IRLR),
+          Mov (Reg (IRParam 2)) (Reg (IRParam 1)),
+          Load (Reg (IRParam 1) (Abs strLabel)),
+          Jmp printfLabel,
+          Mov (Reg (IRParam 1)) (Imm 0),
+          Jmp fflushLabel,
+          Pop (IRPC)
+        ]
       ]
+  where
+    funcLabel = showHelperLabel (Print hType)
+    strLabel = showStrLabel (Print hType) 0
+
 
 -- generateHelperFuncs = scanHelperFuncs >>= generateHelperFuncs' 
 --     where
