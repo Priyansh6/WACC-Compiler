@@ -38,6 +38,7 @@ data Instr a
   | Jge Label
   | Push (Operand a)
   | Pop (Operand a)
+  | Define Label
   | Comment T.Text -- Creates a comment in the assembly file
 
 type Label = T.Text
