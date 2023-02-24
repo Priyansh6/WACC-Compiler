@@ -20,30 +20,94 @@ type HelperGenerator = Reader (SymbolTable, ScopeMap) IRInstrs
 printfLabel :: Label
 printfLabel = "printf"
 
+putsLabel :: Label
+putsLabel = "puts"
+
 fflushLabel :: Label
 fflushLabel = "fflush"
+
+isHelperBool :: HelperType -> Bool
+isHelperBool HBool = True
+isHelperBool _     = False
 
 -- Generates code for print, println, read etc.
 -- should mayb (definitely) mangle names for these so these aren't renamed variables
 generateHelperFunc :: HelperFunc -> Section IRReg
-generateHelperFunc (Print hType) 
-  = Section 
-      [ StringData (strLabel) (showHelperOption hType) ] 
-      [ Function funcLabel False 
-        [ 
-          Define (showHelperLabel (Print hType)) False,
-          Push (Reg IRLR),
-          Mov (Reg (IRParam 2)) (Reg (IRParam 1)),
-          Load (Reg (IRParam 1) (Abs strLabel)),
-          Jmp printfLabel,
-          Mov (Reg (IRParam 1)) (Imm 0),
-          Jmp fflushLabel,
-          Pop (IRPC)
-        ]
+generateHelperFunc hf@(Print HBool)
+  = Section
+    [ 
+      StringData boolStr0 "false",
+      StringData boolStr1 "true",
+      StringData boolStr2 (showHelperOption HBool)
+    ]
+    [ 
+      Function (showHelperLabel hf) False
+      [ 
+        Push (Reg IRLR),
+        Cmp (Reg (IRParam 0)) (Imm 0),
+        Jne bool0,
+        Load (Reg (IRParam 2)) (Abs boolStr0),
+        Jmp bool1
+      ],
+      Function bool0 False [ Load (Reg (IRParam 2)) (Abs boolStr1) ],
+      Function bool1 False 
+      [
+        Load (Reg (IRParam 1)) (ImmOffset (IRParam 2) (-4)),
+        Load (Reg (IRParam 0)) (Abs boolStr2),
+        Jsr printfLabel,
+        Mov (Reg (IRParam 0)) (Imm 0),
+        Jsr fflushLabel,
+        Pop (Reg IRPC)
       ]
+    ]
+    where
+      bool0 = showHelperOption HBool <> "0"
+      bool1 = showHelperOption HBool <> "1"
+      boolStr0 = showStrLabel hf 0
+      boolStr1 = showStrLabel hf 1
+      boolStr2 = showStrLabel hf 2
+generateHelperFunc hf@(Print hType) 
+  = Section 
+    [ StringData strLabel (showHelperOption hType) ] 
+    [ Function funcLabel False $
+      [ Push (Reg IRLR) ]
+      ++ setupParams
+      ++ [
+        Load (Reg (IRParam 0)) (Abs strLabel),
+        Jsr printfLabel,
+        Mov (Reg (IRParam 0)) (Imm 0),
+        Jsr fflushLabel,
+        Pop (Reg IRPC)
+      ]
+    ]
   where
-    funcLabel = showHelperLabel (Print hType)
-    strLabel = showStrLabel (Print hType) 0
+    funcLabel = showHelperLabel hf
+    strLabel = showStrLabel hf 0
+
+    setupParams :: IRInstrs
+    setupParams = 
+      case hType of
+        HString -> [
+                     Mov (Reg (IRParam 2)) (Reg (IRParam 0)),
+                     Load (Reg (IRParam 1)) (ImmOffset (IRParam 0) (-4))
+                   ]
+        _       -> [ Mov (Reg (IRParam 1)) (Reg (IRParam 0)) ]
+generateHelperFunc Println
+  = Section
+    [ StringData strLabel "" ]
+    [ Function (showHelperLabel Println) False
+      [
+        Push (Reg IRLR),
+        Load (Reg (IRParam 0)) (Abs strLabel),
+        Jsr putsLabel,
+        Mov (Reg (IRParam 0)) (Imm 0),
+        Jsr fflushLabel,
+        Pop (Reg IRPC)
+      ]
+    ]
+    where
+      strLabel = showStrLabel Println 0
+
 
 
 -- generateHelperFuncs = scanHelperFuncs >>= generateHelperFuncs' 
