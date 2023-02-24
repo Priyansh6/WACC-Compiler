@@ -13,7 +13,7 @@ type Global = Bool
 
 data Data = StringData Label T.Text
 
-data IRReg = TmpReg Int | IRFP | IRSP | IRLR | IRPC | IRRet
+data IRReg = TmpReg Int | IRParam Int | IRFP | IRSP | IRLR | IRPC | IRRet
 
 type Instrs a = [Instr a]
 type IRInstrs = Instrs IRReg
