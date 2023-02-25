@@ -4,7 +4,7 @@ module CodeGeneration.Statements (transStats) where
 import AST hiding (Ident)
 import CodeGeneration.IR
 import CodeGeneration.Expressions (transExp)
-import CodeGeneration.Utils (IRStatementGenerator, nextFreeReg, makeRegAvailable, insertVarReg, Aux (varLocs))
+import CodeGeneration.Utils (IRStatementGenerator, nextFreeReg, makeRegAvailable, insertVarReg, getVarReg)
 import Control.Monad.State
 import Data.Map ((!))
 
@@ -23,8 +23,7 @@ transStat (DecAssign t (AST.Ident i _) r _) = do
   insertVarReg (Ident i) varReg
   return $ rInstrs ++ [Mov (Reg varReg) (Reg rReg)]
 transStat (Assign (LIdent (AST.Ident i _)) r _) = do
-  vl <- gets varLocs 
-  let varReg = vl ! Ident i
+  varReg <- getVarReg (Ident i)
   rReg <- nextFreeReg
   rInstrs <- transRVal r rReg 
   makeRegAvailable rReg

@@ -8,6 +8,7 @@ module CodeGeneration.Utils
     makeRegAvailable,
     makeRegsAvailable,
     insertVarReg,
+    getVarReg,
     nextLabel,
     (<++>),
     (++>),
@@ -18,6 +19,7 @@ where
 import CodeGeneration.IR
 import Control.Monad.Reader
 import Control.Monad.State
+import Data.Map ((!))
 import Semantic.Type.SymbolTable
 import Semantic.Rename.Scope
 
@@ -52,6 +54,9 @@ nextLabel = nextLabelId >>= toLabel
 
 insertVarReg :: Ident -> IRReg -> IRStatementGenerator ()
 insertVarReg i r = modify (\a@Aux {varLocs = vl} -> a {varLocs = M.insert i r vl})
+
+getVarReg :: Ident -> IRStatementGenerator IRReg
+getVarReg i = gets (\Aux {varLocs = vl} -> vl ! i)
 
 (<++>) :: Applicative m => m [a] -> m [a] -> m [a]
 a <++> b = (++) <$> a <*> b
