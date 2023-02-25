@@ -3,7 +3,7 @@
 module CodeGeneration.Utils 
   ( IRSectionGenerator,
     IRStatementGenerator,
-    Aux(Aux, available, labelId, varLocs),
+    Aux(Aux, available, labelId, varLocs, sectionName),
     nextFreeReg,
     makeRegAvailable,
     makeRegsAvailable,
@@ -32,6 +32,7 @@ type IRSectionGenerator a = (Reader (SymbolTable, ScopeMap)) a
 data Aux = Aux { 
   available :: [IRReg],
   labelId :: Int,
+  sectionName :: T.Text,
   varLocs :: M.Map Ident IRReg }
 
 nextFreeReg :: IRStatementGenerator IRReg
@@ -50,7 +51,7 @@ nextLabel = nextLabelId >>= toLabel
     nextLabelId = state (\a@Aux {labelId = l} -> (l, a {labelId = l + 1}))
 
     toLabel :: Int -> StateT Aux (Reader (SymbolTable, ScopeMap)) Label
-    toLabel x = return $ "_L" <> T.pack (show x)
+    toLabel i = gets (\Aux {sectionName = x} -> x <> "_l" <> T.pack (show i))
 
 insertVarReg :: Ident -> IRReg -> IRStatementGenerator ()
 insertVarReg i r = modify (\a@Aux {varLocs = vl} -> a {varLocs = M.insert i r vl})
