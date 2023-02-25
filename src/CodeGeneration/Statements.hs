@@ -54,7 +54,15 @@ transStat (If e ss _ ss' _ _) = do
       branchInstrs' = Define branchLabel' : ssInstrs'
   makeRegAvailable eReg
   return $ eInstrs ++ condJumpInstrs ++ branchInstrs ++ branchInstrs' ++ [Define endLabel]
-transStat (While e ss _ _) = return []
+transStat (While e ss _ _) = do
+  eReg <- nextFreeReg  
+  eInstrs <- transExp e eReg
+  ssInstrs <- transStats ss
+  startLabel <- nextLabel
+  condLabel <- nextLabel
+  makeRegAvailable eReg
+  let condJumpInstrs = [Cmp (Reg eReg) (Imm 1), Je startLabel]
+  return $ [Jmp condLabel, Define startLabel] ++ ssInstrs ++ [Define condLabel] ++ eInstrs ++ condJumpInstrs
 transStat (Begin ss _) = transStats ss
 
 transRVal :: RVal -> IRReg -> IRStatementGenerator IRInstrs
