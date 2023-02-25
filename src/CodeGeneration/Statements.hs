@@ -4,9 +4,7 @@ module CodeGeneration.Statements (transStats) where
 import AST hiding (Ident)
 import CodeGeneration.IR
 import CodeGeneration.Expressions (transExp)
-import CodeGeneration.Utils (IRStatementGenerator, nextFreeReg, makeRegAvailable, insertVarReg, getVarReg)
-import Control.Monad.State
-import Data.Map ((!))
+import CodeGeneration.Utils (IRStatementGenerator, nextFreeReg, makeRegAvailable, insertVarReg, getVarReg, nextLabel)
 
 import qualified AST (Ident(Ident)) 
 
@@ -43,7 +41,19 @@ transStat (Exit e _) = do
   return $ eis ++ [Mov (Reg IRRet) (Reg dst)]
 transStat (Print e) = return []
 transStat (Println e) = return []
-transStat (If e ss _ ss' _ _) = return [] 
+transStat (If e ss _ ss' _ _) = do
+  eReg <- nextFreeReg
+  eInstrs <- transExp e eReg
+  branchLabel <- nextLabel
+  ssInstrs <- transStats ss
+  branchLabel' <- nextLabel
+  ssInstrs' <- transStats ss'
+  endLabel <- nextLabel
+  let condJumpInstrs = [Cmp (Reg eReg) (Imm 1), Jne branchLabel']
+      branchInstrs = [Define branchLabel] ++ ssInstrs ++ [Jmp endLabel]
+      branchInstrs' = Define branchLabel' : ssInstrs'
+  makeRegAvailable eReg
+  return $ eInstrs ++ condJumpInstrs ++ branchInstrs ++ branchInstrs' ++ [Define endLabel]
 transStat (While e ss _ _) = return []
 transStat (Begin ss _) = transStats ss
 
