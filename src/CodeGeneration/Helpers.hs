@@ -2,20 +2,12 @@
 
 module CodeGeneration.Helpers (generateHelperFunc) where
 
-import Control.Monad.Reader
-import Data.Set (Set)
 import qualified Data.Text as T
 
 import CodeGeneration.IR 
-import Semantic.Rename.Scope (ScopeMap)
-import Semantic.Type.SymbolTable (SymbolTable)
-import qualified AST
 
 data HelperFunc = Print HelperType | Println | Read HelperType | ErrDivZero | ErrOverflow | ErrNull
 data HelperType = HInt | HChar | HBool | HString | HPointer
-data FormatType = FInt | FStr 
-
-type HelperGenerator = Reader (SymbolTable, ScopeMap) IRInstrs
 
 printfLabel :: Label
 printfLabel = "printf"
@@ -26,9 +18,17 @@ putsLabel = "puts"
 fflushLabel :: Label
 fflushLabel = "fflush"
 
-isHelperBool :: HelperType -> Bool
-isHelperBool HBool = True
-isHelperBool _     = False
+scanfLabel :: Label
+scanfLabel = "scanf"
+
+exitLabel :: Label
+exitLabel = "exit"
+
+isErrHelperFunc :: HelperFunc -> Bool
+isErrHelperFunc ErrDivZero = True
+isErrHelperFunc ErrOverflow = True
+isErrHelperFunc ErrNull = True
+isErrHelperFunc _ = False
 
 -- Generates code for print, println, read etc.
 -- should mayb (definitely) mangle names for these so these aren't renamed variables
@@ -107,21 +107,50 @@ generateHelperFunc Println
     ]
     where
       strLabel = showStrLabel Println 0
+generateHelperFunc hf@(Read hType)
+  = Section
+    [ StringData strLabel (spaceIfChar <> showHelperOption hType) ]
+    [ Function (showHelperLabel hf) False
+      [
+        Push (Reg IRLR),
+        Store (Reg (IRParam 0)) (ImmOffset IRSP (-4)), -- TODO: Only push byte size
+        Mov (Reg (IRParam 1)) (Reg IRSP),
+        Load (Reg (IRParam 0)) (Abs strLabel),
+        Jsr scanfLabel,
+        Load (Reg (IRParam 0)) (Reg IRSP),
+        Add (Reg IRSP) (Reg IRSP) (Imm 1),
+        Pop (Reg IRPC)
+      ]
+    ]
+  where
+    strLabel = showStrLabel hf 0
+    spaceIfChar = case hType of
+      HChar -> " "
+      _     -> ""
+generateHelperFunc errFunc 
+  | isErrHelperFunc errFunc 
+    = Section
+      [ StringData strLabel errMsg ]
+      [ Function (showHelperLabel ErrDivZero) False
+        [
+          Load (Reg (IRParam 0)) (Abs strLabel),
+          Jsr (showHelperLabel (Print HString)),
+          Mov (Reg (IRParam 0)) (Imm 255),
+          Jsr exitLabel
+        ]
+      ]
+  | otherwise = error "Unsupported helper function for generation"
+  where 
+    strLabel = showStrLabel errFunc 0
+    errMsg = case errFunc of
+      ErrDivZero -> "fatal error: division or modulo by zero\n"
+      ErrOverflow -> "fatal error: integer overflow or underflow occurred\n"
+      ErrNull -> "fatal error: null pair deferenced or freed\n"
 
-
-
--- generateHelperFuncs = scanHelperFuncs >>= generateHelperFuncs' 
---     where
---         generateHelperFuncs' :: Set (HelperFunc, FormatType) -> Reader (SymbolTable, ScopeMap) IRInstrs
---         generateHelperFuncs' = undefined
-
-scanHelperFuncs :: AST.Program -> Set (HelperFunc, FormatType)
-scanHelperFuncs = undefined
-
-showStrLabel :: HelperFunc -> Int -> T.Text
+showStrLabel :: HelperFunc -> Int -> Label
 showStrLabel hf i = ".L." <> showHelperLabel hf <> "_str" <> (T.pack . show) i
 
-showHelperLabel :: HelperFunc -> T.Text
+showHelperLabel :: HelperFunc -> Label
 showHelperLabel (Print HInt) = "_printi"
 showHelperLabel (Print HChar) = "_printc"
 showHelperLabel (Print HBool) = "_printb"
@@ -133,6 +162,7 @@ showHelperLabel (Read HChar) = "_readc"
 showHelperLabel (ErrDivZero) = "_errDivZero"
 showHelperLabel (ErrOverflow) = "_errOverflow"
 showHelperLabel (ErrNull) = "_errNull"
+showHelperLabel _ = error "Unknown Helper Function Label"
 
 showHelperOption :: HelperType -> T.Text
 showHelperOption HInt = "%d"
