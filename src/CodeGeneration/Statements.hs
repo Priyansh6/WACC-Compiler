@@ -49,4 +49,9 @@ transStat (While e ss _ _) = return []
 transStat (Begin ss _) = transStats ss
 
 transRVal :: RVal -> IRReg -> IRStatementGenerator IRInstrs
-transRVal = undefined
+transRVal (RExpr e) dst = transExp e dst
+transRVal (ArrayLiter es _) dst = return []
+transRVal (NewPair e e' _) dst = return []
+transRVal (RPair pe) dst = return []
+transRVal (Call (AST.Ident i _) es _) dst = return []
+ 
