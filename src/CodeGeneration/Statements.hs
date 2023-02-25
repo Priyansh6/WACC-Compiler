@@ -1,18 +1,35 @@
 {-# LANGUAGE OverloadedStrings #-}
 module CodeGeneration.Statements (transStats) where
 
-import AST
+import AST hiding (Ident)
 import CodeGeneration.IR
 import CodeGeneration.Expressions (transExp)
-import CodeGeneration.Utils (IRStatementGenerator, nextFreeReg, makeRegAvailable)
+import CodeGeneration.Utils (IRStatementGenerator, nextFreeReg, makeRegAvailable, insertVarReg, Aux (varLocs))
+import Control.Monad.State
+import Data.Map ((!))
+
+import qualified AST (Ident(Ident)) 
 
 transStats :: Stats -> IRStatementGenerator IRInstrs
 transStats ss = concat <$> mapM transStat ss 
 
 transStat :: Stat -> IRStatementGenerator IRInstrs
 transStat Skip = return []
-transStat (DecAssign t i r _) = return []
-transStat (Assign l r _) = return []
+transStat (DecAssign t (AST.Ident i _) r _) = do
+  varReg <- nextFreeReg
+  rReg <- nextFreeReg
+  rInstrs <- transRVal r rReg 
+  makeRegAvailable rReg
+  insertVarReg (Ident i) varReg
+  return $ rInstrs ++ [Mov (Reg varReg) (Reg rReg)]
+transStat (Assign (LIdent (AST.Ident i _)) r _) = do
+  vl <- gets varLocs 
+  let varReg = vl ! Ident i
+  rReg <- nextFreeReg
+  rInstrs <- transRVal r rReg 
+  makeRegAvailable rReg
+  return $ rInstrs ++ [Mov (Reg varReg) (Reg rReg)]
+transStat (Assign _ _ _) = return []
 transStat (Read l _) = return []
 transStat (Free e _) = return []
 transStat (Return e _) = do
@@ -30,3 +47,6 @@ transStat (Println e) = return []
 transStat (If e ss _ ss' _ _) = return [] 
 transStat (While e ss _ _) = return []
 transStat (Begin ss _) = transStats ss
+
+transRVal :: RVal -> IRReg -> IRStatementGenerator IRInstrs
+transRVal = undefined

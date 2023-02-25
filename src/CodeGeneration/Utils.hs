@@ -3,10 +3,11 @@
 module CodeGeneration.Utils 
   ( IRSectionGenerator,
     IRStatementGenerator,
-    Aux(Aux, available, labelId),
+    Aux(Aux, available, labelId, varLocs),
     nextFreeReg,
     makeRegAvailable,
     makeRegsAvailable,
+    insertVarReg,
     nextLabel,
     (<++>),
     (++>),
