@@ -41,17 +41,16 @@ generateHelperFunc hf@(Print HBool)
       StringData boolStr2 (showHelperOption HBool)
     ]
     [ 
-      Function (showHelperLabel hf) False
+      Function boolLabel False
       [ 
         Push (Reg IRLR),
         Cmp (Reg (IRParam 0)) (Imm 0),
-        Jne bool0,
+        Jne boolLabel0,
         Load (Reg (IRParam 2)) (Abs boolStr0),
-        Jmp bool1
-      ],
-      Function bool0 False [ Load (Reg (IRParam 2)) (Abs boolStr1) ],
-      Function bool1 False 
-      [
+        Jmp boolLabel1,
+        Define boolLabel0,
+        Load (Reg (IRParam 2)) (Abs boolStr1),
+        Define boolLabel1,
         Load (Reg (IRParam 1)) (ImmOffset (IRParam 2) (-4)),
         Load (Reg (IRParam 0)) (Abs boolStr2),
         Jsr printfLabel,
@@ -61,8 +60,9 @@ generateHelperFunc hf@(Print HBool)
       ]
     ]
     where
-      bool0 = showHelperOption HBool <> "0"
-      bool1 = showHelperOption HBool <> "1"
+      boolLabel = showHelperLabel hf
+      boolLabel0 = ".L" <> boolLabel <> "0"
+      boolLabel1 = ".L" <> boolLabel <> "1"
       boolStr0 = showStrLabel hf 0
       boolStr1 = showStrLabel hf 1
       boolStr2 = showStrLabel hf 2
@@ -83,8 +83,6 @@ generateHelperFunc hf@(Print hType)
   where
     funcLabel = showHelperLabel hf
     strLabel = showStrLabel hf 0
-
-    setupParams :: IRInstrs
     setupParams = 
       case hType of
         HString -> [

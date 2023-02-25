@@ -5,20 +5,20 @@ import qualified Data.Text as T
 
 type Program a = [Section a]
 
-data Section a = Section [Data] [Function a]
+data Section a = Section [Data] [Function a] deriving (Show, Eq)
 
-data Function a = Function Label Global [Instr a]
+data Function a = Function Label Global [Instr a] deriving (Show, Eq)
 
 type Global = Bool
 
-data Data = StringData Label T.Text
+data Data = StringData Label T.Text deriving (Show, Eq)
 
-data IRReg = TmpReg Int | IRParam Int | IRFP | IRSP | IRLR | IRPC | IRRet
+data IRReg = TmpReg Int | IRParam Int | IRFP | IRSP | IRLR | IRPC | IRRet deriving (Show, Eq)
 
 type Instrs a = [Instr a]
 type IRInstrs = Instrs IRReg
 
-data Ident = Ident T.Text
+data Ident = Ident T.Text deriving (Show, Ord, Eq)
 
 data Instr a
   = Load (Operand a) (Operand a)
@@ -41,6 +41,7 @@ data Instr a
   | Pop (Operand a)
   | Define Label
   | Comment T.Text -- Creates a comment in the assembly file
+  deriving (Show, Eq)
 
 type Label = T.Text
 
@@ -52,5 +53,6 @@ data Operand a
   | Var Ident
   | Ind a -- register indirect
   | ImmOffset a Int -- for addressing mode 2
+  deriving (Show, Eq)
 
 type FPOffsets = M.Map Ident Int
