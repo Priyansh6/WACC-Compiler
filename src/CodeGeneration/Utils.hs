@@ -5,6 +5,8 @@ module CodeGeneration.Utils
     IRStatementGenerator,
     Aux(Aux, available, labelId),
     nextFreeReg,
+    makeRegAvailable,
+    makeRegsAvailable,
     nextLabel,
     (<++>),
     (++>),
@@ -18,6 +20,7 @@ import Control.Monad.State
 import Semantic.Type.SymbolTable
 import Semantic.Rename.Scope
 
+import qualified Data.Map as M
 import qualified Data.Text as T
 
 type IRStatementGenerator a = StateT Aux (Reader (SymbolTable, ScopeMap)) a
@@ -25,7 +28,8 @@ type IRSectionGenerator a = (Reader (SymbolTable, ScopeMap)) a
 
 data Aux = Aux { 
   available :: [IRReg],
-  labelId :: Int }
+  labelId :: Int,
+  varLocs :: M.Map Ident IRReg }
 
 nextFreeReg :: IRStatementGenerator IRReg
 nextFreeReg = do
@@ -34,6 +38,12 @@ nextFreeReg = do
   case regs of 
     [] -> error "no registers available!" -- we assume an infinite number of registers in our IR so should never reach this case
     (nxt:rst) -> put (aux {available = rst}) >> return nxt
+
+makeRegAvailable :: IRReg -> IRStatementGenerator ()
+makeRegAvailable r = modify (\a@Aux {available = rs} -> a {available = r:rs})
+
+makeRegsAvailable :: [IRReg] -> IRStatementGenerator ()
+makeRegsAvailable = mapM_ makeRegAvailable
 
 nextLabel :: IRStatementGenerator Label
 nextLabel = nextLabelId >>= toLabel

@@ -4,7 +4,7 @@ module CodeGeneration.Expressions (transExp) where
 
 import AST
 import CodeGeneration.IR
-import CodeGeneration.Utils (IRStatementGenerator, nextLabel, nextFreeReg)
+import CodeGeneration.Utils (IRStatementGenerator, nextLabel, nextFreeReg, makeRegAvailable, makeRegsAvailable)
 import Data.Char (ord)
 
 type NumInstrCons a = Operand a -> Operand a -> Operand a -> Instr a
@@ -24,6 +24,7 @@ transExp (Not e _) dst = do
   exprInstrs <- transExp e eReg
   trueLabel <- nextLabel
   endLabel <- nextLabel
+  makeRegAvailable eReg
   return $ exprInstrs ++ [Cmp (Reg dst) (Imm 1), Je trueLabel, Mov (Reg eReg) (Imm 1), Jmp endLabel, Define trueLabel, Mov (Reg eReg) (Imm 0), Define endLabel, Mov (Reg dst) (Reg eReg)]
 transExp (Neg e _) dst = do
   exprInstrs <- transExp e dst 
@@ -53,6 +54,7 @@ transExp ((:&&:) e e' _) dst = do
   let successCase = [Cmp (Reg r) (Imm 1), Jne failLabel, Cmp (Reg r') (Imm 1), Jne failLabel, Mov (Reg cmpReg) (Imm 1), Jmp endLabel]
       failCase = [Define failLabel, Mov (Reg cmpReg) (Imm 0)] 
       end = [Define endLabel, Mov (Reg dst) (Reg cmpReg)]
+  makeRegsAvailable [cmpReg, r, r']
   return $ eInstrs ++ eInstrs' ++ successCase ++ failCase ++ end
 transExp ((:||:) e e' _) dst = do
   cmpReg <- nextFreeReg 
@@ -65,6 +67,7 @@ transExp ((:||:) e e' _) dst = do
   let failCase = [Cmp (Reg r) (Imm 1), Jne successLabel, Cmp (Reg r') (Imm 1), Je successLabel, Mov (Reg cmpReg) (Imm 0), Jmp endLabel]
       successCase = [Define successLabel, Mov (Reg cmpReg) (Imm 1)] 
       end = [Define endLabel, Mov (Reg dst) (Reg cmpReg)]
+  makeRegsAvailable [cmpReg, r, r']
   return $ eInstrs ++ eInstrs' ++ failCase ++ successCase ++ end
 
 transNumOp :: NumInstrCons IRReg -> Expr -> Expr -> IRReg -> IRStatementGenerator IRInstrs
@@ -73,6 +76,7 @@ transNumOp cons e e' dst = do
   eInstrs <- transExp e r
   r' <- nextFreeReg
   eInstrs' <- transExp e' r'
+  makeRegsAvailable [r, r']
   return $ eInstrs ++ eInstrs' ++ [cons (Reg dst) (Reg r) (Reg r')]
 
 transCmpOp :: BranchInstrCons IRReg -> Expr -> Expr -> IRReg -> IRStatementGenerator IRInstrs
@@ -87,4 +91,5 @@ transCmpOp cons e e' dst = do
   eInstrs <- transExp e r
   r' <- nextFreeReg
   eInstrs' <- transExp e' r'
+  makeRegsAvailable [cmpReg, r, r']
   return $ eInstrs ++ eInstrs' ++ [Cmp (Reg r) (Reg r'), cons greaterLabel] ++ otherCase ++ greaterCase ++ end

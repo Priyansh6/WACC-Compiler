@@ -4,7 +4,7 @@ module CodeGeneration.Statements (transStats) where
 import AST
 import CodeGeneration.IR
 import CodeGeneration.Expressions (transExp)
-import CodeGeneration.Utils (IRStatementGenerator, nextFreeReg)
+import CodeGeneration.Utils (IRStatementGenerator, nextFreeReg, makeRegAvailable)
 
 transStats :: Stats -> IRStatementGenerator IRInstrs
 transStats ss = concat <$> mapM transStat ss 
@@ -18,10 +18,12 @@ transStat (Free e _) = return []
 transStat (Return e _) = do
   dst <- nextFreeReg 
   eis <- transExp e dst
+  makeRegAvailable dst
   return $ eis ++ [Mov (Reg IRRet) (Reg dst)]
 transStat (Exit e _) = do 
   dst <- nextFreeReg
   eis <- transExp e dst
+  makeRegAvailable dst
   return $ eis ++ [Mov (Reg IRRet) (Reg dst)]
 transStat (Print e) = return []
 transStat (Println e) = return []
