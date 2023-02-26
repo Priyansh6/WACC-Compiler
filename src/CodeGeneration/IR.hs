@@ -5,9 +5,10 @@ import qualified Data.Text as T
 
 type Program a = [Section a]
 
-data Section a = Section [Data] [Function a] deriving (Show, Eq)
+-- data Section a = Section [Data] [Function a] deriving (Show, Eq)
+data Section a = Section [Data] (Body a) deriving (Show, Eq)
 
-data Function a = Function Label Global [Instr a] deriving (Show, Eq)
+data Body a = Body Label Global [Instr a] deriving (Show, Eq)
 
 type Global = Bool
 

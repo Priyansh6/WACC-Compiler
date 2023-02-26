@@ -22,11 +22,11 @@ transMain ss = do
       name = "main"
   bodyInstrs <- evalStateT (transStats ss) (Aux {available = unlimitedRegs, labelId = 0, varLocs = M.empty, sectionName = name}) 
   case bodyInstrs of
-    [] -> return $ Section [] [Function name True (wrapSectionBody [Mov (Reg IRRet) (Imm 0)])] 
-    _ -> return $ Section [] [Function name True (wrapSectionBody bodyInstrs)]
+    [] -> return $ Section [] (Body name True (wrapSectionBody [Mov (Reg IRRet) (Imm 0)]))
+    _ -> return $ Section [] (Body name True (wrapSectionBody bodyInstrs))
 
 transFunc :: AST.Func -> IRSectionGenerator (Section IRReg)
-transFunc _ = return $ Section [] []
+transFunc (AST.Func _ (AST.Ident i _) _ _ _ _) = return $ Section [] (Body i False [])
 
 wrapSectionBody :: IRInstrs -> IRInstrs
 wrapSectionBody ss = [Push (Regs [IRFP, IRLR]), Mov (Reg IRFP) (Reg IRSP)] ++ ss ++ [Pop (Regs [IRFP, IRPC])]

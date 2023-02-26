@@ -10,19 +10,14 @@ showArm :: Program ArmReg -> T.Text
 showArm = T.intercalate "\n" . map showSection
 
 showSection :: Section ArmReg -> T.Text
-showSection (Section ds fs) =
-  T.intercalate "\n" $
-    ([".data" | not (null ds)])
-      ++ showData ds
-      ++ ([".text" | not (null fs)])
-      ++ map showFunction fs
-      ++ [""]
+showSection (Section ds f) =
+  T.intercalate "\n" [".data", showData ds, ".text", showFunction f, ""]
 
-showData :: [Data] -> [T.Text]
-showData = map (\(StringData l v) -> l <> ":\n\t.asciz \"" <> v <> "\"")
+showData :: [Data] -> T.Text
+showData = T.intercalate "\n" . map (\(StringData l v) -> l <> ":\n\t.asciz \"" <> v <> "\"")
 
-showFunction :: Function ArmReg -> T.Text
-showFunction (Function l g instrs) =
+showFunction :: Body ArmReg -> T.Text
+showFunction (Body l g instrs) =
   T.intercalate
     "\n"
     ( [".global " <> l | g]
