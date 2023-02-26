@@ -80,7 +80,7 @@ a <++ b = (++) <$> a  <*> pure b
 infixr 5 <++
 
 typeSize :: WType -> Int
-typeSize WUnit = error "size not known"
+typeSize WUnit = 4
 typeSize WInt = 4
 typeSize WBool = 1
 typeSize WChar = 1
