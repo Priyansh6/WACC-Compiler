@@ -3,11 +3,19 @@
 module CodeGeneration.Helpers (generateHelperFunc) where
 
 import qualified Data.Text as T
+import qualified Data.Set as S
 
 import CodeGeneration.IR 
+import CodeGeneration.Utils (intSize, maxRegSize)
 
-data HelperFunc = Print HelperType | Println | Read HelperType | ErrDivZero | ErrOverflow | ErrNull
-data HelperType = HInt | HChar | HBool | HString | HPointer
+type HelperFuncs = S.Set HelperFunc
+
+data HelperFunc = Print HelperType | Println | Read HelperType | FreePair | ArrStore 
+                | ArrLoad | BoundsCheck | ErrDivZero | ErrOverflow | ErrNull deriving (Ord, Eq)
+data HelperType = HInt | HChar | HBool | HString | HPointer deriving (Ord, Eq)
+
+errorCode :: Int
+errorCode = 255
 
 printfLabel :: Label
 printfLabel = "printf"
@@ -24,14 +32,25 @@ scanfLabel = "scanf"
 exitLabel :: Label
 exitLabel = "exit"
 
+freeLabel :: Label
+freeLabel = "free"
+
+isArrHelperFunc :: HelperFunc -> Bool
+isArrHelperFunc ArrStore = True
+isArrHelperFunc ArrLoad = True
+isArrHelperFunc _ = False
+
 isErrHelperFunc :: HelperFunc -> Bool
+isErrHelperFunc BoundsCheck = True
 isErrHelperFunc ErrDivZero = True
 isErrHelperFunc ErrOverflow = True
 isErrHelperFunc ErrNull = True
 isErrHelperFunc _ = False
 
--- Generates code for print, println, read etc.
--- should mayb (definitely) mangle names for these so these aren't renamed variables
+insertHelperFunc :: HelperFunc -> HelperFuncs -> HelperFuncs
+insertHelperFunc
+  = S.insert
+
 generateHelperFunc :: HelperFunc -> Section IRReg
 generateHelperFunc hf@(Print HBool)
   = Section
@@ -43,7 +62,7 @@ generateHelperFunc hf@(Print HBool)
     [ 
       Function boolLabel False
       [ 
-        Push (Reg IRLR),
+        Push (Regs [IRLR]),
         Cmp (Reg (IRParam 0)) (Imm 0),
         Jne boolLabel0,
         Load (Reg (IRParam 2)) (Abs boolStr0),
@@ -51,12 +70,12 @@ generateHelperFunc hf@(Print HBool)
         Define boolLabel0,
         Load (Reg (IRParam 2)) (Abs boolStr1),
         Define boolLabel1,
-        Load (Reg (IRParam 1)) (ImmOffset (IRParam 2) (-4)),
+        Load (Reg (IRParam 1)) (ImmOffset (IRParam 2) (-maxRegSize)),
         Load (Reg (IRParam 0)) (Abs boolStr2),
         Jsr printfLabel,
         Mov (Reg (IRParam 0)) (Imm 0),
         Jsr fflushLabel,
-        Pop (Reg IRPC)
+        Pop (Regs [IRPC])
       ]
     ]
     where
@@ -70,14 +89,14 @@ generateHelperFunc hf@(Print hType)
   = Section 
     [ StringData strLabel (showHelperOption hType) ] 
     [ Function funcLabel False $
-      [ Push (Reg IRLR) ]
+      [ Push (Regs [IRLR]) ]
       ++ setupParams
       ++ [
         Load (Reg (IRParam 0)) (Abs strLabel),
         Jsr printfLabel,
         Mov (Reg (IRParam 0)) (Imm 0),
         Jsr fflushLabel,
-        Pop (Reg IRPC)
+        Pop (Regs [IRPC])
       ]
     ]
   where
@@ -87,7 +106,7 @@ generateHelperFunc hf@(Print hType)
       case hType of
         HString -> [
                      Mov (Reg (IRParam 2)) (Reg (IRParam 0)),
-                     Load (Reg (IRParam 1)) (ImmOffset (IRParam 0) (-4))
+                     Load (Reg (IRParam 1)) (ImmOffset (IRParam 0) (-intSize))
                    ]
         _       -> [ Mov (Reg (IRParam 1)) (Reg (IRParam 0)) ]
 generateHelperFunc Println
@@ -95,12 +114,12 @@ generateHelperFunc Println
     [ StringData strLabel "" ]
     [ Function (showHelperLabel Println) False
       [
-        Push (Reg IRLR),
+        Push (Regs [IRLR]),
         Load (Reg (IRParam 0)) (Abs strLabel),
         Jsr putsLabel,
         Mov (Reg (IRParam 0)) (Imm 0),
         Jsr fflushLabel,
-        Pop (Reg IRPC)
+        Pop (Regs [IRPC])
       ]
     ]
     where
@@ -110,14 +129,15 @@ generateHelperFunc hf@(Read hType)
     [ StringData strLabel (spaceIfChar <> showHelperOption hType) ]
     [ Function (showHelperLabel hf) False
       [
-        Push (Reg IRLR),
-        Store (Reg (IRParam 0)) (ImmOffset IRSP (-4)), -- TODO: Only push byte size
+        Push (Regs [IRLR]),
+        Sub (Reg IRSP) (Reg IRSP) (Imm intSize),
+        Store (Reg (IRParam 0)) (Reg IRSP),
         Mov (Reg (IRParam 1)) (Reg IRSP),
         Load (Reg (IRParam 0)) (Abs strLabel),
         Jsr scanfLabel,
         Load (Reg (IRParam 0)) (Reg IRSP),
-        Add (Reg IRSP) (Reg IRSP) (Imm 1),
-        Pop (Reg IRPC)
+        Add (Reg IRSP) (Reg IRSP) (Imm intSize),
+        Pop (Regs [IRPC])
       ]
     ]
   where
@@ -125,46 +145,96 @@ generateHelperFunc hf@(Read hType)
     spaceIfChar = case hType of
       HChar -> " "
       _     -> ""
-generateHelperFunc errFunc 
-  | isErrHelperFunc errFunc 
-    = Section
-      [ StringData strLabel errMsg ]
-      [ Function (showHelperLabel ErrDivZero) False
+generateHelperFunc FreePair
+  = Section [] 
+    [ Function (showHelperLabel FreePair) False 
+      [
+        Push (Regs [IRLR]),
+        Mov (Reg IRLR) (Reg (IRParam 0)),
+        Cmp (Reg IRLR) (Imm 0),
+        Jle (showHelperLabel ErrNull),
+        Load (Reg (IRParam 0)) (ImmOffset IRLR 0),
+        Jsr freeLabel,
+        Load (Reg (IRParam 0)) (ImmOffset IRLR maxRegSize),
+        Jsr freeLabel,
+        Mov (Reg (IRParam 0)) (Reg IRLR),
+        Jsr freeLabel,
+        Pop (Regs [IRPC])
+      ]
+    ]
+generateHelperFunc hf
+  | isArrHelperFunc hf
+    = Section []
+      [ Function (showHelperLabel hf) False
         [
-          Load (Reg (IRParam 0)) (Abs strLabel),
-          Jsr (showHelperLabel (Print HString)),
-          Mov (Reg (IRParam 0)) (Imm 255),
+          Push (Regs [IRLR]),
+          Cmp (Reg (IRParam 1)) (Imm 0),
+          Jl (showHelperLabel BoundsCheck),
+          Load (Reg IRLR) (ImmOffset (IRParam 0) (-intSize)),
+          Cmp (Reg (IRParam 1)) (Reg IRLR),
+          Jge (showHelperLabel BoundsCheck),
+          Mul (Reg (IRParam 1)) (Reg (IRParam 1)) (Imm maxRegSize),
+          Add (Reg (IRParam 0)) (Reg (IRParam 0)) (Reg (IRParam 1)),
+          arrInstr,
+          Pop (Regs [IRPC])
+        ]
+      ]
+  | isErrHelperFunc hf 
+    = Section
+      [ StringData errStrLabel errMsg ]
+      [ Function (showHelperLabel ErrDivZero) False $
+        [ Load (Reg (IRParam 0)) (Abs errStrLabel) ]
+        ++ errInstrs
+        ++ [
+          Mov (Reg (IRParam 0)) (Imm errorCode),
           Jsr exitLabel
         ]
       ]
   | otherwise = error "Unsupported helper function for generation"
   where 
-    strLabel = showStrLabel errFunc 0
-    errMsg = case errFunc of
-      ErrDivZero -> "fatal error: division or modulo by zero\n"
+    arrInstr = case hf of
+      ArrStore -> Store (Reg (IRParam 2)) (Reg (IRParam 0))
+      ArrLoad  -> Load (Reg IRRet) (Reg (IRParam 0))
+      _        -> error "Can't have non ArrStore or ArrLoad array helper function"
+    errInstrs = case hf of
+      BoundsCheck -> [
+                       Jsr printfLabel,
+                       Mov (Reg (IRParam 0)) (Imm 0),
+                       Jsr fflushLabel
+                     ]
+      _           -> [ Jsr (showHelperLabel (Print HString)) ]
+    errStrLabel = showStrLabel hf 0
+    errMsg = case hf of
+      BoundsCheck -> "fatal error: array index %d out of bounds\n"
+      ErrDivZero  -> "fatal error: division or modulo by zero\n"
       ErrOverflow -> "fatal error: integer overflow or underflow occurred\n"
-      ErrNull -> "fatal error: null pair deferenced or freed\n"
+      ErrNull     -> "fatal error: null pair deferenced or freed\n"
+      _           -> error "Can't generate error message for this helper function"
 
 showStrLabel :: HelperFunc -> Int -> Label
 showStrLabel hf i = ".L." <> showHelperLabel hf <> "_str" <> (T.pack . show) i
 
 showHelperLabel :: HelperFunc -> Label
-showHelperLabel (Print HInt) = "_printi"
-showHelperLabel (Print HChar) = "_printc"
-showHelperLabel (Print HBool) = "_printb"
-showHelperLabel (Print HString) = "_prints"
+showHelperLabel (Print HInt)     = "_printi"
+showHelperLabel (Print HChar)    = "_printc"
+showHelperLabel (Print HBool)    = "_printb"
+showHelperLabel (Print HString)  = "_prints"
 showHelperLabel (Print HPointer) = "_printp"
-showHelperLabel (Println) = "_println"
-showHelperLabel (Read HInt) = "_readi"
-showHelperLabel (Read HChar) = "_readc"
-showHelperLabel (ErrDivZero) = "_errDivZero"
-showHelperLabel (ErrOverflow) = "_errOverflow"
-showHelperLabel (ErrNull) = "_errNull"
-showHelperLabel _ = error "Unknown Helper Function Label"
+showHelperLabel Println          = "_println"
+showHelperLabel (Read HInt)      = "_readi"
+showHelperLabel (Read HChar)     = "_readc"
+showHelperLabel FreePair         = "_freepair"
+showHelperLabel ArrStore         = "_arrStore"
+showHelperLabel ArrLoad          = "_arrLoad"
+showHelperLabel BoundsCheck      = "_boundsCheck"
+showHelperLabel ErrDivZero       = "_errDivZero"
+showHelperLabel ErrOverflow      = "_errOverflow"
+showHelperLabel ErrNull          = "_errNull"
+showHelperLabel _                = error "Unknown Helper Function Label"
 
 showHelperOption :: HelperType -> T.Text
-showHelperOption HInt = "%d"
-showHelperOption HChar = "%c"
-showHelperOption HBool = "%b"
-showHelperOption HString = "%.*s"
+showHelperOption HInt     = "%d"
+showHelperOption HChar    = "%c"
+showHelperOption HBool    = "%b"
+showHelperOption HString  = "%.*s"
 showHelperOption HPointer = "%p"

@@ -4,6 +4,8 @@ module CodeGeneration.Utils
   ( IRSectionGenerator,
     IRStatementGenerator,
     Aux(Aux, available, labelId, varLocs),
+    intSize,
+    maxRegSize,
     nextFreeReg,
     makeRegAvailable,
     makeRegsAvailable,
@@ -33,6 +35,12 @@ data Aux = Aux {
   available :: [IRReg],
   labelId :: Int,
   varLocs :: M.Map Ident IRReg }
+
+maxRegSize :: Int
+maxRegSize = 4
+
+intSize :: Int
+intSize = 4
 
 nextFreeReg :: IRStatementGenerator IRReg
 nextFreeReg = state (\a@Aux {available = (nxt:rst)} -> (nxt, a {available = rst}))
