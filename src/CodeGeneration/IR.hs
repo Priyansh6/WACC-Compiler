@@ -51,7 +51,6 @@ data Operand a
   | Regs [a] -- for Push and Pop
   | Imm Int
   | Abs Label
-  | Var Ident
   | Ind a -- register indirect
   | ImmOffset a Int -- for addressing mode 2
   deriving (Show, Eq)

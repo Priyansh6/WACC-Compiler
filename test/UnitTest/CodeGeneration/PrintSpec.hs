@@ -2,12 +2,11 @@
 
 module UnitTest.CodeGeneration.PrintSpec (spec) where
 
-import qualified Data.Text as T
-import Test.Hspec
-
 import CodeGeneration.ARM.PrettyPrint
 import CodeGeneration.ARM.Registers
 import CodeGeneration.IR
+import qualified Data.Text as T
+import Test.Hspec
 
 spec :: Spec
 spec = do
@@ -17,23 +16,23 @@ spec = do
           [ StringData "._s" "bob bill3",
             StringData "a2_" ""
           ]
-          []
+          (Body "main" False [])
       ]
       `shouldBe` T.unlines
         [ ".data",
           "._s:",
           "\t.asciz \"bob bill3\"",
           "a2_:",
-          "\t.asciz \"\""
+          "\t.asciz \"\"",
+          ".text",
+          "main:"
         ]
 
   it "creates functions" $
     showArm
       [ Section
           []
-          [ Function "func1" True [],
-            Function "func2" False []
-          ]
+          (Body "func1" True [Define "func2"])
       ]
       `shouldBe` T.unlines
         [ ".text",
@@ -46,13 +45,13 @@ spec = do
     showArm
       [ Section
           []
-          [ Function
+          ( Body
               "main"
               True
               [ Add (Reg R0) (Reg R8) (Reg R9),
                 Mul (Reg R0) (Reg R9) (Reg R4)
               ]
-          ]
+          )
       ]
       `shouldBe` T.unlines
         [ ".text",
@@ -66,14 +65,14 @@ spec = do
     showArm
       [ Section
           []
-          [ Function
+          ( Body
               "main"
               True
               [ Push (Regs [LR]),
                 Pop (Regs [R8, R10, R12]),
                 Pop (Regs [FP])
               ]
-          ]
+          )
       ]
       `shouldBe` T.unlines
         [ ".text",
@@ -88,15 +87,17 @@ spec = do
     showArm
       [ Section
           []
-          [ Function
+          ( Body
               "asdf"
               False
               [ Comment "hello there",
                 Cmp (Ind R8) (Imm (-1)),
                 Comment "hi@",
-                Jsr "._3dla"
+                Define "yo",
+                Comment "@hello@",
+                Jsr "yo"
               ]
-          ]
+          )
       ]
       `shouldBe` T.unlines
         [ ".text",
@@ -104,20 +105,22 @@ spec = do
           "\t@ hello there",
           "\tcmp [r8], #-1",
           "\t@ hi@",
-          "\tbl ._3dla"
+          "yo:",
+          "\t@ @hello@",
+          "\tbl yo"
         ]
 
   it "loads different address modes" $
     showArm
       [ Section
           []
-          [ Function
+          ( Body
               "main"
               True
               [ Load (Reg R0) (Abs ".L._println_str0"),
                 Load (Reg R1) (ImmOffset R0 (-4))
               ]
-          ]
+          )
       ]
       `shouldBe` T.unlines
         [ ".text",
@@ -133,25 +136,19 @@ spec = do
           [ StringData ".L.str0" "looping...",
             StringData ".L.str1" "end of loop"
           ]
-          [ Function
+          ( Body
               "main"
               True
               [ Push (Regs [FP, LR]),
                 Push (Regs [R8, R10, R12]),
                 Mov (Reg FP) (Reg SP),
-                Jmp ".L0"
-              ],
-            Function
-              ".L1"
-              False
-              [ Load (Reg R0) (Abs ".L.str0"),
+                Jmp ".L0",
+                Define ".L1",
+                Load (Reg R0) (Abs ".L.str0"),
                 Jsr "_prints",
-                Jsr "_println"
-              ],
-            Function
-              ".L0"
-              False
-              [ Mov (Reg R8) (Imm 0),
+                Jsr "_println",
+                Define ".L0",
+                Mov (Reg R8) (Imm 0),
                 Cmp (Reg R8) (Imm 1),
                 Je ".L1",
                 Load (Reg R0) (Abs ".L.str1"),
@@ -161,10 +158,10 @@ spec = do
                 Pop (Regs [R8, R10, R12]),
                 Pop (Regs [FP, PC])
               ]
-          ],
+          ),
         Section
           [StringData ".L._prints_str0" "%.*s"]
-          [ Function
+          ( Body
               "_prints"
               False
               [ Push (Regs [LR]),
@@ -176,10 +173,10 @@ spec = do
                 Jsr "fflush",
                 Pop (Regs [PC])
               ]
-          ],
+          ),
         Section
           [StringData ".L._println_str0" ""]
-          [ Function
+          ( Body
               "_println"
               False
               [ Push (Regs [LR]),
@@ -189,7 +186,7 @@ spec = do
                 Jsr "fflush",
                 Pop (Regs [PC])
               ]
-          ]
+          )
       ]
       `shouldBe` T.unlines
         [ ".data",
