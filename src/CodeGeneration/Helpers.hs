@@ -4,6 +4,7 @@ module CodeGeneration.Helpers (generateHelperFunc) where
 
 import qualified Data.Text as T
 import qualified Data.Set as S
+import qualified Data.Map as M
 
 import CodeGeneration.IR 
 import CodeGeneration.Utils (intSize, maxRegSize)
@@ -13,6 +14,17 @@ type HelperFuncs = S.Set HelperFunc
 data HelperFunc = Print HelperType | Println | Read HelperType | FreePair | ArrStore 
                 | ArrLoad | BoundsCheck | ErrDivZero | ErrOverflow | ErrNull deriving (Ord, Eq)
 data HelperType = HInt | HChar | HBool | HString | HPointer deriving (Ord, Eq)
+
+dependencyMap :: M.Map HelperFunc [HelperFunc]
+dependencyMap = M.fromList
+  [
+    (FreePair, [ErrNull]),
+    (ArrStore, [BoundsCheck]),
+    (ArrLoad, [BoundsCheck]),
+    (ErrDivZero, [Print HString]),
+    (ErrOverflow, [Print HString]),
+    (ErrNull, [Print HString])
+  ]
 
 errorCode :: Int
 errorCode = 255
@@ -87,7 +99,7 @@ generateHelperFunc hf@(Print HBool)
 generateHelperFunc hf@(Print hType) 
   = Section 
     [ StringData strLabel (showHelperOption hType) ] 
-    (Body funcLabel False $
+    (Body (showHelperLabel hf) False $
       [ Push (Regs [IRLR]) ]
       ++ setupParams
       ++ [
@@ -99,7 +111,6 @@ generateHelperFunc hf@(Print hType)
       ]
     )
   where
-    funcLabel = showHelperLabel hf
     strLabel = showStrLabel hf 0
     setupParams = 
       case hType of
@@ -181,7 +192,7 @@ generateHelperFunc hf
   | isErrHelperFunc hf 
     = Section
       [ StringData errStrLabel errMsg ]
-      (Body (showHelperLabel ErrDivZero) False $
+      (Body (showHelperLabel hf) False $
         [ Load (Reg (IRParam 0)) (Abs errStrLabel) ]
         ++ errInstrs
         ++ [
