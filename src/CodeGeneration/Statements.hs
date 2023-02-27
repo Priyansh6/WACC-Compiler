@@ -86,19 +86,19 @@ transRVal (NewPair e e' _) dst = do
   makeRegsAvailable [eReg, eReg', ePtrReg, ePtrReg']
   return $ evalFstInstrs ++ evalSndInstrs ++ mallocPair ++ movePointers
 transRVal (RPair pe) dst = transPairElem pe dst
+  where 
+    -- gets the VALUE/ptr at fst pair and puts it in dst'
+    transPairElem :: PairElem -> IRReg -> IRStatementGenerator IRInstrs 
+    transPairElem (Fst (LIdent (AST.Ident i _)) _) dst' = getVarReg (Ident i) >>= (\r -> return [Mov (Reg dst') (Ind r)])
+    transPairElem (Fst (LPair pe') _) dst' = transPairElem pe' dst' <++ [Mov (Reg dst') (Ind dst')]
+    transPairElem (Snd (LIdent (AST.Ident i _)) _) dst' = do
+      varReg <- getVarReg (Ident i) 
+      aType <- getVarType (Ident i)
+      return [Mov (Reg dst') (ImmOffset varReg (typeSize $ fromIdentType aType))]
+    transPairElem (Snd (LPair pe') _) dst' = transPairElem pe' dst' <++ [Mov (Reg dst') (ImmOffset dst' $ typeSize WUnit)]
+    transPairElem _ _ = error "cannot take fst or snd of a non array type"
 transRVal (Call (AST.Ident i _) es _) dst = return []
 
--- gets the VALUE/ptr at fst pair and puts it in dst
-transPairElem :: PairElem -> IRReg -> IRStatementGenerator IRInstrs 
-transPairElem (Fst (LIdent (AST.Ident i _)) _) dst = getVarReg (Ident i) >>= (\r -> return [Mov (Reg dst) (Ind r)])
-transPairElem (Fst (LPair pe) _) dst = transPairElem pe dst <++ [Mov (Reg dst) (Ind dst)]
-transPairElem (Snd (LIdent (AST.Ident i _)) _) dst = do
-  varReg <- getVarReg (Ident i) 
-  aType <- getVarType (Ident i)
-  return [Mov (Reg dst) (ImmOffset varReg (typeSize $ fromIdentType aType))]
-transPairElem (Snd (LPair pe) _) dst = 
-  transPairElem pe dst <++ [Mov (Reg dst) (ImmOffset dst $ typeSize WUnit)]
-transPairElem _ _ = error "cannot take fst or snd of a non array type"
 
 transMallocCall :: Int -> IRStatementGenerator IRInstrs
 transMallocCall size = return [Mov (Reg (IRParam 0)) (Imm size), Jsr "malloc"]
