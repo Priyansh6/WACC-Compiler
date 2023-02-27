@@ -14,11 +14,20 @@ type BranchInstrCons a = Label -> Instr a
 
 transExp :: Expr -> IRReg -> IRStatementGenerator IRInstrs
 transExp (IntLiter x _) dst = return [Mov (Reg dst) (Imm (fromIntegral x))]
-transExp (BoolLiter True _) dst = return [Mov (Reg dst) (Imm 1)]
-transExp (BoolLiter False _) dst = return [Mov (Reg dst) (Imm 0)]
+transExp (BoolLiter True _) dst 
+  = return [Mov (Reg dst) true]
+  where
+    true = Imm 1
+transExp (BoolLiter False _) dst 
+  = return [Mov (Reg dst) false]
+  where
+    false = Imm 0
 transExp (CharLiter c _) dst = return [Mov (Reg dst) (Imm (ord c))]
 transExp (StrLiter t _) dst = return []
-transExp (PairLiter _) dst = return []
+transExp (PairLiter _) dst 
+  = return [Mov (Reg dst) nullptr]
+  where
+    nullptr = Imm 0
 transExp (IdentExpr (AST.Ident i _) _) dst = getVarReg (Ident i) >>= (\r -> return [Mov (Reg dst) (Reg r)])
 transExp (ArrayExpr (ArrayElem (AST.Ident i _) exprs _) _) dst = return []
 transExp (Not e _) dst = do
