@@ -27,6 +27,32 @@ transStat (Assign (LIdent (AST.Ident i _)) r _) = do
   rInstrs <- transRVal r rReg
   makeRegAvailable rReg
   return $ rInstrs ++ [Mov (Reg varReg) (Reg rReg)]
+transStat (Assign (LPair pe) r _) = do
+  rReg <- nextFreeReg
+  pointerReg <- nextFreeReg
+  rInstrs <- transRVal r rReg
+  lInstrs <- transLPair pe pointerReg
+  makeRegsAvailable [rReg, pointerReg]
+  return $ rInstrs ++ lInstrs ++ [Store (Reg rReg) (Ind pointerReg)]
+  where
+    transLPair :: PairElem -> IRReg -> IRStatementGenerator IRInstrs
+    transLPair (Fst (LIdent (AST.Ident i _)) _) dst = getVarReg (Ident i )>>= (\vr -> return [Load (Reg dst) (Ind vr)])
+    transLPair (Fst (LPair pe') _) dst = do
+      dst' <- nextFreeReg 
+      nestedInstrs <- transLPair pe' dst'
+      makeRegAvailable dst'
+      return $ nestedInstrs ++ [Load (Reg dst) (Ind dst')]
+    transLPair (Snd (LIdent (AST.Ident i _)) _) dst = do
+      vr <- getVarReg (Ident i)
+      vType <- getVarType (Ident i)  
+      return [Load (Reg dst) (ImmOffset vr (typeSize $ fromIdentType vType))]
+    transLPair (Snd (LPair pe') _) dst = do
+      dst' <- nextFreeReg
+      nestedInstrs <- transLPair pe' dst'
+      makeRegAvailable dst'
+      return $ nestedInstrs ++ [Load (Reg dst) (ImmOffset dst' (typeSize WUnit))]
+    transLPair _ _ = undefined
+
 transStat (Assign _ _ _) = return []
 transStat (Read l _) = return []
 transStat (Free e _) = return []
@@ -96,9 +122,8 @@ transRVal (RPair pe) dst = transPairElem pe dst
       aType <- getVarType (Ident i)
       return [Mov (Reg dst') (ImmOffset varReg (typeSize $ fromIdentType aType))]
     transPairElem (Snd (LPair pe') _) dst' = transPairElem pe' dst' <++ [Mov (Reg dst') (ImmOffset dst' $ typeSize WUnit)]
-    transPairElem _ _ = error "cannot take fst or snd of a non array type"
+    transPairElem _ _ = error "cannot take fst or snd of an array type"
 transRVal (Call (AST.Ident i _) es _) dst = return []
-
 
 transMallocCall :: Int -> IRStatementGenerator IRInstrs
 transMallocCall size = return [Mov (Reg (IRParam 0)) (Imm size), Jsr "malloc"]
