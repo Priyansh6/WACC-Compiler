@@ -59,8 +59,7 @@ generateHelperFunc hf@(Print HBool)
       StringData boolStr1 "true",
       StringData boolStr2 (showHelperOption HBool)
     ]
-    [ 
-      Function boolLabel False
+    (Body boolLabel False
       [ 
         Push (Regs [IRLR]),
         Cmp (Reg (IRParam 0)) (Imm 0),
@@ -77,7 +76,7 @@ generateHelperFunc hf@(Print HBool)
         Jsr fflushLabel,
         Pop (Regs [IRPC])
       ]
-    ]
+    )
     where
       boolLabel = showHelperLabel hf
       boolLabel0 = ".L" <> boolLabel <> "0"
@@ -88,7 +87,7 @@ generateHelperFunc hf@(Print HBool)
 generateHelperFunc hf@(Print hType) 
   = Section 
     [ StringData strLabel (showHelperOption hType) ] 
-    [ Function funcLabel False $
+    (Body funcLabel False $
       [ Push (Regs [IRLR]) ]
       ++ setupParams
       ++ [
@@ -98,7 +97,7 @@ generateHelperFunc hf@(Print hType)
         Jsr fflushLabel,
         Pop (Regs [IRPC])
       ]
-    ]
+    )
   where
     funcLabel = showHelperLabel hf
     strLabel = showStrLabel hf 0
@@ -112,7 +111,7 @@ generateHelperFunc hf@(Print hType)
 generateHelperFunc Println
   = Section
     [ StringData strLabel "" ]
-    [ Function (showHelperLabel Println) False
+    (Body (showHelperLabel Println) False
       [
         Push (Regs [IRLR]),
         Load (Reg (IRParam 0)) (Abs strLabel),
@@ -121,13 +120,13 @@ generateHelperFunc Println
         Jsr fflushLabel,
         Pop (Regs [IRPC])
       ]
-    ]
+    )
     where
       strLabel = showStrLabel Println 0
 generateHelperFunc hf@(Read hType)
   = Section
     [ StringData strLabel (spaceIfChar <> showHelperOption hType) ]
-    [ Function (showHelperLabel hf) False
+    (Body (showHelperLabel hf) False
       [
         Push (Regs [IRLR]),
         Sub (Reg IRSP) (Reg IRSP) (Imm intSize),
@@ -139,7 +138,7 @@ generateHelperFunc hf@(Read hType)
         Add (Reg IRSP) (Reg IRSP) (Imm intSize),
         Pop (Regs [IRPC])
       ]
-    ]
+    )
   where
     strLabel = showStrLabel hf 0
     spaceIfChar = case hType of
@@ -147,7 +146,7 @@ generateHelperFunc hf@(Read hType)
       _     -> ""
 generateHelperFunc FreePair
   = Section [] 
-    [ Function (showHelperLabel FreePair) False 
+    (Body (showHelperLabel FreePair) False 
       [
         Push (Regs [IRLR]),
         Mov (Reg IRLR) (Reg (IRParam 0)),
@@ -161,11 +160,11 @@ generateHelperFunc FreePair
         Jsr freeLabel,
         Pop (Regs [IRPC])
       ]
-    ]
+    )
 generateHelperFunc hf
   | isArrHelperFunc hf
     = Section []
-      [ Function (showHelperLabel hf) False
+      (Body (showHelperLabel hf) False
         [
           Push (Regs [IRLR]),
           Cmp (Reg (IRParam 1)) (Imm 0),
@@ -178,18 +177,18 @@ generateHelperFunc hf
           arrInstr,
           Pop (Regs [IRPC])
         ]
-      ]
+      )
   | isErrHelperFunc hf 
     = Section
       [ StringData errStrLabel errMsg ]
-      [ Function (showHelperLabel ErrDivZero) False $
+      (Body (showHelperLabel ErrDivZero) False $
         [ Load (Reg (IRParam 0)) (Abs errStrLabel) ]
         ++ errInstrs
         ++ [
           Mov (Reg (IRParam 0)) (Imm errorCode),
           Jsr exitLabel
         ]
-      ]
+      )
   | otherwise = error "Unsupported helper function for generation"
   where 
     arrInstr = case hf of
