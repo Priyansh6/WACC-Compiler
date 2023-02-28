@@ -1,4 +1,4 @@
-module CodeGeneration.ARM.Registers (ArmInstr, ArmInstrs, ArmReg, transProg, initAux) where
+module CodeGeneration.ARM.Registers (ArmInstr, ArmInstrs, ArmReg, irToArm) where
 
 import CodeGeneration.IR
 
@@ -28,6 +28,9 @@ initAux = Aux {
 
 retReg :: ArmReg
 retReg = R0
+
+irToArm :: Program IRReg -> Program ArmReg
+irToArm p = evalState (transProg p) initAux
 
 transProg :: Program IRReg -> ArmTranslator (Program ArmReg)
 transProg = mapM transSection
