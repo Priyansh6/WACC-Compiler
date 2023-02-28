@@ -1,6 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module CodeGeneration.Helpers (generateHelperFunc) where
+module CodeGeneration.Helpers 
+  (generateHelperFunc,
+  showHelperLabel,
+  HelperFunc(..)) 
+where
 
 import qualified Data.Text as T
 import qualified Data.Set as S
