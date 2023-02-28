@@ -1,8 +1,14 @@
-VIEW_HASKELL_OUTPUT = False
-QEMU_TESTS = [ # specify any test paths in test/integration/ to run qemu on
+# view each test's output
+VIEW_OUTPUT = False
+
+# specify any test paths in test/integration to test emulation on
+# WARNING: if qemu not found, it uses the slow refEmulate
+QEMU_TESTS = [
 	# "valid/array",
 	# "valid/basic/exit",
 ]
+
+################################################################################
 
 from os import path as os_path, remove, scandir
 from pathlib import Path
@@ -21,7 +27,8 @@ BOLD = "\033[1m"
 END = "\033[0m"
 
 PASSED = GREEN + "." + END
-FAILED_EXIT = RED + "C" + END
+FAILED_COMPILE = RED + "C" + END
+FAILED_EXIT = RED + "E" + END
 FAILED_OUTPUT = RED + "O" + END
 SKIPPED = YELLOW + "-" + END
 
@@ -33,7 +40,8 @@ def shouldTestOutput(testPath):
 
 def integrationTests():
 	print(PASSED, "passed")
-	print(FAILED_EXIT, "failed compilation")
+	print(FAILED_COMPILE, "failed compilation")
+	print(FAILED_EXIT, "wrong exit code")
 	print(FAILED_OUTPUT, "wrong output")
 	print(SKIPPED, "skipped")
 	testSummary = ""
@@ -50,13 +58,13 @@ def integrationTests():
 			totalTests += 1
 			result = subprocess.run(
 				[wacc40exe, waccFilename],
-				stdout=None if VIEW_HASKELL_OUTPUT else subprocess.DEVNULL
+				stdout=None if VIEW_OUTPUT else subprocess.DEVNULL
 			)
 
 			expectedExit = getExpectedExit(waccFilename)
 			actualExit = result.returncode
 			if expectedExit != actualExit:
-				testSummary += addTestResult(FAILED_EXIT, waccFilename, f"Exit code: {expectedExit}", f"Exit code: {actualExit} (toggle VIEW_HASKELL_OUTPUT for more info)")
+				testSummary += addTestResult(FAILED_COMPILE, waccFilename, f"Exit code: {expectedExit}", f"Exit code: {actualExit} (toggle {BOLD}VIEW_OUTPUT{END} for more info)")
 				continue
 			if expectedExit != 0:
 				testSummary += addTestResult(PASSED)
@@ -65,12 +73,11 @@ def integrationTests():
 
 			if shouldTestOutput(waccFilename):
 				expectedInput, expectedOutput = getWaccFileIO(waccFilename)
-				actualOutput = getActualOutput(basename, expectedInput)
-				if actualOutput == None:
-					testSummary += addTestResult(SKIPPED)
-					skippedTests += 1
-				else:
+				actualOutput, actualExit = getActualOutput(basename, expectedInput)
+				if actualExit == 0:
 					testSummary += addTestResult(PASSED if actualOutput == expectedOutput else FAILED_OUTPUT, waccFilename, expectedOutput, actualOutput)
+				else:
+					testSummary += addTestResult(FAILED_EXIT, waccFilename, f"Exit code: {expectedExit}", f"Exit code: {actualExit} (toggle {BOLD}VIEW_OUTPUT{END} for more info)")
 			else:
 				testSummary += addTestResult(SKIPPED)
 				skippedTests += 1
@@ -91,14 +98,15 @@ def integrationTests():
 	passedTests = totalTests - len(failedTests) - skippedTests
 	if len(failedTests) > 0:
 		print("\n" + PASSED, "passed")
-		print(FAILED_EXIT, "failed compilation")
+		print(FAILED_COMPILE, "failed compilation")
+		print(FAILED_EXIT, "wrong exit code")
 		print(FAILED_OUTPUT, "wrong output")
 		print(SKIPPED, "skipped")
 		print(testSummary)
 
 	print(BOLD, GREEN, "\n", passedTests, "passed," + RED, len(failedTests), "failed," + YELLOW, skippedTests, "skipped.", END)
 	if QEMU_NOT_FOUND:
-		print("all qemu tests were skipped as command not found")
+		print("qemu tests were run by refEmulate as command not found")
 
 	exit(0 if len(failedTests) == 0 else 1)
 
@@ -141,12 +149,12 @@ def getActualOutput(basename, waccInput):
 			text=True
 		)
 		remove(basename)
-		return result2.stdout
+		return result2.stdout, result2.returncode
 	except FileNotFoundError as e:
 		if e.filename == "arm-linux-gnueabi-gcc":
 			global QEMU_NOT_FOUND
 			QEMU_NOT_FOUND = True
-			return None
+			return runRefEmulator(basename + ".s", waccInput)
 		else:
 			raise e
 
@@ -156,28 +164,47 @@ def addTestResult(result, testname='', expected='', actual=''):
 		failedTests.append((testname, expected, actual))
 	return result
 
+
+def runRefCompiler(waccFilename, waccFileInput):
+	result = subprocess.run(
+		["ruby", "test/integration/refCompile", "-a", "-x", waccFilename],
+		input=waccFileInput + '\n',
+		capture_output=True,
+		text=True
+	)
+
+	LINE_DIVIDER = "===========================================================\n"
+	ASSEMBLY_DIVIDER = ".s contents are:\n" + LINE_DIVIDER
+	OUTPUT_DIVIDER = "-- Executing...\n" + LINE_DIVIDER
+	EXIT_CODE_TEXT = "\nThe exit code is "
+
+	rawAssembly = extract(result.stdout, ASSEMBLY_DIVIDER, "\n" + LINE_DIVIDER)
+
+	assembly = '\n'.join(line.split('\t', 1)[1] for line in rawAssembly.split("\n")) if rawAssembly else None
+	output = extract(result.stdout, OUTPUT_DIVIDER, "\n" + LINE_DIVIDER)
+	exitCode = extract(result.stdout, EXIT_CODE_TEXT, ".\n")
+	if assembly:
+		with open(os_path.splitext(os_path.basename(waccFilename))[0] + '.s', 'w') as f:
+			f.write(assembly)
+			f.close()
+
+def runRefEmulator(assemblyFile, assemblyInput):
+	result = subprocess.run(
+		["ruby", "test/integration/refEmulate", assemblyFile],
+		input=(assemblyInput or '') + '\n',
+		capture_output=True,
+		text=True
+	)
+	LINE_DIVIDER = "---------------------------------------------------------------\n"
+	ASSEMBLY_OUTPUT_DIVIDER = "-- Assembly Output:\n"
+	OUTPUT_DIVIDER = "-- Emulation Output:\n"
+	EXIT_CODE_TEXT = LINE_DIVIDER + "The exit code is: "
+	assemblyOutput = extract(result.stdout, ASSEMBLY_OUTPUT_DIVIDER, "\n\n" + OUTPUT_DIVIDER)
+	if assemblyOutput != "" and VIEW_OUTPUT:
+		print(assemblyOutput)
+	output = extract(result.stdout, OUTPUT_DIVIDER, "\n" + LINE_DIVIDER)
+	exitCode = extract(result.stdout, EXIT_CODE_TEXT, ".\n")
+	return output, int(exitCode)
+
 integrationTests()
 
-# result = subprocess.run(
-# 	["./test/integration/refCompile", "-a", "-x", waccFilename],
-# 	input=waccFileInput + '\n',
-# 	capture_output=True,
-# 	text=True
-# )
-
-# LINE_DIVIDER = "===========================================================\n"
-# ASSEMBLY_DIVIDER = ".s contents are:\n" + LINE_DIVIDER
-# OUTPUT_DIVIDER = "-- Executing...\n" + LINE_DIVIDER
-# EXIT_CODE_TEXT = "\nThe exit code is "
-
-# rawAssembly = extract(result.stdout, ASSEMBLY_DIVIDER, "\n" + LINE_DIVIDER)
-
-# assembly = '\n'.join(line.split('\t', 1)[1] for line in rawAssembly.split("\n")) if rawAssembly else None
-# output = extract(result.stdout, OUTPUT_DIVIDER, "\n" + LINE_DIVIDER)
-# exitCode = extract(result.stdout, EXIT_CODE_TEXT, ".\n")
-
-# print(assembly)
-# if assembly:
-# 	with open(os_path.splitext(os_path.basename(waccFilename))[0] + '.s', 'w') as f:
-# 		f.write(assembly)
-# 		f.close()
