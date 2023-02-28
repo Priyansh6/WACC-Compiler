@@ -3,7 +3,7 @@ module CodeGeneration.Statements (transStats) where
 
 import AST hiding (Ident)
 import CodeGeneration.IR
-import CodeGeneration.Expressions (transExp)
+import CodeGeneration.Expressions (transExp, transArrayElem)
 import CodeGeneration.Helpers (HelperFunc(ArrStore), showHelperLabel)
 import CodeGeneration.Utils (IRStatementGenerator, (<++), (<++>), nextFreeReg, makeRegAvailable, insertVarReg, getVarReg, nextLabel, exprType, typeSize, makeRegsAvailable, getVarType)
 import Control.Monad
@@ -54,7 +54,13 @@ transStat (Assign (LPair pe) r _) = do
       makeRegAvailable dst'
       return $ nestedInstrs ++ [Load (Reg dst) (ImmOffset dst' (typeSize WUnit))]
     transLPair _ _ = undefined
-transStat (Assign _ _ _) = return []
+transStat (Assign (LArray ae) r _) = do
+  aeReg <- nextFreeReg
+  rReg <- nextFreeReg
+  aeInstrs <- transArrayElem ae aeReg
+  rInstrs <- transRVal r rReg
+  makeRegsAvailable [aeReg, rReg]
+  return $ aeInstrs ++ rInstrs ++ [Store (Reg rReg) (Ind aeReg)]
 transStat (Read l _) = return []
 transStat (Free e _) = return []
 transStat (Return e _) = do

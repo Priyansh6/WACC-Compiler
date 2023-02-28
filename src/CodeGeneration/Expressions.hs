@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module CodeGeneration.Expressions (transExp) where
+module CodeGeneration.Expressions (transExp, transArrayElem) where
 
 import AST hiding (Ident)
 import CodeGeneration.IR
@@ -36,16 +36,7 @@ transExp (PairLiter _) dst
   where
     nullptr = Imm 0
 transExp (IdentExpr (AST.Ident i _) _) dst = getVarReg (Ident i) >>= (\r -> return [Mov (Reg dst) (Reg r)])
-transExp (ArrayExpr (ArrayElem (AST.Ident i _) exprs _) _) dst = do
-  varReg <- getVarReg (Ident i)
-  concat <$> mapM (`transArrExpr` varReg) exprs
-  where
-    transArrExpr :: Expr -> IRReg -> IRStatementGenerator IRInstrs
-    transArrExpr e varReg' = do
-      exprReg <- nextFreeReg
-      exprInstrs <- transExp e exprReg
-      makeRegAvailable exprReg
-      return $ exprInstrs ++ [Mov (Reg $ IRParam 0) (Reg varReg'), Mov (Reg $ IRParam 1) (Reg exprReg), Jsr $ showHelperLabel ArrLoad, Mov (Reg dst) (Reg IRRet)]
+transExp (ArrayExpr ae _) dst = transArrayElem ae dst
 transExp (Not e _) dst = do
   eReg <- nextFreeReg
   exprInstrs <- transExp e eReg
@@ -120,3 +111,15 @@ transCmpOp cons e e' dst = do
   eInstrs' <- transExp e' r'
   makeRegsAvailable [cmpReg, r, r']
   return $ eInstrs ++ eInstrs' ++ [Cmp (Reg r) (Reg r'), cons greaterLabel] ++ otherCase ++ greaterCase ++ end
+
+transArrayElem :: ArrayElem -> IRReg -> IRStatementGenerator IRInstrs
+transArrayElem (ArrayElem (AST.Ident i _) exprs _) dst = do
+  varReg <- getVarReg (Ident i)
+  concat <$> mapM (`transArrExpr` varReg) exprs
+  where
+    transArrExpr :: Expr -> IRReg -> IRStatementGenerator IRInstrs
+    transArrExpr e varReg' = do
+      exprReg <- nextFreeReg
+      exprInstrs <- transExp e exprReg
+      makeRegAvailable exprReg
+      return $ exprInstrs ++ [Mov (Reg $ IRParam 0) (Reg varReg'), Mov (Reg $ IRParam 1) (Reg exprReg), Jsr $ showHelperLabel ArrLoad, Mov (Reg dst) (Reg IRRet)]
