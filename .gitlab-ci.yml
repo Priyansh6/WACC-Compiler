@@ -22,7 +22,7 @@ unit-test:
 integration-test:
   stage: test
   script:
-    - python3 integration_runner.py -o
+    - python3 integration_runner.py
   only:
     refs:
       - master

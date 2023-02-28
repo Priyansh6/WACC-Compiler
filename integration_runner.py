@@ -1,16 +1,16 @@
 VIEW_HASKELL_OUTPUT = False
-TESTS = [
-	"invalid/semanticErr",
-	"invalid/syntaxErr",
-	"valid",
+QEMU_TESTS = [ # specify any test paths in test/integration/ to run qemu on
+	# "valid/array",
+	# "valid/basic/exit",
 ]
 
-from os import path as os_path, remove
+from os import path as os_path, remove, scandir
 from pathlib import Path
 import subprocess
-from sys import argv
+from itertools import chain
 
-SKIP_OUTPUT_TESTS = True # len(argv) < 2 or argv[1] != "-o"
+global QEMU_NOT_FOUND
+QEMU_NOT_FOUND = False
 
 BLUE = "\033[0;34m"
 GREEN = "\033[0;32m"
@@ -27,6 +27,10 @@ SKIPPED = YELLOW + "-" + END
 
 failedTests = []
 
+QEMU_TEST_PATHS = [Path("test/integration/" + path) for path in QEMU_TESTS]
+def shouldTestOutput(testPath):
+	return any(runPath in testPath.parents for runPath in QEMU_TEST_PATHS)
+
 def integrationTests():
 	print(PASSED, "passed")
 	print(FAILED_EXIT, "failed compilation")
@@ -35,17 +39,17 @@ def integrationTests():
 	testSummary = ""
 	skippedTests = totalTests = 0
 	
-	wacc40exe = next(Path("./.stack-work/dist").rglob("build/WACC40-exe/WACC40-exe"), None)
+	wacc40exe = str(next(Path("./.stack-work/dist").rglob("build/WACC40-exe/WACC40-exe"), ""))
 	if not wacc40exe:
 		print(RED + "\nWACC40-exe not found - did you", BOLD + "stack build" + END + RED + "?", END)
 		exit(1)
 
-	for testDir in TESTS:
-		print("\n" + testDir + "\t(tests compilation" + (" + output" if testDir == "valid" else "") +  ")")
-		for waccFilename in Path("./test/integration/" + testDir).rglob("*.wacc"):
+	for testGroup in chain(scandir("./test/integration/invalid"), scandir("./test/integration/valid")):
+		print(BOLD, BLUE, "\n", str(Path(testGroup))[17:], END)
+		for waccFilename in Path(testGroup).rglob("*.wacc"):
 			totalTests += 1
 			result = subprocess.run(
-				[str(wacc40exe), waccFilename],
+				[wacc40exe, waccFilename],
 				stdout=None if VIEW_HASKELL_OUTPUT else subprocess.DEVNULL
 			)
 
@@ -54,22 +58,25 @@ def integrationTests():
 			if expectedExit != actualExit:
 				testSummary += addTestResult(FAILED_EXIT, waccFilename, f"Exit code: {expectedExit}", f"Exit code: {actualExit} (toggle VIEW_HASKELL_OUTPUT for more info)")
 				continue
-			testSummary += addTestResult(PASSED)
 			if expectedExit != 0:
+				testSummary += addTestResult(PASSED)
 				continue
-
 			basename = os_path.splitext(os_path.basename(waccFilename))[0]
 
-			if SKIP_OUTPUT_TESTS:
+			if shouldTestOutput(waccFilename):
+				expectedInput, expectedOutput = getWaccFileIO(waccFilename)
+				actualOutput = getActualOutput(basename, expectedInput)
+				if actualOutput == None:
+					testSummary += addTestResult(SKIPPED)
+					skippedTests += 1
+				else:
+					testSummary += addTestResult(PASSED if actualOutput == expectedOutput else FAILED_OUTPUT, waccFilename, expectedOutput, actualOutput)
+			else:
 				testSummary += addTestResult(SKIPPED)
 				skippedTests += 1
-				remove(basename + ".s")
-				continue
 
-			expectedInput, expectedOutput = getWaccFileIO(waccFilename)
-			actualOutput = getActualOutput(basename, expectedInput)
+			remove(basename + ".s")
 
-			testSummary += addTestResult(PASSED if actualOutput == expectedOutput else FAILED_OUTPUT, waccFilename, expectedOutput, actualOutput)
 
 	print()
 	for testname, expectedOutput, actualOutput in failedTests:
@@ -81,8 +88,8 @@ def integrationTests():
 		for line in actualOutput.split("\n"):
 			print("\t\t" + line)
 
-	passedTests = totalTests - len(failedTests)
-	if passedTests != totalTests:
+	passedTests = totalTests - len(failedTests) - skippedTests
+	if len(failedTests) > 0:
 		print("\n" + PASSED, "passed")
 		print(FAILED_EXIT, "failed compilation")
 		print(FAILED_OUTPUT, "wrong output")
@@ -90,6 +97,8 @@ def integrationTests():
 		print(testSummary)
 
 	print(BOLD, GREEN, "\n", passedTests, "passed," + RED, len(failedTests), "failed," + YELLOW, skippedTests, "skipped.", END)
+	if QEMU_NOT_FOUND:
+		print("all qemu tests were skipped as command not found")
 
 	exit(0 if len(failedTests) == 0 else 1)
 
@@ -111,7 +120,7 @@ def getExpectedExit(waccFilename):
 def getWaccFileIO(waccFilename):
 	waccCode = open(f"{waccFilename}", 'r').read()
 	waccFileOutputRaw = extract(waccCode, "# Output:", "\n\n")
-	expectedInput = extract(waccCode, "Input: ", "\n")
+	expectedInput = extract(waccCode, "# Input: ", "\n")
 	expectedOutput = '\n'.join(line[2:] for line in waccFileOutputRaw.split("\n")) if waccFileOutputRaw else ""
 	if expectedOutput:
 		if expectedOutput[0] == '\n':
@@ -121,17 +130,25 @@ def getWaccFileIO(waccFilename):
 	return expectedInput, expectedOutput
 
 def getActualOutput(basename, waccInput):
-	result1 = subprocess.run(
-		["arm-linux-gnueabi-gcc", "-o", basename, "-mcpu=arm1176jzf-s", "-mtune=arm1176jzf-s", basename + ".s"],
-	)
-	remove(basename + ".s")
-	result2 = subprocess.run(
-		["qemu-arm", "-L", "/usr/arm-linux-gnueabi/", basename],
-		input=(waccInput or '') + '\n',
-		capture_output=True,
-		text=True
-	)
-	return result2.stdout
+	try:
+		result1 = subprocess.run(
+			["arm-linux-gnueabi-gcc", "-o", basename, "-mcpu=arm1176jzf-s", "-mtune=arm1176jzf-s", basename + ".s"],
+		)
+		result2 = subprocess.run(
+			["qemu-arm", "-L", "/usr/arm-linux-gnueabi/", basename],
+			input=(waccInput or '') + '\n',
+			capture_output=True,
+			text=True
+		)
+		remove(basename)
+		return result2.stdout
+	except FileNotFoundError as e:
+		if e.filename == "arm-linux-gnueabi-gcc":
+			global QEMU_NOT_FOUND
+			QEMU_NOT_FOUND = True
+			return None
+		else:
+			raise e
 
 def addTestResult(result, testname='', expected='', actual=''):
 	print(result, end='', flush=True)
