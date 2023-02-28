@@ -1,4 +1,4 @@
-module CodeGeneration.ARM.Registers (ArmInstr, ArmInstrs, ArmReg) where
+module CodeGeneration.ARM.Registers (ArmInstr, ArmInstrs, ArmReg, transProg, initAux) where
 
 import CodeGeneration.IR
 
@@ -19,6 +19,12 @@ data Aux = Aux {
   regLocs :: M.Map IRReg (Either ArmReg FPOffset) }
 
 type ArmTranslator a = State Aux a
+
+initAux :: Aux
+initAux = Aux {
+    regsAvailable = [],
+    regLocs = M.empty
+  }
 
 retReg :: ArmReg
 retReg = R0
