@@ -3,7 +3,7 @@
 module CodeGeneration.Utils 
   ( IRSectionGenerator,
     IRStatementGenerator,
-    Aux(Aux, available, labelId, varLocs, sectionName),
+    Aux(Aux, available, labelId, varLocs, sectionName, literTable),
     intSize,
     maxRegSize,
     nextFreeReg,
@@ -18,6 +18,7 @@ module CodeGeneration.Utils
     (<++>),
     (++>),
     (<++),
+    LiterTable
   )
 where
 
@@ -36,11 +37,15 @@ import qualified Data.Text as T
 type IRStatementGenerator a = StateT Aux (Reader (SymbolTable, ScopeMap)) a
 type IRSectionGenerator a = (Reader (SymbolTable, ScopeMap)) a
 
+type LiterTable = M.Map T.Text Label
+
 data Aux = Aux { 
   available :: [IRReg],
   labelId :: Int,
   sectionName :: T.Text,
-  varLocs :: M.Map Ident IRReg }
+  varLocs :: M.Map Ident IRReg,
+  literTable :: LiterTable
+  }
 
 maxRegSize :: Int
 maxRegSize = 4
