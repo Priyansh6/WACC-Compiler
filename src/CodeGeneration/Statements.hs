@@ -4,10 +4,12 @@ module CodeGeneration.Statements (transStats) where
 import AST hiding (Ident)
 import CodeGeneration.IR
 import CodeGeneration.Expressions (transExp)
-import CodeGeneration.Utils (IRStatementGenerator, (<++), nextFreeReg, makeRegAvailable, insertVarReg, getVarReg, nextLabel, exprType, typeSize, makeRegsAvailable, getVarType)
+import CodeGeneration.Helpers (HelperFunc(ArrStore), showHelperLabel)
+import CodeGeneration.Utils (IRStatementGenerator, (<++), (<++>), nextFreeReg, makeRegAvailable, insertVarReg, getVarReg, nextLabel, exprType, typeSize, makeRegsAvailable, getVarType)
+import Control.Monad
+import Semantic.Type.SymbolTable (fromIdentType)
 
 import qualified AST (Ident(Ident))
-import Semantic.Type.SymbolTable (fromIdentType)
 
 transStats :: Stats -> IRStatementGenerator IRInstrs
 transStats ss = concat <$> mapM transStat ss
@@ -93,7 +95,18 @@ transStat (Begin ss _) = transStats ss
 
 transRVal :: RVal -> IRReg -> IRStatementGenerator IRInstrs
 transRVal (RExpr e) dst = transExp e dst
-transRVal (ArrayLiter es _) dst = return []
+transRVal (ArrayLiter [] _) dst = transArrayCreation 0 0 dst
+transRVal (ArrayLiter elems@(e:_) _) dst = do
+  eType <- exprType e
+  let eSize = typeSize eType
+  transArrayCreation eSize (length elems) dst <++> (concat <$> zipWithM transArrLiterElem elems [0..])
+  where
+    transArrLiterElem :: Expr -> Int -> IRStatementGenerator IRInstrs
+    transArrLiterElem e' idx = do
+      eReg <- nextFreeReg
+      exprInstrs <- transExp e' eReg
+      makeRegAvailable eReg
+      return $ exprInstrs ++ [Mov (Reg (IRParam 0)) (Reg dst), Mov (Reg (IRParam 1)) (Imm idx), Mov (Reg (IRParam 2)) (Reg eReg), Jsr (showHelperLabel ArrStore)]
 transRVal (NewPair e e' _) dst = do
   eReg <- nextFreeReg
   ePtrReg <- nextFreeReg
@@ -102,12 +115,12 @@ transRVal (NewPair e e' _) dst = do
   eType <- exprType e
   eType' <- exprType e'
   let pType = AST.WPair eType eType'
-      movePointers = [Mov (Reg dst) (Reg IRRet), Store (Reg eReg) (ImmOffset dst 0), Store (Reg eReg') (ImmOffset dst (typeSize eType))]
-  mallocFst <- transMallocCall $ typeSize eType
-  mallocSnd <- transMallocCall $ typeSize eType'
-  mallocPair <- transMallocCall $ typeSize pType
-  evalFstInstrs <- transExp e eReg <++ mallocFst ++ [Mov (Reg ePtrReg) (Reg IRRet), Mov (Ind ePtrReg) (Reg eReg)] -- not sure if Ind as the dst of a Mov is dodgy or not
-  evalSndInstrs <- transExp e' eReg' <++ mallocSnd ++ [Mov (Reg ePtrReg') (Reg IRRet), Mov (Ind ePtrReg') (Reg eReg')]
+      movePointers = [Store (Reg eReg) (ImmOffset dst 0), Store (Reg eReg') (ImmOffset dst (typeSize eType))]
+  mallocFst <- transMallocCall (typeSize eType) ePtrReg
+  mallocSnd <- transMallocCall (typeSize eType) ePtrReg'
+  mallocPair <- transMallocCall (typeSize pType) dst
+  evalFstInstrs <- transExp e eReg <++ mallocFst ++ [Mov (Ind ePtrReg) (Reg eReg)] -- not sure if Ind as the dst of a Mov is dodgy or not
+  evalSndInstrs <- transExp e' eReg' <++ mallocSnd ++ [Mov (Ind ePtrReg') (Reg eReg')]
   makeRegsAvailable [eReg, eReg', ePtrReg, ePtrReg']
   return $ evalFstInstrs ++ evalSndInstrs ++ mallocPair ++ movePointers
 transRVal (RPair pe) dst = transPairElem pe dst
@@ -124,5 +137,12 @@ transRVal (RPair pe) dst = transPairElem pe dst
     transPairElem _ _ = error "cannot take fst or snd of an array type"
 transRVal (Call (AST.Ident i _) es _) dst = return []
 
-transMallocCall :: Int -> IRStatementGenerator IRInstrs
-transMallocCall size = return [Mov (Reg (IRParam 0)) (Imm size), Jsr "malloc"]
+transMallocCall :: Int -> IRReg -> IRStatementGenerator IRInstrs
+transMallocCall size dst = return [Mov (Reg (IRParam 0)) (Imm size), Jsr "malloc", Mov (Reg dst) (Reg IRRet)]
+
+transArrayCreation :: Int -> Int -> IRReg -> IRStatementGenerator IRInstrs
+transArrayCreation size len dst = do
+  sizeReg <- nextFreeReg
+  mallocInstrs <- transMallocCall (typeSize WInt + size) dst
+  makeRegAvailable sizeReg
+  return $ mallocInstrs ++ [Mov (Reg sizeReg) (Imm len), Store (Reg sizeReg) (Ind dst), Add (Reg dst) (Reg dst) (Imm $ typeSize WInt)]
