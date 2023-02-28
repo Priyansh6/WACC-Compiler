@@ -60,8 +60,15 @@ isErrHelperFunc ErrNull = True
 isErrHelperFunc _ = False
 
 insertHelperFunc :: HelperFunc -> HelperFuncs -> HelperFuncs
-insertHelperFunc
-  = S.insert
+insertHelperFunc hf hfs
+  | hf `S.member` hfs = hfs
+  | otherwise         = foldr insertHelperFunc (S.insert hf hfs) hfDependencies 
+  where
+    hfDependencies = M.findWithDefault [] hf dependencyMap
+
+generateHelperFuncs :: HelperFuncs -> [Section IRReg]
+generateHelperFuncs hfs
+  = map generateHelperFunc $ S.toList hfs
 
 generateHelperFunc :: HelperFunc -> Section IRReg
 generateHelperFunc hf@(Print HBool)
