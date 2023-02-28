@@ -1,13 +1,70 @@
-module CodeGeneration.ARM.Registers (module CodeGeneration.ARM.Registers) where
+module CodeGeneration.ARM.Registers (ArmInstr, ArmInstrs, ArmReg) where
 
-import CodeGeneration.IR (Instr, Instrs, IRReg)
+import CodeGeneration.IR
 
-data ArmReg = R0 | R1 | R2 | R3 | R4 | R5 | R6 | R7 | R8 | R9 | R10 | FP | R12 | SP | LR | PC
-  deriving (Show)
+import Control.Monad.State
+
+import qualified Data.Map as M
 
 type ArmInstr = Instr ArmReg
-type ArmInstrs = Instrs ArmReg
+type ArmInstrs = [ArmInstr]
 
--- could be a TRICKY job
-allocRegisters :: Instrs IRReg -> Instrs ArmReg
-allocRegisters = undefined
+data ArmReg = R0 | R1 | R2 | R3 | R4 | R5 | R6 | R7 | R8 | R9 | R10 | FP | R12 | SP | LR | PC
+  deriving (Show, Eq)
+
+type FPOffset = Int
+
+data Aux = Aux {
+  regsAvailable :: [ArmReg],
+  regLocs :: M.Map IRReg (Either ArmReg FPOffset) }
+
+type ArmTranslator a = State Aux a
+
+retReg :: ArmReg
+retReg = R0
+
+transProg :: Program IRReg -> ArmTranslator (Program ArmReg)
+transProg = mapM transSection
+
+transSection :: Section IRReg -> ArmTranslator (Section ArmReg)
+transSection (Section d (Body label global instrs)) 
+  = mapM transInstr instrs >>= (\iss -> return $ Section d (Body label global (concat iss)))
+
+transInstr :: Instr IRReg -> ArmTranslator [Instr ArmReg]
+transInstr (Load o1 o2) = fmap (:[]) $ liftM2 Load (transOperand o1) (transOperand o2)
+transInstr (Store o1 o2) = fmap (:[]) $ liftM2 Store (transOperand o1) (transOperand o2)
+transInstr (Mov o1 o2) = fmap (:[]) $ liftM2 Mov (transOperand o1) (transOperand o2)
+transInstr (Add o1 o2 o3) = fmap (:[]) $ liftM3 Add (transOperand o1) (transOperand o2) (transOperand o3)
+transInstr (Sub o1 o2 o3) = fmap (:[]) $ liftM3 Sub (transOperand o1) (transOperand o2) (transOperand o3)
+transInstr (Mul o1 o2 o3) = fmap (:[]) $ liftM3 Mul (transOperand o1) (transOperand o2) (transOperand o3)
+transInstr (Div o1 o2 o3) = fmap (:[]) $ liftM3 Div (transOperand o1) (transOperand o2) (transOperand o3)
+transInstr (Cmp o1 o2) = fmap (:[]) $ liftM2 Mov (transOperand o1) (transOperand o2)
+transInstr (Jsr l) = return [Jsr l]
+transInstr (Push o) = fmap ((:[]) . Push) (transOperand o)
+transInstr (Pop o) = fmap ((:[]) . Pop) (transOperand o)
+transInstr (Jmp l) = return [Jmp l]
+transInstr (Je l) = return [Je l]
+transInstr (Jne l) = return [Jne l]
+transInstr (Jl l) = return [Jl l]
+transInstr (Jg l) = return [Jg l]
+transInstr (Jle l) = return [Jle l]
+transInstr (Jge l) = return [Jge l]
+transInstr (Define l) = return [Define l]
+transInstr (Comment c) = return [Comment c]
+
+transOperand :: Operand IRReg -> ArmTranslator (Operand ArmReg)
+transOperand (Reg r) = fmap Reg (transIRReg r)
+transOperand (Regs rs) = fmap Regs $ mapM transIRReg rs
+transOperand (Ind r) = fmap Ind (transIRReg r)
+transOperand (ImmOffset r offset) = fmap (flip ImmOffset offset) (transIRReg r)
+transOperand (Imm i) = return $ Imm i
+transOperand (Abs l) = return $ Abs l
+
+transIRReg :: IRReg -> ArmTranslator ArmReg
+transIRReg (TmpReg n) = return R0
+transIRReg (IRParam n) = return R0
+transIRReg IRFP = return FP
+transIRReg IRSP = return SP
+transIRReg IRLR = return LR
+transIRReg IRPC = return PC
+transIRReg IRRet = return retReg
