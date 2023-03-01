@@ -18,13 +18,10 @@ transStats ss = concat <$> mapM transStat ss
 
 transStat :: Stat -> IRStatementGenerator IRInstrs
 transStat Skip = return []
-transStat (DecAssign t (AST.Ident i _) r _) = do
+transStat (DecAssign _ (AST.Ident i _) r _) = do
   varReg <- nextFreeReg
-  rReg <- nextFreeReg
-  rInstrs <- transRVal r rReg
-  makeRegAvailable rReg
   insertVarReg (Ident i) varReg
-  return $ rInstrs ++ [Mov (Reg varReg) (Reg rReg)]
+  withReg (\rReg -> transRVal r rReg <++ [Mov (Reg varReg) (Reg rReg)])
 transStat (Assign l@(LIdent _) r _) = withReg (\lReg -> withReg (\rReg -> transLVal l lReg <++> transRVal r rReg <++ [Mov (Reg lReg) (Reg rReg)]))
 transStat (Assign l r _) = withReg (\lReg -> withReg (\rReg -> transLVal l lReg <++> transRVal r rReg <++ [Store (Reg rReg) (Ind lReg)]))
 transStat (Read l _) = do
@@ -47,16 +44,8 @@ transStat (Free e _) = do
     WPair _ _ -> addHelperFunc FreePair >> evalRefInstrs ++> checkNull refReg <++ [Mov (Reg IRRet) (Reg refReg), Jsr (showHelperLabel FreePair)]
     WArr _ _ -> addHelperFunc FreeArr >> return (evalRefInstrs ++ [Mov (Reg IRRet) (Reg refReg), Jsr (showHelperLabel FreeArr)])
     _ -> undefined
-transStat (Return e _) = do
-  dst <- nextFreeReg
-  eis <- transExp e dst
-  makeRegAvailable dst
-  return $ eis ++ [Mov (Reg IRRet) (Reg dst)]
-transStat (Exit e _) = do
-  dst <- nextFreeReg
-  eis <- transExp e dst
-  makeRegAvailable dst
-  return $ eis ++ [Mov (Reg IRRet) (Reg dst)]
+transStat (Return e _) = withReg (\dst -> transExp e dst <++ [Mov (Reg IRRet) (Reg dst)])
+transStat (Exit e _) = withReg (\dst -> transExp e dst <++ [Mov (Reg IRRet) (Reg dst)])
 transStat (Print e) = do
   helperFuncType <- HPrint . fromWType <$> exprType e 
   eInstrs <- withReg (\r -> transExp e r <++ [Mov (Reg (IRParam 0)) (Reg r), Jsr (showHelperLabel helperFuncType)])
