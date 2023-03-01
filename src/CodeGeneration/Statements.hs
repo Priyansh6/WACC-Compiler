@@ -71,7 +71,15 @@ transStat (Read l _) = lvalWType l <&> (addHelperFunc . HRead . fromWType) >> re
       getWType (Ident i) >>= (\(WArr baseType _) -> return baseType)
     lvalWType (LPair (Fst lval _)) = lvalWType lval >>= (\(WPair wt _) -> return wt)
     lvalWType (LPair (Snd lval _)) = lvalWType lval >>= (\(WPair _ wt) -> return wt)
-transStat (Free e _) = exprType e >>= (\(WPair {}) -> addHelperFunc FreePair) >> return []
+transStat (Free e _) = do
+  refReg <- nextFreeReg
+  evalRefInstrs <- transExp e refReg
+  eType <- exprType e
+  makeRegAvailable refReg
+  case eType of
+    WPair _ _ -> addHelperFunc FreePair >> return (evalRefInstrs ++ [Mov (Reg IRRet) (Reg refReg), Jsr (showHelperLabel FreePair)])
+    WArr _ _ -> addHelperFunc FreeArr >> return (evalRefInstrs ++ [Mov (Reg IRRet) (Reg refReg), Jsr (showHelperLabel FreeArr)])
+    _ -> undefined
 transStat (Return e _) = do
   dst <- nextFreeReg
   eis <- transExp e dst

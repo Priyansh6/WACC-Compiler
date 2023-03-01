@@ -22,6 +22,7 @@ data HelperFunc
   | HPrintln
   | HRead HelperType
   | FreePair
+  | FreeArr
   | ArrStore   
   | ArrLoad
   | BoundsCheck
@@ -195,6 +196,18 @@ generateHelperFunc FreePair
         Pop (Regs [IRPC])
       ]
     )
+generateHelperFunc FreeArr
+  = Section [] 
+    (Body (showHelperLabel FreeArr) False 
+      [
+        Push (Regs [IRLR]),
+        Mov (Reg IRLR) (Reg (IRParam 0)),
+        Comment "Array pointers are shifted forward by 4 bytes, so correct it back to original pointer before free",
+        Sub (Reg (IRParam 0)) (Reg IRLR) (Imm intSize),
+        Jsr freeLabel,
+        Pop (Regs [IRPC])
+      ]
+    )
 generateHelperFunc hf
   | isArrHelperFunc hf
     = Section []
@@ -257,6 +270,7 @@ showHelperLabel HPrintln          = "_println"
 showHelperLabel (HRead HInt)      = "_readi"
 showHelperLabel (HRead HChar)     = "_readc"
 showHelperLabel FreePair         = "_freepair"
+showHelperLabel FreeArr         = "_freearr"
 showHelperLabel ArrStore         = "_arrStore"
 showHelperLabel ArrLoad          = "_arrLoad"
 showHelperLabel BoundsCheck      = "_boundsCheck"
