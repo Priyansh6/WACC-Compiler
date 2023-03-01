@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module CodeGeneration.ARM.Registers (ArmInstr, ArmInstrs, ArmReg, transProg) where
+module CodeGeneration.ARM.Registers (ArmInstr, ArmInstrs, ArmReg (..), transProg) where
 
 import CodeGeneration.IR
 
