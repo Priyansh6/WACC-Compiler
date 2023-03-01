@@ -3,6 +3,7 @@
 module CodeGeneration.Statements (transStats) where
 
 import Control.Monad
+import Control.Monad.State
 import Data.Functor ((<&>))
 
 import AST hiding (Ident)
@@ -149,7 +150,10 @@ transRVal (RPair pe) dst = transPairElem pe dst
       return [Load (Reg dst') (ImmOffset varReg (typeSize aType))]
     transPairElem (Snd (LPair pe') _) dst' = transPairElem pe' dst' <++ [Load (Reg dst') (ImmOffset dst' $ typeSize WUnit)]
     transPairElem _ _ = error "cannot take fst or snd of an array type"
-transRVal (Call (AST.Ident i _) es _) dst = return []
+transRVal (Call (AST.Ident i _) es _) dst = do
+  movParamInstrs <- concat <$> zipWithM transExp es [IRParam x | x <- [0..]]
+  regsInUse <- gets inUse
+  return $ movParamInstrs ++ [Comment "We push the dst register despite it containing uninitialised data. Thus we have to pop and then move the return register into dst.", Push (Regs regsInUse), Jsr i, Pop (Regs regsInUse), Mov (Reg dst) (Reg IRRet)] 
 
 transMallocCall :: Int -> IRReg -> IRStatementGenerator IRInstrs
 transMallocCall size dst = return [Mov (Reg (IRParam 0)) (Imm size), Jsr "malloc", Mov (Reg dst) (Reg IRRet)]

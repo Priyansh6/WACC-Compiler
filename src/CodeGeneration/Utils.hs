@@ -42,6 +42,7 @@ type LiterTable = M.Map T.Text Label
 
 data Aux = Aux
   { available :: [IRReg],
+    inUse :: [IRReg],
     labelId :: Int,
     sectionName :: T.Text,
     varLocs :: M.Map Ident IRReg,
@@ -53,10 +54,10 @@ addHelperFunc :: HelperFunc -> IRStatementGenerator ()
 addHelperFunc hf = modify (\a@(Aux {helperFuncs = hfs}) -> a {helperFuncs = insertHelperFunc hf hfs})
 
 nextFreeReg :: IRStatementGenerator IRReg
-nextFreeReg = state (\a@Aux {available = (nxt:rst)} -> (nxt, a {available = rst}))
+nextFreeReg = state (\a@Aux {available = (nxt:rst), inUse = rs} -> (nxt, a {available = rst, inUse = nxt:rs}))
 
 makeRegAvailable :: IRReg -> IRStatementGenerator ()
-makeRegAvailable r = modify (\a@Aux {available = rs} -> a {available = r:rs})
+makeRegAvailable r = modify (\a@Aux {available = rs, inUse = (_:rs')} -> a {available = r:rs, inUse = rs'})
 
 makeRegsAvailable :: [IRReg] -> IRStatementGenerator ()
 makeRegsAvailable = mapM_ makeRegAvailable
