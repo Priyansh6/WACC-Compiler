@@ -59,7 +59,7 @@ transAndAddMemoryInstrs :: Instr IRReg -> ArmTranslator ArmInstrs
 transAndAddMemoryInstrs instr = do
   (translatedInstr, (loadInstrs, storeInstrs, rs)) <- runWriterT (transInstr instr)
   _ <- mapM makeScratchAvailable $ S.toList rs
-  return $ [Comment "start"] ++ loadInstrs ++ [translatedInstr] ++ storeInstrs ++ [Comment "end"]
+  return $ loadInstrs ++ [translatedInstr] ++ storeInstrs
 
 transInstr :: Instr IRReg -> ArmMemoryAllocator ArmInstr
 transInstr (Load o1 o2) = Load <$> transOperand o1 False <*> transOperand o2 True
