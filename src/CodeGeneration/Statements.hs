@@ -92,10 +92,13 @@ transStat (Exit e _) = do
   return $ eis ++ [Mov (Reg IRRet) (Reg dst)]
 transStat (Print e) = do
   helperFuncType <- HPrint . fromWType <$> exprType e 
-  eInstrs <- nextFreeReg >>= (\r -> transExp e r <++ [Mov (Reg (IRParam 0)) (Reg r), Jsr (showHelperLabel helperFuncType)] <* makeRegAvailable r)
+  eInstrs <- withReg (\r -> transExp e r <++ [Mov (Reg (IRParam 0)) (Reg r), Jsr (showHelperLabel helperFuncType)])
   addHelperFunc helperFuncType
   return eInstrs
-transStat (Println e) = return []
+transStat (Println e) = do
+  eInstrs <- withReg (\r -> transExp e r <++ [Mov (Reg (IRParam 0)) (Reg r), Jsr (showHelperLabel HPrintln)])
+  addHelperFunc HPrintln
+  return eInstrs
 transStat (If e ss _ ss' _ _) = do
   eReg <- nextFreeReg
   eInstrs <- transExp e eReg

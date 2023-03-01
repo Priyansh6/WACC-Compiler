@@ -13,6 +13,7 @@ module CodeGeneration.Utils
     insertVarReg,
     makeRegAvailable,
     makeRegsAvailable,
+    withReg,
     nextFreeReg,
     nextLabel,
     typeSize,
