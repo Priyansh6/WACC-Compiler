@@ -1,16 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
+
 module CodeGeneration.Statements (transStats) where
 
 import Control.Monad
 import Data.Functor ((<&>))
 
 import AST hiding (Ident)
-import qualified AST (Ident(Ident))
-import CodeGeneration.Expressions (transExp, transArrayElem)
+import qualified AST (Ident (Ident))
+import CodeGeneration.Expressions (transArrayElem, transExp)
 import CodeGeneration.Helpers
 import CodeGeneration.IR
 import CodeGeneration.Utils
-import Semantic.Type.SymbolTable hiding (getIdentType)
 
 transStats :: Stats -> IRStatementGenerator IRInstrs
 transStats ss = concat <$> mapM transStat ss
@@ -47,15 +47,14 @@ transStat (Assign (LPair pe) r _) = do
       return $ nestedInstrs ++ [Load (Reg dst) (Ind dst')]
     transLPair (Snd (LIdent (AST.Ident i _)) _) dst = do
       vr <- getVarReg (Ident i)
-      vType <- getIdentType (Ident i)
-      return [Load (Reg dst) (ImmOffset vr (typeSize $ fromIdentType vType))]
+      vType <- getWType (Ident i)
+      return [Load (Reg dst) (ImmOffset vr (typeSize vType))]
     transLPair (Snd (LPair pe') _) dst = do
       dst' <- nextFreeReg
       nestedInstrs <- transLPair pe' dst'
       makeRegAvailable dst'
       return $ nestedInstrs ++ [Load (Reg dst) (ImmOffset dst' (typeSize WUnit))]
     transLPair _ _ = undefined
-
 transStat (Assign (LArray ae) r _) = do
   aeReg <- nextFreeReg
   rReg <- nextFreeReg
@@ -63,18 +62,15 @@ transStat (Assign (LArray ae) r _) = do
   rInstrs <- transRVal r rReg
   makeRegsAvailable [aeReg, rReg]
   return $ aeInstrs ++ rInstrs ++ [Store (Reg rReg) (Ind aeReg)]
-
-transStat (Read l _) = getWType l <&> (addHelperFunc . HRead . fromWType) >> return []
+transStat (Read l _) = lvalWType l <&> (addHelperFunc . HRead . fromWType) >> return []
   where
-    getWType :: LVal -> IRStatementGenerator WType
-    getWType (LIdent (AST.Ident i _)) = getIdentType (Ident i) <&> fromIdentType
-    getWType (LArray (ArrayElem (AST.Ident i _) _ _)) =
-      getIdentType (Ident i) >>= (\(ArrType baseType _) -> return baseType)
-    getWType (LPair (Fst lval _)) = getWType lval >>= (\(WPair wt _) -> return wt)
-    getWType (LPair (Snd lval _)) = getWType lval >>= (\(WPair _ wt) -> return wt)
-
+    lvalWType :: LVal -> IRStatementGenerator WType
+    lvalWType (LIdent (AST.Ident i _)) = getWType (Ident i)
+    lvalWType (LArray (ArrayElem (AST.Ident i _) _ _)) =
+      getWType (Ident i) >>= (\(WArr baseType _) -> return baseType)
+    lvalWType (LPair (Fst lval _)) = lvalWType lval >>= (\(WPair wt _) -> return wt)
+    lvalWType (LPair (Snd lval _)) = lvalWType lval >>= (\(WPair _ wt) -> return wt)
 transStat (Free e _) = exprType e >>= (\(WPair {}) -> addHelperFunc FreePair) >> return []
-
 transStat (Return e _) = do
   dst <- nextFreeReg
   eis <- transExp e dst
@@ -149,8 +145,8 @@ transRVal (RPair pe) dst = transPairElem pe dst
     transPairElem (Fst (LPair pe') _) dst' = transPairElem pe' dst' <++ [Load (Reg dst') (Ind dst')]
     transPairElem (Snd (LIdent (AST.Ident i _)) _) dst' = do
       varReg <- getVarReg (Ident i) 
-      aType <- getIdentType (Ident i)
-      return [Load (Reg dst') (ImmOffset varReg (typeSize $ fromIdentType aType))]
+      aType <- getWType (Ident i)
+      return [Load (Reg dst') (ImmOffset varReg (typeSize aType))]
     transPairElem (Snd (LPair pe') _) dst' = transPairElem pe' dst' <++ [Load (Reg dst') (ImmOffset dst' $ typeSize WUnit)]
     transPairElem _ _ = error "cannot take fst or snd of an array type"
 transRVal (Call (AST.Ident i _) es _) dst = return []

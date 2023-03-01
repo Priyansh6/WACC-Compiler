@@ -62,22 +62,12 @@ insertHelperFunc hf hfs
 errorCode :: Int
 errorCode = 255
 
-printfLabel :: Label
+printfLabel, putsLabel, fflushLabel, scanfLabel, exitLabel, freeLabel :: Label
 printfLabel = "printf"
-
-putsLabel :: Label
 putsLabel = "puts"
-
-fflushLabel :: Label
 fflushLabel = "fflush"
-
-scanfLabel :: Label
 scanfLabel = "scanf"
-
-exitLabel :: Label
 exitLabel = "exit"
-
-freeLabel :: Label
 freeLabel = "free"
 
 isArrHelperFunc :: HelperFunc -> Bool
