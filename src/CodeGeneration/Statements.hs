@@ -27,14 +27,17 @@ transStat (DecAssign t (AST.Ident i _) r _) = do
   return $ rInstrs ++ [Mov (Reg varReg) (Reg rReg)]
 transStat (Assign l@(LIdent _) r _) = withReg (\lReg -> withReg (\rReg -> transLVal l lReg <++> transRVal r rReg <++ [Mov (Reg lReg) (Reg rReg)]))
 transStat (Assign l r _) = withReg (\lReg -> withReg (\rReg -> transLVal l lReg <++> transRVal r rReg <++ [Store (Reg rReg) (Ind lReg)]))
-transStat (Read l _) = lvalWType l <&> (addHelperFunc . HRead . fromWType) >> return []
+transStat (Read l _) = do
+  helperFuncType <- lValWType l <&> HRead . fromWType
+  addHelperFunc helperFuncType
+  withReg (\lReg -> transLVal l lReg <++ [Mov (Reg (IRParam 0)) (Reg lReg), Jsr (showHelperLabel helperFuncType)])
   where
-    lvalWType :: LVal -> IRStatementGenerator WType
-    lvalWType (LIdent (AST.Ident i _)) = getWType (Ident i)
-    lvalWType (LArray (ArrayElem (AST.Ident i _) _ _)) =
+    lValWType :: LVal -> IRStatementGenerator WType
+    lValWType (LIdent (AST.Ident i _)) = getWType (Ident i)
+    lValWType (LArray (ArrayElem (AST.Ident i _) _ _)) =
       getWType (Ident i) >>= (\(WArr baseType _) -> return baseType)
-    lvalWType (LPair (Fst lval _)) = lvalWType lval >>= (\(WPair wt _) -> return wt)
-    lvalWType (LPair (Snd lval _)) = lvalWType lval >>= (\(WPair _ wt) -> return wt)
+    lValWType (LPair (Fst lval _)) = lValWType lval >>= (\(WPair wt _) -> return wt)
+    lValWType (LPair (Snd lval _)) = lValWType lval >>= (\(WPair _ wt) -> return wt)
 transStat (Free e _) = do
   refReg <- nextFreeReg
   evalRefInstrs <- transExp e refReg
