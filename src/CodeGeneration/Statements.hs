@@ -135,11 +135,10 @@ transMallocCall :: Int -> IRReg -> IRStatementGenerator IRInstrs
 transMallocCall size dst = return [Mov (Reg (IRParam 0)) (Imm size), Jsr "malloc", Mov (Reg dst) (Reg IRRet)]
 
 transArrayCreation :: Int -> Int -> IRReg -> IRStatementGenerator IRInstrs
-transArrayCreation size len dst = do
-  sizeReg <- nextFreeReg
-  mallocInstrs <- transMallocCall (typeSize WInt + size) dst
-  makeRegAvailable sizeReg
-  return $ mallocInstrs ++ [Mov (Reg sizeReg) (Imm len), Store (Reg sizeReg) (Ind dst), Add (Reg dst) (Reg dst) (Imm $ typeSize WInt)]
+transArrayCreation size len dst 
+  = withReg (\sizeReg -> transMallocCall (typeSize WInt + size) dst <++ [Mov (Reg sizeReg) (Imm len), 
+                                                                         Store (Reg sizeReg) (Ind dst), 
+                                                                         Add (Reg dst) (Reg dst) (Imm $ typeSize WInt)])
 
 checkNull :: IRReg -> IRStatementGenerator IRInstrs
 checkNull toCheck = addHelperFunc ErrNull *> (nextLabel <&> (\notNullLabel -> [Cmp (Reg toCheck) (Imm 0), Jge notNullLabel, Jsr (showHelperLabel ErrNull), Define notNullLabel]))
