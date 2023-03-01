@@ -1,23 +1,45 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module CodeGeneration.Helpers 
-  (generateHelperFunc,
-  showHelperLabel,
-  HelperFunc(..)) 
-where
+module CodeGeneration.Helpers (module CodeGeneration.Helpers) where
 
 import qualified Data.Text as T
 import qualified Data.Set as S
 import qualified Data.Map as M
 
 import CodeGeneration.IR 
-import CodeGeneration.Utils (intSize, maxRegSize)
+import AST
+
+intSize :: Int
+intSize = 4
+
+maxRegSize :: Int
+maxRegSize = 4
 
 type HelperFuncs = S.Set HelperFunc
 
-data HelperFunc = Print HelperType | Println | Read HelperType | FreePair | ArrStore 
-                | ArrLoad | BoundsCheck | ErrDivZero | ErrOverflow | ErrNull deriving (Ord, Eq)
+data HelperFunc
+  = HPrint HelperType
+  | HPrintln
+  | HRead HelperType
+  | FreePair
+  | ArrStore   
+  | ArrLoad
+  | BoundsCheck
+  | ErrDivZero
+  | ErrOverflow
+  | ErrNull
+  deriving (Ord, Eq)
+
 data HelperType = HInt | HChar | HBool | HString | HPointer deriving (Ord, Eq)
+
+fromWType :: WType -> HelperType
+fromWType WUnit = HInt
+fromWType WInt = HInt
+fromWType WBool = HBool
+fromWType WChar = HChar
+fromWType WStr = HString
+fromWType (WArr _ _) = HPointer
+fromWType (WPair _ _) = HPointer
 
 dependencyMap :: M.Map HelperFunc [HelperFunc]
 dependencyMap = M.fromList
@@ -25,30 +47,27 @@ dependencyMap = M.fromList
     (FreePair, [ErrNull]),
     (ArrStore, [BoundsCheck]),
     (ArrLoad, [BoundsCheck]),
-    (ErrDivZero, [Print HString]),
-    (ErrOverflow, [Print HString]),
-    (ErrNull, [Print HString])
+    (ErrDivZero, [HPrint HString]),
+    (ErrOverflow, [HPrint HString]),
+    (ErrNull, [HPrint HString])
   ]
+
+insertHelperFunc :: HelperFunc -> HelperFuncs -> HelperFuncs
+insertHelperFunc hf hfs
+  | hf `S.member` hfs = hfs
+  | otherwise         = foldr insertHelperFunc (S.insert hf hfs) hfDependencies 
+  where
+    hfDependencies = M.findWithDefault [] hf dependencyMap
 
 errorCode :: Int
 errorCode = 255
 
-printfLabel :: Label
+printfLabel, putsLabel, fflushLabel, scanfLabel, exitLabel, freeLabel :: Label
 printfLabel = "printf"
-
-putsLabel :: Label
 putsLabel = "puts"
-
-fflushLabel :: Label
 fflushLabel = "fflush"
-
-scanfLabel :: Label
 scanfLabel = "scanf"
-
-exitLabel :: Label
 exitLabel = "exit"
-
-freeLabel :: Label
 freeLabel = "free"
 
 isArrHelperFunc :: HelperFunc -> Bool
@@ -63,19 +82,12 @@ isErrHelperFunc ErrOverflow = True
 isErrHelperFunc ErrNull = True
 isErrHelperFunc _ = False
 
-insertHelperFunc :: HelperFunc -> HelperFuncs -> HelperFuncs
-insertHelperFunc hf hfs
-  | hf `S.member` hfs = hfs
-  | otherwise         = foldr insertHelperFunc (S.insert hf hfs) hfDependencies 
-  where
-    hfDependencies = M.findWithDefault [] hf dependencyMap
-
 generateHelperFuncs :: HelperFuncs -> [Section IRReg]
 generateHelperFuncs hfs
   = map generateHelperFunc $ S.toList hfs
 
 generateHelperFunc :: HelperFunc -> Section IRReg
-generateHelperFunc hf@(Print HBool)
+generateHelperFunc hf@(HPrint HBool)
   = Section
     [ 
       StringData boolStr0 "false",
@@ -107,7 +119,7 @@ generateHelperFunc hf@(Print HBool)
       boolStr0 = showStrLabel hf 0
       boolStr1 = showStrLabel hf 1
       boolStr2 = showStrLabel hf 2
-generateHelperFunc hf@(Print hType) 
+generateHelperFunc hf@(HPrint hType) 
   = Section 
     [ StringData strLabel (showHelperOption hType) ] 
     (Body (showHelperLabel hf) False $
@@ -130,10 +142,10 @@ generateHelperFunc hf@(Print hType)
                      Load (Reg (IRParam 1)) (ImmOffset (IRParam 0) (-intSize))
                    ]
         _       -> [ Mov (Reg (IRParam 1)) (Reg (IRParam 0)) ]
-generateHelperFunc Println
+generateHelperFunc HPrintln
   = Section
     [ StringData strLabel "" ]
-    (Body (showHelperLabel Println) False
+    (Body (showHelperLabel HPrintln) False
       [
         Push (Regs [IRLR]),
         Load (Reg (IRParam 0)) (Abs strLabel),
@@ -144,8 +156,8 @@ generateHelperFunc Println
       ]
     )
     where
-      strLabel = showStrLabel Println 0
-generateHelperFunc hf@(Read hType)
+      strLabel = showStrLabel HPrintln 0
+generateHelperFunc hf@(HRead hType)
   = Section
     [ StringData strLabel (spaceIfChar <> showHelperOption hType) ]
     (Body (showHelperLabel hf) False
@@ -223,7 +235,7 @@ generateHelperFunc hf
                        Mov (Reg (IRParam 0)) (Imm 0),
                        Jsr fflushLabel
                      ]
-      _           -> [ Jsr (showHelperLabel (Print HString)) ]
+      _           -> [ Jsr (showHelperLabel (HPrint HString)) ]
     errStrLabel = showStrLabel hf 0
     errMsg = case hf of
       BoundsCheck -> "fatal error: array index %d out of bounds\n"
@@ -236,14 +248,14 @@ showStrLabel :: HelperFunc -> Int -> Label
 showStrLabel hf i = ".L." <> showHelperLabel hf <> "_str" <> (T.pack . show) i
 
 showHelperLabel :: HelperFunc -> Label
-showHelperLabel (Print HInt)     = "_printi"
-showHelperLabel (Print HChar)    = "_printc"
-showHelperLabel (Print HBool)    = "_printb"
-showHelperLabel (Print HString)  = "_prints"
-showHelperLabel (Print HPointer) = "_printp"
-showHelperLabel Println          = "_println"
-showHelperLabel (Read HInt)      = "_readi"
-showHelperLabel (Read HChar)     = "_readc"
+showHelperLabel (HPrint HInt)     = "_printi"
+showHelperLabel (HPrint HChar)    = "_printc"
+showHelperLabel (HPrint HBool)    = "_printb"
+showHelperLabel (HPrint HString)  = "_prints"
+showHelperLabel (HPrint HPointer) = "_printp"
+showHelperLabel HPrintln          = "_println"
+showHelperLabel (HRead HInt)      = "_readi"
+showHelperLabel (HRead HChar)     = "_readc"
 showHelperLabel FreePair         = "_freepair"
 showHelperLabel ArrStore         = "_arrStore"
 showHelperLabel ArrLoad          = "_arrLoad"

@@ -5,11 +5,12 @@ module CodeGeneration.Program (transProg) where
 import CodeGeneration.IR 
 import CodeGeneration.Statements (transStats)
 import CodeGeneration.DataSection
-import CodeGeneration.Utils (IRSectionGenerator, Aux(Aux, available, labelId, varLocs, sectionName, literTable))
+import CodeGeneration.Utils (IRSectionGenerator, Aux(Aux, available, labelId, varLocs, sectionName, literTable, helperFuncs))
 import Control.Monad.State
 
 import qualified AST
 import qualified Data.Map as M
+import qualified Data.Set as S
 
 transProg :: AST.Program -> IRSectionGenerator (Program IRReg)
 transProg (AST.Program fs ss) = do
@@ -22,7 +23,7 @@ transMain ss = do
   let unlimitedRegs = map TmpReg [0..]
       name = "main"
       (dataSection, lt) = generateDataSection ss name
-  bodyInstrs <- evalStateT (transStats ss) (Aux {available = unlimitedRegs, labelId = 0, varLocs = M.empty, sectionName = name, literTable = lt}) 
+  bodyInstrs <- evalStateT (transStats ss) (Aux {available = unlimitedRegs, labelId = 0, varLocs = M.empty, sectionName = name, literTable = lt, helperFuncs = S.empty}) 
   case bodyInstrs of
     [] -> return $ Section dataSection (Body name True (wrapSectionBody [Mov (Reg IRRet) (Imm 0)]))
     _ -> return $ Section dataSection (Body name True (wrapSectionBody bodyInstrs))

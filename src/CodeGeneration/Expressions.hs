@@ -10,8 +10,9 @@ import CodeGeneration.Utils
     nextFreeReg,
     makeRegAvailable,
     makeRegsAvailable,
-    getVarReg )
-import CodeGeneration.Helpers (HelperFunc(ArrLoad), showHelperLabel)
+    getVarReg,
+    addHelperFunc )
+import CodeGeneration.Helpers (HelperFunc(ArrLoad, ErrDivZero, BoundsCheck), showHelperLabel)
 import Data.Char (ord)
 
 import qualified AST (Ident(Ident))
@@ -51,7 +52,7 @@ transExp (Len e _) dst = return []
 transExp (Ord e _) dst = transExp e dst
 transExp (Chr e _) dst = return []
 transExp ((:*:) e e' _) dst = transNumOp Mul e e' dst
-transExp ((:/:) e e' _) dst = transNumOp Div e e' dst
+transExp ((:/:) e e' _) dst = addHelperFunc ErrDivZero >> transNumOp Div e e' dst
 transExp ((:%:) e e' _) dst = return []
 transExp ((:+:) e e' _) dst = transNumOp Add e e' dst
 transExp ((:-:) e e' _) dst = transNumOp Sub e e' dst
@@ -114,6 +115,7 @@ transCmpOp cons e e' dst = do
 
 transArrayElem :: ArrayElem -> IRReg -> IRStatementGenerator IRInstrs
 transArrayElem (ArrayElem (AST.Ident i _) exprs _) dst = do
+  addHelperFunc BoundsCheck
   varReg <- getVarReg (Ident i)
   concat <$> mapM (`transArrExpr` varReg) exprs
   where
