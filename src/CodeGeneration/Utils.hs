@@ -3,18 +3,18 @@
 module CodeGeneration.Utils 
   ( IRSectionGenerator,
     IRStatementGenerator,
-    Aux(Aux, available, labelId, varLocs, sectionName, literTable),
-    intSize,
-    maxRegSize,
+    Aux(Aux, available, labelId, varLocs, sectionName, literTable, helperFuncs),
+    addHelperFunc,
     nextFreeReg,
     makeRegAvailable,
     makeRegsAvailable,
     nextLabel,
     insertVarReg,
     getVarReg,
-    getVarType,
+    getIdentType,
     exprType,
     typeSize,
+    getHelperType,
     (<++>),
     (++>),
     (<++),
@@ -22,17 +22,18 @@ module CodeGeneration.Utils
   )
 where
 
-import AST hiding (Ident)
-import CodeGeneration.IR
 import Control.Monad.Reader
 import Control.Monad.State
-import Data.Map ((!))
-import Semantic.Type.SymbolTable
-import Semantic.Rename.Scope
-
-import qualified AST (Ident(Ident))
 import qualified Data.Map as M
 import qualified Data.Text as T
+import Data.Functor ((<&>)) 
+
+import AST hiding (Ident)
+import qualified AST (Ident(Ident))
+import CodeGeneration.IR
+import CodeGeneration.Helpers
+import Semantic.Rename.Scope
+import Semantic.Type.SymbolTable (SymbolTable, fromIdentType, IdentType)
 
 type IRStatementGenerator a = StateT Aux (Reader (SymbolTable, ScopeMap)) a
 type IRSectionGenerator a = (Reader (SymbolTable, ScopeMap)) a
@@ -44,14 +45,11 @@ data Aux = Aux {
   labelId :: Int,
   sectionName :: T.Text,
   varLocs :: M.Map Ident IRReg,
-  literTable :: LiterTable
-  }
+  literTable :: LiterTable,
+  helperFuncs :: HelperFuncs }
 
-maxRegSize :: Int
-maxRegSize = 4
-
-intSize :: Int
-intSize = 4
+addHelperFunc :: HelperFunc -> IRStatementGenerator ()
+addHelperFunc hf = modify (\a@(Aux {helperFuncs = hfs}) -> a {helperFuncs = insertHelperFunc hf hfs})
 
 nextFreeReg :: IRStatementGenerator IRReg
 nextFreeReg = state (\a@Aux {available = (nxt:rst)} -> (nxt, a {available = rst}))
@@ -75,10 +73,13 @@ insertVarReg :: Ident -> IRReg -> IRStatementGenerator ()
 insertVarReg i r = modify (\a@Aux {varLocs = vl} -> a {varLocs = M.insert i r vl})
 
 getVarReg :: Ident -> IRStatementGenerator IRReg
-getVarReg i = gets (\Aux {varLocs = vl} -> vl ! i)
+getVarReg i = gets (\Aux {varLocs = vl} -> vl M.! i)
 
-getVarType :: Ident -> IRStatementGenerator IdentType
-getVarType (Ident i) = asks ((! AST.Ident i (0, 0)) . fst)
+getIdentType :: Ident -> IRStatementGenerator IdentType
+getIdentType (Ident i) = asks ((M.! AST.Ident i (0, 0)) . fst)
+
+getHelperType :: Ident -> IRStatementGenerator HelperType
+getHelperType i = getIdentType i <&> (fromWType . fromIdentType)
 
 (<++>) :: Applicative m => m [a] -> m [a] -> m [a]
 a <++> b = (++) <$> a <*> b
@@ -107,8 +108,8 @@ exprType (BoolLiter _ _) = return WBool
 exprType (CharLiter _ _) = return WChar
 exprType (StrLiter _ _) = return WStr
 exprType (PairLiter _) = return WUnit
-exprType (IdentExpr (AST.Ident i _) _) = fromIdentType <$> getVarType (Ident i)
-exprType (ArrayExpr (ArrayElem (AST.Ident i _) _ _) _) = fromIdentType <$> getVarType (Ident i)
+exprType (IdentExpr (AST.Ident i _) _) = fromIdentType <$> getIdentType (Ident i)
+exprType (ArrayExpr (ArrayElem (AST.Ident i _) _ _) _) = fromIdentType <$> getIdentType (Ident i)
 exprType (Not _ _) = return WBool
 exprType (Neg _ _) = return WInt
 exprType (Len _ _) = return WInt
