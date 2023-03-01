@@ -4,6 +4,7 @@ module CodeGeneration.Expressions (transExp, transArrayElem) where
 
 import AST hiding (Ident)
 import CodeGeneration.IR
+import Control.Monad.State
 import CodeGeneration.Utils
   ( IRStatementGenerator,
     nextLabel,
@@ -11,11 +12,13 @@ import CodeGeneration.Utils
     makeRegAvailable,
     makeRegsAvailable,
     getVarReg,
-    addHelperFunc )
+    addHelperFunc,
+    Aux (..) )
 import CodeGeneration.Helpers (HelperFunc(ArrLoad, ErrDivZero, BoundsCheck), showHelperLabel)
 import Data.Char (ord)
 
 import qualified AST (Ident(Ident))
+import qualified Data.Map as M
 
 type NumInstrCons a = Operand a -> Operand a -> Operand a -> Instr a
 type BranchInstrCons a = Label -> Instr a
@@ -31,7 +34,7 @@ transExp (BoolLiter False _) dst
   where
     false = Imm 0
 transExp (CharLiter c _) dst = return [Mov (Reg dst) (Imm (ord c))]
-transExp (StrLiter t _) dst = return []
+transExp (StrLiter t _) dst = (gets (\Aux {literTable = lt} -> lt M.! t)) >>= (\label -> return [Load (Reg dst) (Abs label)])
 transExp (PairLiter _) dst
   = return [Mov (Reg dst) nullptr]
   where
