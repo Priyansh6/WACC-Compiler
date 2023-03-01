@@ -62,6 +62,9 @@ makeRegAvailable r = modify (\a@Aux {available = rs, inUse = (_:rs')} -> a {avai
 makeRegsAvailable :: [IRReg] -> IRStatementGenerator ()
 makeRegsAvailable = mapM_ makeRegAvailable
 
+withReg :: (IRReg -> IRStatementGenerator a) -> IRStatementGenerator a
+withReg f = nextFreeReg >>= (\r -> f r <* makeRegAvailable r)
+
 nextLabel :: IRStatementGenerator Label
 nextLabel = nextLabelId >>= toLabel
   where
