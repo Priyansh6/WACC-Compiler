@@ -2,6 +2,7 @@ module CodeGeneration.ARM.Registers (ArmInstr, ArmInstrs, ArmReg, irToArm) where
 
 import CodeGeneration.IR
 
+import Control.Composition ((.*))
 import Control.Monad.State
 
 import qualified Data.Map as M
@@ -40,17 +41,17 @@ transSection (Section d (Body label global instrs))
   = mapM transInstr instrs >>= (\iss -> return $ Section d (Body label global (concat iss)))
 
 transInstr :: Instr IRReg -> ArmTranslator [Instr ArmReg]
-transInstr (Load o1 o2) = fmap (:[]) $ liftM2 Load (transOperand o1) (transOperand o2)
-transInstr (Store o1 o2) = fmap (:[]) $ liftM2 Store (transOperand o1) (transOperand o2)
-transInstr (Mov o1 o2) = fmap (:[]) $ liftM2 Mov (transOperand o1) (transOperand o2)
-transInstr (Add o1 o2 o3) = fmap (:[]) $ liftM3 Add (transOperand o1) (transOperand o2) (transOperand o3)
-transInstr (Sub o1 o2 o3) = fmap (:[]) $ liftM3 Sub (transOperand o1) (transOperand o2) (transOperand o3)
-transInstr (Mul o1 o2 o3) = fmap (:[]) $ liftM3 Mul (transOperand o1) (transOperand o2) (transOperand o3)
-transInstr (Div o1 o2 o3) = fmap (:[]) $ liftM3 Div (transOperand o1) (transOperand o2) (transOperand o3)
-transInstr (Cmp o1 o2) = fmap (:[]) $ liftM2 Mov (transOperand o1) (transOperand o2)
+transInstr (Load o1 o2) = (:[]) .* Load <$> transOperand o1 <*> transOperand o2
+transInstr (Store o1 o2) = (:[]) .* Store <$> transOperand o1 <*> transOperand o2
+transInstr (Mov o1 o2) = (:[]) .* Mov <$> transOperand o1 <*> transOperand o2
+transInstr (Add o1 o2 o3) = (:[]) .* Add <$> transOperand o1 <*> transOperand o2 <*> transOperand o3
+transInstr (Sub o1 o2 o3) = (:[]) .* Sub <$> transOperand o1 <*> transOperand o2 <*> transOperand o3
+transInstr (Mul o1 o2 o3) = (:[]) .* Mul <$> transOperand o1 <*> transOperand o2 <*> transOperand o3
+transInstr (Div o1 o2 o3) = (:[]) .* Div <$> transOperand o1 <*> transOperand o2 <*> transOperand o3
+transInstr (Cmp o1 o2) = (:[]) .* Mov <$> transOperand o1 <*> transOperand o2
 transInstr (Jsr l) = return [Jsr l]
-transInstr (Push o) = fmap ((:[]) . Push) (transOperand o)
-transInstr (Pop o) = fmap ((:[]) . Pop) (transOperand o)
+transInstr (Push o) = (:[]) . Push <$> transOperand o
+transInstr (Pop o) = (:[]) . Pop <$> transOperand o
 transInstr (Jmp l) = return [Jmp l]
 transInstr (Je l) = return [Je l]
 transInstr (Jne l) = return [Jne l]
@@ -62,10 +63,10 @@ transInstr (Define l) = return [Define l]
 transInstr (Comment c) = return [Comment c]
 
 transOperand :: Operand IRReg -> ArmTranslator (Operand ArmReg)
-transOperand (Reg r) = fmap Reg (transIRReg r)
-transOperand (Regs rs) = fmap Regs $ mapM transIRReg rs
-transOperand (Ind r) = fmap Ind (transIRReg r)
-transOperand (ImmOffset r offset) = fmap (flip ImmOffset offset) (transIRReg r)
+transOperand (Reg r) = Reg <$> transIRReg r
+transOperand (Regs rs) = Regs <$> mapM transIRReg rs
+transOperand (Ind r) = Ind <$> transIRReg r
+transOperand (ImmOffset r offset) = flip ImmOffset offset <$> transIRReg r
 transOperand (Imm i) = return $ Imm i
 transOperand (Abs l) = return $ Abs l
 
