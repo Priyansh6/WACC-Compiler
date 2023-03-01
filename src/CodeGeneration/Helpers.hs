@@ -251,10 +251,10 @@ generateHelperFunc hf
       _           -> [ Jsr (showHelperLabel (HPrint HString)) ]
     errStrLabel = showStrLabel hf 0
     errMsg = case hf of
-      BoundsCheck -> "fatal error: array index %d out of bounds\n"
-      ErrDivZero  -> "fatal error: division or modulo by zero\n"
-      ErrOverflow -> "fatal error: integer overflow or underflow occurred\n"
-      ErrNull     -> "fatal error: null pair deferenced or freed\n"
+      BoundsCheck -> "fatal error: array index %d out of bounds"
+      ErrDivZero  -> "fatal error: division or modulo by zero"
+      ErrOverflow -> "fatal error: integer overflow or underflow occurred"
+      ErrNull     -> "fatal error: null pair deferenced or freed"
       _           -> error "Can't generate error message for this helper function"
 
 showStrLabel :: HelperFunc -> Int -> Label
@@ -282,6 +282,6 @@ showHelperLabel _                = error "Unknown Helper Function Label"
 showHelperOption :: HelperType -> T.Text
 showHelperOption HInt     = "%d"
 showHelperOption HChar    = "%c"
-showHelperOption HBool    = "%b"
+showHelperOption HBool    = "%.*s"
 showHelperOption HString  = "%.*s"
 showHelperOption HPointer = "%p"
