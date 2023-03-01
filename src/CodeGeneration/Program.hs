@@ -24,7 +24,9 @@ transMain ss = do
       name = "main"
       (dataSection, lt) = generateDataSection ss name
   bodyInstrs <- evalStateT (transStats ss) (Aux {available = unlimitedRegs, labelId = 0, varLocs = M.empty, sectionName = name, literTable = lt, helperFuncs = S.empty, inUse = []}) 
-  return $ Section dataSection (Body name True (wrapSectionBody bodyInstrs))
+  case bodyInstrs of 
+    [] -> return $ Section dataSection (Body name True (wrapSectionBody [Mov (Reg IRRet) (Imm 0)]))
+    _ -> return $ Section dataSection (Body name True (wrapSectionBody bodyInstrs))
 
 transFunc :: AST.Func -> IRSectionGenerator (Section IRReg)
 transFunc (AST.Func _ (AST.Ident i _) params ss _ _) = do
