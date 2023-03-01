@@ -38,7 +38,7 @@ initAux = Aux {
   }
 
 generalRegs :: ArmRegs
-generalRegs = S.fromList [R0, R1, R2, R3, R4, R5, R6, R7]
+generalRegs = S.fromList [R4, R5, R6, R7]
 
 paramRegs :: ArmRegs
 paramRegs = S.fromList [R0, R1, R2, R3]
