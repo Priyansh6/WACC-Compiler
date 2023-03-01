@@ -2,16 +2,21 @@
 VIEW_STDOUT = 0
 VIEW_STDERR = 0
 
+# specify any test paths to run any tests on
+TESTS = [
+	"valid",
+	"invalid"
+]
 # specify any test paths in test/integration to test emulation on
 # WARNING: if qemu not found, it uses the slow refEmulate
 QEMU_TESTS = [
-	# "valid/array",
+	# "valid",
 ]
 TIMEOUT_DURATION = 2 # seconds
 
 ################################################################################
 
-from os import path as os_path, remove, scandir
+from os import path as os_path, remove as os_remove, scandir
 from pathlib import Path
 import subprocess
 from itertools import chain
@@ -19,9 +24,9 @@ from itertools import chain
 global QEMU_NOT_FOUND
 QEMU_NOT_FOUND = False
 
-BLUE = "\033[0;34m"
-GREEN = "\033[0;32m"
-LIGHT_RED = "\033[0;31m"
+BLUE = "\033[1;34m"
+GREEN = "\033[1;32m"
+LIGHT_RED = "\033[1;31m"
 RED = "\033[1;31m"
 YELLOW = "\033[1;33m"
 BOLD = "\033[1m"
@@ -37,6 +42,7 @@ SKIPPED = YELLOW + "-" + END
 failedTests = []
 
 QEMU_TEST_PATHS = [Path("test/integration/" + path) for path in QEMU_TESTS]
+TEST_PATHS = [Path("test/integration/" + path) for path in TESTS]
 def shouldTestOutput(testPath):
 	return any(runPath in testPath.parents for runPath in QEMU_TEST_PATHS)
 
@@ -58,6 +64,8 @@ def integrationTests():
 	for testGroup in chain(scandir("./test/integration/invalid"), scandir("./test/integration/valid")):
 		print(BOLD, BLUE, "\n", str(Path(testGroup))[17:], END)
 		for waccFilename in Path(testGroup).rglob("*.wacc"):
+			if not any(runPath in waccFilename.parents for runPath in TEST_PATHS):
+				continue
 			totalTests += 1
 			result = subprocess.run(
 				[wacc40exe, waccFilename],
@@ -77,9 +85,10 @@ def integrationTests():
 
 			if shouldTestOutput(waccFilename):
 				expectedInput, expectedOutput = getWaccFileIO(waccFilename)
+				expectedExit = 255 if "#runtime_error#" in expectedOutput else 0
 				try:
 					actualOutput, actualExit = getActualOutput(basename, expectedInput)
-					if actualExit == 0:
+					if actualExit == expectedExit:
 						testSummary += addTestResult(PASSED if actualOutput == expectedOutput else FAILED_OUTPUT, waccFilename, expectedOutput, actualOutput)
 					else:
 						testSummary += addTestResult(FAILED_EXIT, waccFilename, f"{LIGHT_RED}qemu exit code: {expectedExit}{END}", f"{LIGHT_RED}qemu exit code: {actualExit}{END}")
@@ -89,10 +98,16 @@ def integrationTests():
 				testSummary += addTestResult(SKIPPED)
 				skippedTests += 1
 			try:
-				remove(f"{basename}.s")
-				remove(basename)
+				Path(f"./{basename}.s").unlink()
+				# os_remove(f"./{basename}.s")
+			except OSError as e:
+				print(e)
+				# if e.filename != f"./{basename}.s":
+				# 	raise e
+			try:
+				os_remove(f"./{basename}")
 			except FileNotFoundError as e:
-				if e.filename not in [basename, f"{basename}.s"]:
+				if e.filename != f"./{basename}":
 					raise e
 
 
@@ -105,7 +120,7 @@ def integrationTests():
 		print(YELLOW, "\t", "Actual:", END)
 		for line in actualOutput.split("\n"):
 			print("\t\t" + line)
-		print()
+		# print()
 
 	passedTests = totalTests - len(failedTests) - skippedTests
 	if len(failedTests) > 0:
@@ -224,4 +239,8 @@ def runRefEmulator(assemblyFile, assemblyInput):
 	return output, int(exitCode)
 
 integrationTests()
+test = os.listdir(".")
 
+for item in test:
+    if item.endswith(".s"):
+        os.remove(item)
