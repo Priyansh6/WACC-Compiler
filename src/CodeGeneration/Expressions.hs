@@ -7,13 +7,15 @@ import CodeGeneration.IR
 import Control.Monad.State
 import CodeGeneration.Utils
   ( IRStatementGenerator,
+    (<++),
     nextLabel,
     nextFreeReg,
     makeRegAvailable,
     makeRegsAvailable,
     getVarReg,
     addHelperFunc,
-    Aux (..) )
+    Aux (..),
+    typeSize )
 import CodeGeneration.Helpers (HelperFunc(ArrLoad, ErrDivZero, BoundsCheck), showHelperLabel)
 import Data.Char (ord)
 
@@ -51,7 +53,7 @@ transExp (Not e _) dst = do
 transExp (Neg e _) dst = do
   exprInstrs <- transExp e dst
   return $ exprInstrs ++ [Sub (Reg dst) (Reg dst) (Imm 0)]
-transExp (Len e _) dst = return []
+transExp (Len e _) dst = transExp e dst <++ [Load (Reg dst) (ImmOffset dst (- (typeSize WInt)))]
 transExp (Ord e _) dst = transExp e dst
 transExp (Chr e _) dst = return []
 transExp ((:*:) e e' _) dst = transNumOp Mul e e' dst
