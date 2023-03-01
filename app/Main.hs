@@ -4,7 +4,7 @@ module Main (main) where
 
 import qualified Lexer as L
 import CodeGeneration.ARM.PrettyPrint (showArm)
-import CodeGeneration.ARM.Registers (irToArm)
+import CodeGeneration.ARM.Registers (transProg)
 import CodeGeneration.Program (transProg)
 import Syntax.Program (program)
 import Semantic.Errors (printSemanticErrors)
@@ -35,7 +35,7 @@ main = do
       ((scopeMap, []), renamedAST) -> case runExcept $ execStateT (checkProg renamedAST) M.empty of
         Left err -> printSemanticErrors [err] contents fname >> exitWith (ExitFailure 200)
         Right symbolTable -> do
-          let irProg = runReader (transProg renamedAST) (symbolTable, scopeMap)
-          let armProg = irToArm irProg
+          let irProg = runReader (CodeGeneration.Program.transProg renamedAST) (symbolTable, scopeMap)
+          let armProg = CodeGeneration.ARM.Registers.transProg irProg
           TIO.writeFile (takeBaseName fname ++ ".s") (showArm armProg) >> exitSuccess
       ((_, errs), _) -> printSemanticErrors errs contents fname >> exitWith (ExitFailure 200)

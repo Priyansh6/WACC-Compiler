@@ -14,7 +14,7 @@ type Global = Bool
 
 data Data = StringData Label T.Text deriving (Show, Eq)
 
-data IRReg = TmpReg Int | IRParam Int | IRFP | IRSP | IRLR | IRPC | IRRet deriving (Show, Eq)
+data IRReg = TmpReg Int | IRParam Int | IRScratch1 | IRScratch2 | IRScratch3 | IRFP | IRSP | IRLR | IRPC | IRRet deriving (Show, Eq)
 
 type Instrs a = [Instr a]
 type IRInstrs = Instrs IRReg

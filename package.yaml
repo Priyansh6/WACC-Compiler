@@ -16,7 +16,6 @@ dependencies:
 - hspec
 - transformers
 - mtl
-- composition-prelude
 - filepath
 
 ghc-options:
