@@ -44,7 +44,7 @@ transStat (Free e _) = do
   eType <- exprType e
   makeRegAvailable refReg
   case eType of
-    WPair _ _ -> addHelperFunc FreePair >> return (evalRefInstrs ++ [Mov (Reg IRRet) (Reg refReg), Jsr (showHelperLabel FreePair)])
+    WPair _ _ -> addHelperFunc FreePair >> evalRefInstrs ++> checkNull refReg <++ [Mov (Reg IRRet) (Reg refReg), Jsr (showHelperLabel FreePair)]
     WArr _ _ -> addHelperFunc FreeArr >> return (evalRefInstrs ++ [Mov (Reg IRRet) (Reg refReg), Jsr (showHelperLabel FreeArr)])
     _ -> undefined
 transStat (Return e _) = do
@@ -124,13 +124,13 @@ transRVal (RPair pe) dst = transPairElem pe dst
   where 
     -- gets the VALUE/ptr at fst pair and puts it in dst'
     transPairElem :: PairElem -> IRReg -> IRStatementGenerator IRInstrs 
-    transPairElem (Fst (LIdent (AST.Ident i _)) _) dst' = getVarReg (Ident i) >>= (\r -> return [Load (Reg dst') (Ind r)])
-    transPairElem (Fst (LPair pe') _) dst' = transPairElem pe' dst' <++ [Load (Reg dst') (Ind dst')]
+    transPairElem (Fst (LIdent (AST.Ident i _)) _) dst' = getVarReg (Ident i) >>= (\r -> checkNull r <++ [Load (Reg dst') (Ind r)])
+    transPairElem (Fst (LPair pe') _) dst' = transPairElem pe' dst' <++> checkNull dst' <++ [Load (Reg dst') (Ind dst')]
     transPairElem (Snd (LIdent (AST.Ident i _)) _) dst' = do
       varReg <- getVarReg (Ident i) 
       aType <- getWType (Ident i)
-      return [Load (Reg dst') (ImmOffset varReg (typeSize aType))]
-    transPairElem (Snd (LPair pe') _) dst' = transPairElem pe' dst' <++ [Load (Reg dst') (ImmOffset dst' $ typeSize WUnit)]
+      checkNull varReg <++ [Load (Reg dst') (ImmOffset varReg (typeSize aType))]
+    transPairElem (Snd (LPair pe') _) dst' = transPairElem pe' dst' <++> checkNull dst' <++ [Load (Reg dst') (ImmOffset dst' $ typeSize WUnit)]
     transPairElem _ _ = error "cannot take fst or snd of an array type"
 transRVal (Call (AST.Ident i _) es _) dst = do
   movParamInstrs <- concat <$> zipWithM transExp es [IRParam x | x <- [0..]]
@@ -142,13 +142,13 @@ transLVal (LIdent (AST.Ident i _)) dst = getVarReg (Ident i) >>= (\r -> return [
 transLVal (LPair pe) dst = withReg (\r -> transLPair pe r <++ [Mov (Reg dst) (Reg r)])
   where
     transLPair :: PairElem -> IRReg -> IRStatementGenerator IRInstrs
-    transLPair (Fst (LIdent (AST.Ident i _)) _) dst' = getVarReg (Ident i) >>= (\vr -> return [Load (Reg dst') (Ind vr)])
-    transLPair (Fst (LPair pe') _) dst' = withReg (\r -> transLPair pe' r <++ [Mov (Reg dst') (Ind r)])
+    transLPair (Fst (LIdent (AST.Ident i _)) _) dst' = getVarReg (Ident i) >>= (\vr -> checkNull vr <++ [Load (Reg dst') (Ind vr)])
+    transLPair (Fst (LPair pe') _) dst' = withReg (\r -> transLPair pe' r <++> checkNull r <++ [Mov (Reg dst') (Ind r)])
     transLPair (Snd (LIdent (AST.Ident i _)) _) dst' = do
       vr <- getVarReg (Ident i)
       vType <- getWType (Ident i)
-      return [Mov (Reg dst') (ImmOffset vr (typeSize vType))]
-    transLPair (Snd (LPair pe') _) dst' = withReg (\r -> transLPair pe' r <++ [Mov (Reg dst') (ImmOffset r (typeSize WUnit))])
+      checkNull vr <++ [Mov (Reg dst') (ImmOffset vr (typeSize vType))]
+    transLPair (Snd (LPair pe') _) dst' = withReg (\r -> transLPair pe' r <++> checkNull dst' <++ [Mov (Reg dst') (ImmOffset r (typeSize WUnit))])
     transLPair _ _ = undefined
 transLVal (LArray ae) dst = withReg (\r -> transArrayElem ae r <++ [Mov (Reg dst) (Reg r)])
 
@@ -161,3 +161,6 @@ transArrayCreation size len dst = do
   mallocInstrs <- transMallocCall (typeSize WInt + size) dst
   makeRegAvailable sizeReg
   return $ mallocInstrs ++ [Mov (Reg sizeReg) (Imm len), Store (Reg sizeReg) (Ind dst), Add (Reg dst) (Reg dst) (Imm $ typeSize WInt)]
+
+checkNull :: IRReg -> IRStatementGenerator IRInstrs
+checkNull toCheck = addHelperFunc ErrNull *> (nextLabel <&> (\notNullLabel -> [Cmp (Reg toCheck) (Imm 0), Jge notNullLabel, Jsr (showHelperLabel ErrNull), Define notNullLabel]))
