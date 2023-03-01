@@ -2,7 +2,7 @@ module CodeGeneration.ARM.Registers (ArmInstr, ArmInstrs, ArmReg, irToArm) where
 
 import CodeGeneration.IR
 
-import Control.Composition ((.*))
+import Control.Composition ((.*), (.**))
 import Control.Monad.State
 
 import qualified Data.Map as M
@@ -23,9 +23,15 @@ type ArmTranslator a = State Aux a
 
 initAux :: Aux
 initAux = Aux {
-    regsAvailable = [],
+    regsAvailable = generalRegs,
     regLocs = M.empty
   }
+
+generalRegs :: [ArmReg]
+generalRegs = [R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R12]
+
+paramRegs :: [ArmReg]
+paramRegs = [R0, R1, R2, R3]
 
 retReg :: ArmReg
 retReg = R0
@@ -38,16 +44,16 @@ transProg = mapM transSection
 
 transSection :: Section IRReg -> ArmTranslator (Section ArmReg)
 transSection (Section d (Body label global instrs)) 
-  = mapM transInstr instrs >>= (\iss -> return $ Section d (Body label global (concat iss)))
+  = Section d . Body label global . concat <$> mapM transInstr instrs
 
 transInstr :: Instr IRReg -> ArmTranslator [Instr ArmReg]
 transInstr (Load o1 o2) = (:[]) .* Load <$> transOperand o1 <*> transOperand o2
 transInstr (Store o1 o2) = (:[]) .* Store <$> transOperand o1 <*> transOperand o2
 transInstr (Mov o1 o2) = (:[]) .* Mov <$> transOperand o1 <*> transOperand o2
-transInstr (Add o1 o2 o3) = (:[]) .* Add <$> transOperand o1 <*> transOperand o2 <*> transOperand o3
-transInstr (Sub o1 o2 o3) = (:[]) .* Sub <$> transOperand o1 <*> transOperand o2 <*> transOperand o3
-transInstr (Mul o1 o2 o3) = (:[]) .* Mul <$> transOperand o1 <*> transOperand o2 <*> transOperand o3
-transInstr (Div o1 o2 o3) = (:[]) .* Div <$> transOperand o1 <*> transOperand o2 <*> transOperand o3
+transInstr (Add o1 o2 o3) = (:[]) .** Add <$> transOperand o1 <*> transOperand o2 <*> transOperand o3
+transInstr (Sub o1 o2 o3) = (:[]) .** Sub <$> transOperand o1 <*> transOperand o2 <*> transOperand o3
+transInstr (Mul o1 o2 o3) = (:[]) .** Mul <$> transOperand o1 <*> transOperand o2 <*> transOperand o3
+transInstr (Div o1 o2 o3) = (:[]) .** Div <$> transOperand o1 <*> transOperand o2 <*> transOperand o3
 transInstr (Cmp o1 o2) = (:[]) .* Mov <$> transOperand o1 <*> transOperand o2
 transInstr (Jsr l) = return [Jsr l]
 transInstr (Push o) = (:[]) . Push <$> transOperand o
