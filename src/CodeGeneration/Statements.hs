@@ -36,13 +36,11 @@ transStat (Read l _) = do
     lValWType (LPair (Fst lval _)) = lValWType lval >>= (\(WPair wt _) -> return wt)
     lValWType (LPair (Snd lval _)) = lValWType lval >>= (\(WPair _ wt) -> return wt)
 transStat (Free e _) = do
-  refReg <- nextFreeReg
-  evalRefInstrs <- transExp e refReg
   eType <- exprType e
-  makeRegAvailable refReg
+  let freeInstrs errType = withReg (\refReg -> transExp e refReg <++> checkNull refReg <++ [Mov (Reg IRRet) (Reg refReg), Jsr (showHelperLabel errType)])
   case eType of
-    WPair _ _ -> addHelperFunc FreePair >> evalRefInstrs ++> checkNull refReg <++ [Mov (Reg IRRet) (Reg refReg), Jsr (showHelperLabel FreePair)]
-    WArr _ _ -> addHelperFunc FreeArr >> return (evalRefInstrs ++ [Mov (Reg IRRet) (Reg refReg), Jsr (showHelperLabel FreeArr)])
+    WPair _ _ -> addHelperFunc FreePair >> freeInstrs FreePair
+    WArr _ _ -> addHelperFunc FreeArr >> freeInstrs FreeArr
     _ -> undefined
 transStat (Return e _) = withReg (\dst -> transExp e dst <++ [Mov (Reg IRRet) (Reg dst)])
 transStat (Exit e _) = withReg (\dst -> transExp e dst <++ [Mov (Reg IRRet) (Reg dst)])
