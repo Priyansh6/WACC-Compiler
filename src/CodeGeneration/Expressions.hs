@@ -44,17 +44,13 @@ transExp (PairLiter _) dst
 transExp (IdentExpr (AST.Ident i _) _) dst = getVarReg (Ident i) >>= (\r -> return [Mov (Reg dst) (Reg r)])
 transExp (ArrayExpr ae _) dst = transArrayElem ae dst
 transExp (Not e _) dst = do
-  eReg <- nextFreeReg
-  exprInstrs <- transExp e eReg
   trueLabel <- nextLabel
   endLabel <- nextLabel
-  makeRegAvailable eReg
-  return $ exprInstrs ++ [Cmp (Reg dst) (Imm 1), Je trueLabel, Mov (Reg eReg) (Imm 1), Jmp endLabel, Define trueLabel, Mov (Reg eReg) (Imm 0), Define endLabel, Mov (Reg dst) (Reg eReg)]
+  exprInstrs <- transExp e dst
+  return $ exprInstrs ++ [Cmp (Reg dst) (Imm 1), Je trueLabel, Mov (Reg dst) (Imm 1), Jmp endLabel, Define trueLabel, Mov (Reg dst) (Imm 0), Define endLabel]
 transExp (Neg e _) dst = do
-  eReg <- nextFreeReg
-  exprInstrs <- transExp e eReg
-  makeRegAvailable eReg
-  return $ exprInstrs ++ [Mov (Reg dst) (Imm 0), Sub (Reg dst) (Reg dst) (Reg eReg)]
+  exprInstrs <- transExp e dst
+  return $ exprInstrs ++ [Mov (Reg IRScratch1) (Imm 0), Sub (Reg dst) (Reg IRScratch1) (Reg dst)]
 transExp (Len e _) dst = transExp e dst <++ [Load (Reg dst) (ImmOffset dst (- (typeSize WInt)))]
 transExp (Ord e _) dst = transExp e dst
 transExp (Chr e _) dst = return []
@@ -70,55 +66,57 @@ transExp ((:<=:) e e' _) dst = transCmpOp Jle e e' dst
 transExp ((:==:) e e' _) dst = transCmpOp Je e e' dst
 transExp ((:!=:) e e' _) dst = transCmpOp Jne e e' dst
 transExp ((:&&:) e e' _) dst = do
-  cmpReg <- nextFreeReg
   failLabel <- nextLabel
   endLabel <- nextLabel
-  r <- nextFreeReg
-  eInstrs <- transExp e r
-  r' <- nextFreeReg
-  eInstrs' <- transExp e' r'
-  let successCase = [Cmp (Reg r) (Imm 1), Jne failLabel, Cmp (Reg r') (Imm 1), Jne failLabel, Mov (Reg cmpReg) (Imm 1), Jmp endLabel]
-      failCase = [Define failLabel, Mov (Reg cmpReg) (Imm 0)]
-      end = [Define endLabel, Mov (Reg dst) (Reg cmpReg)]
-  makeRegsAvailable [cmpReg, r, r']
+  eInstrs <- transExp e dst
+  eInstrs' <- transExp e' dst
+  let successCase = [Pop (Reg IRScratch2), 
+                     Pop (Reg IRScratch1), 
+                     Cmp (Reg IRScratch1) (Imm 1), 
+                     Jne failLabel, 
+                     Cmp (Reg IRScratch2) (Imm 1), 
+                     Jne failLabel, 
+                     Mov (Reg dst) (Imm 1), Jmp endLabel]
+      failCase = [Define failLabel, Mov (Reg dst) (Imm 0)]
+      end = [Define endLabel]
   return $ eInstrs ++ eInstrs' ++ successCase ++ failCase ++ end
 transExp ((:||:) e e' _) dst = do
   cmpReg <- nextFreeReg
   successLabel <- nextLabel
   endLabel <- nextLabel
-  r <- nextFreeReg
-  eInstrs <- transExp e r
-  r' <- nextFreeReg
-  eInstrs' <- transExp e' r'
-  let failCase = [Cmp (Reg r) (Imm 1), Jne successLabel, Cmp (Reg r') (Imm 1), Je successLabel, Mov (Reg cmpReg) (Imm 0), Jmp endLabel]
-      successCase = [Define successLabel, Mov (Reg cmpReg) (Imm 1)]
-      end = [Define endLabel, Mov (Reg dst) (Reg cmpReg)]
-  makeRegsAvailable [cmpReg, r, r']
-  return $ eInstrs ++ eInstrs' ++ failCase ++ successCase ++ end
+  eInstrs <- transExp e dst
+  eInstrs' <- transExp e' dst
+  let failCase = [Pop (Reg IRScratch2), 
+                  Pop (Reg IRScratch1), 
+                  Cmp (Reg IRScratch1) (Imm 1), 
+                  Jne successLabel, 
+                  Cmp (Reg IRScratch2) (Imm 1), 
+                  Je successLabel, 
+                  Mov (Reg dst) (Imm 0), Jmp endLabel]
+      successCase = [Define successLabel, Mov (Reg dst) (Imm 1)]
+      end = [Define endLabel]
+  return $ eInstrs ++ [Push (Reg dst)] ++ eInstrs' ++ [Push (Reg dst)] ++ failCase ++ successCase ++ end
 
 transNumOp :: NumInstrCons IRReg -> Expr -> Expr -> IRReg -> IRStatementGenerator IRInstrs
 transNumOp cons e e' dst = do
-  r <- nextFreeReg
-  eInstrs <- transExp e r
-  r' <- nextFreeReg
-  eInstrs' <- transExp e' r'
-  makeRegsAvailable [r, r']
-  return $ eInstrs ++ eInstrs' ++ [cons (Reg dst) (Reg r) (Reg r')]
+  eInstrs <- transExp e dst
+  eInstrs' <- transExp e' dst
+  return $ eInstrs ++ [Push (Reg dst)] ++ eInstrs' ++ [Push (Reg dst)] ++ [Pop (Reg IRScratch2), Pop (Reg IRScratch1), cons (Reg dst) (Reg IRScratch1) (Reg IRScratch2)]
 
 transCmpOp :: BranchInstrCons IRReg -> Expr -> Expr -> IRReg -> IRStatementGenerator IRInstrs
 transCmpOp cons e e' dst = do
-  cmpReg <- nextFreeReg
   greaterLabel <- nextLabel
   endLabel <- nextLabel
-  let greaterCase = [Define greaterLabel, Mov (Reg cmpReg) (Imm 1)]
-      otherCase = [Mov (Reg cmpReg) (Imm 0), Jmp endLabel]
-      end = [Define endLabel, Mov (Reg dst) (Reg cmpReg)]
-  r <- nextFreeReg
-  eInstrs <- transExp e r
-  r' <- nextFreeReg
-  eInstrs' <- transExp e' r'
-  makeRegsAvailable [cmpReg, r, r']
-  return $ eInstrs ++ eInstrs' ++ [Cmp (Reg r) (Reg r'), cons greaterLabel] ++ otherCase ++ greaterCase ++ end
+  let greaterCase = [Define greaterLabel, Mov (Reg dst) (Imm 1)]
+      otherCase = [Mov (Reg dst) (Imm 0), Jmp endLabel]
+      end = [Define endLabel]
+  eInstrs <- transExp e dst
+  eInstrs' <- transExp e' dst
+  return $ eInstrs ++ [Push (Reg dst)] ++ eInstrs' ++ [Push (Reg dst), 
+                                                       Pop (Reg IRScratch2), 
+                                                       Pop (Reg IRScratch1), 
+                                                       Cmp (Reg IRScratch1) (Reg IRScratch2), 
+                                                       cons greaterLabel] ++ otherCase ++ greaterCase ++ end
 
 transArrayElem :: ArrayElem -> IRReg -> IRStatementGenerator IRInstrs
 transArrayElem (ArrayElem (AST.Ident i _) exprs _) dst = do
@@ -127,8 +125,6 @@ transArrayElem (ArrayElem (AST.Ident i _) exprs _) dst = do
   concat <$> mapM (`transArrExpr` varReg) exprs
   where
     transArrExpr :: Expr -> IRReg -> IRStatementGenerator IRInstrs
-    transArrExpr e varReg' = do
-      exprReg <- nextFreeReg
-      exprInstrs <- transExp e exprReg
-      makeRegAvailable exprReg
-      return $ exprInstrs ++ [Mov (Reg $ IRParam 0) (Reg varReg'), Mov (Reg $ IRParam 1) (Reg exprReg), Jsr $ showHelperLabel ArrLoad, Mov (Reg dst) (Reg IRRet)]
+    transArrExpr e varReg' = transExp e dst <++ [Mov (Reg $ IRParam 0) (Reg varReg'), 
+                                                 Mov (Reg $ IRParam 1) (Reg dst), 
+                                                 Jsr $ showHelperLabel ArrLoad, Mov (Reg dst) (Reg IRRet)]

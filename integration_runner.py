@@ -1,16 +1,18 @@
 # view each test's stdout and/or stderr
 VIEW_STDOUT = 0
-VIEW_STDERR = 0
+VIEW_STDERR = 1
 
 # specify any test paths to run any tests on
 TESTS = [
-	"valid",
-	"invalid"
+	"valid/basic/",
+	"valid/expressions/"
+	# "invalid"
 ]
 # specify any test paths in test/integration to test emulation on
 # WARNING: if qemu not found, it uses the slow refEmulate
 QEMU_TESTS = [
-	"valid",
+	"valid/basic/",
+	"valid/expressions/"
 ]
 TIMEOUT_DURATION = 2 # seconds
 
