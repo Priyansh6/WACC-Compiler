@@ -54,27 +54,21 @@ transStat (Println e) = do
   addHelperFunc HPrintln
   return eInstrs
 transStat (If e ss _ ss' _ _) = do
-  eReg <- nextFreeReg
-  eInstrs <- transExp e eReg
   branchLabel <- nextLabel
-  ssInstrs <- transStats ss
   branchLabel' <- nextLabel
-  ssInstrs' <- transStats ss'
   endLabel <- nextLabel
-  let condJumpInstrs = [Cmp (Reg eReg) (Imm 1), Jne branchLabel']
-      branchInstrs = [Define branchLabel] ++ ssInstrs ++ [Jmp endLabel]
-      branchInstrs' = Define branchLabel' : ssInstrs'
-  makeRegAvailable eReg
-  return $ eInstrs ++ condJumpInstrs ++ branchInstrs ++ branchInstrs' ++ [Define endLabel]
-transStat (While e ss _ _) = do
-  eReg <- nextFreeReg
-  eInstrs <- transExp e eReg
+  eInstrs <- withReg (\eReg -> transExp e eReg <++ [Cmp (Reg eReg) (Imm 1), Jne branchLabel'])
   ssInstrs <- transStats ss
+  ssInstrs' <- transStats ss'
+  let branchInstrs = [Define branchLabel] ++ ssInstrs ++ [Jmp endLabel]
+      branchInstrs' = Define branchLabel' : ssInstrs'
+  return $ eInstrs ++ branchInstrs ++ branchInstrs' ++ [Define endLabel]
+transStat (While e ss _ _) = do
   startLabel <- nextLabel
   condLabel <- nextLabel
-  makeRegAvailable eReg
-  let condJumpInstrs = [Cmp (Reg eReg) (Imm 1), Je startLabel]
-  return $ [Jmp condLabel, Define startLabel] ++ ssInstrs ++ [Define condLabel] ++ eInstrs ++ condJumpInstrs
+  eInstrs <- withReg (\eReg -> transExp e eReg <++ [Cmp (Reg eReg) (Imm 1), Je startLabel])
+  ssInstrs <- transStats ss
+  return $ [Jmp condLabel, Define startLabel] ++ ssInstrs ++ [Define condLabel] ++ eInstrs 
 transStat (Begin ss _) = transStats ss
 
 transRVal :: RVal -> IRReg -> IRStatementGenerator IRInstrs
