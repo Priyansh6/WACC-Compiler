@@ -76,15 +76,13 @@ transRVal (RExpr e) dst = transExp e dst
 transRVal (ArrayLiter [] _) dst = transArrayCreation 0 0 dst
 transRVal (ArrayLiter elems@(e:_) _) dst = do
   eType <- exprType e
-  let eSize = typeSize eType
-  transArrayCreation eSize (length elems) dst <++> (concat <$> zipWithM transArrLiterElem elems [0..])
+  transArrayCreation (typeSize eType) (length elems) dst <++> (concat <$> zipWithM transArrLiterElem elems [0..])
   where
     transArrLiterElem :: Expr -> Int -> IRStatementGenerator IRInstrs
-    transArrLiterElem e' idx = do
-      eReg <- nextFreeReg
-      exprInstrs <- transExp e' eReg
-      makeRegAvailable eReg
-      return $ exprInstrs ++ [Mov (Reg (IRParam 0)) (Reg dst), Mov (Reg (IRParam 1)) (Imm idx), Mov (Reg (IRParam 2)) (Reg eReg), Jsr (showHelperLabel ArrStore)]
+    transArrLiterElem e' idx = withReg (\eReg -> transExp e' eReg <++ [Mov (Reg (IRParam 0)) (Reg dst), 
+                                                                       Mov (Reg (IRParam 1)) (Imm idx), 
+                                                                       Mov (Reg (IRParam 2)) (Reg eReg), 
+                                                                       Jsr (showHelperLabel ArrStore)])
 transRVal (NewPair e e' _) dst = do
   eReg <- nextFreeReg
   ePtrReg <- nextFreeReg
