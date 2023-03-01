@@ -79,9 +79,8 @@ transExp ((:&&:) e e' _) dst = do
                      Mov (Reg dst) (Imm 1), Jmp endLabel]
       failCase = [Define failLabel, Mov (Reg dst) (Imm 0)]
       end = [Define endLabel]
-  return $ eInstrs ++ eInstrs' ++ successCase ++ failCase ++ end
+  return $ eInstrs ++ [Push (Reg dst)] ++ eInstrs' ++ [Push (Reg dst)] ++ successCase ++ failCase ++ end
 transExp ((:||:) e e' _) dst = do
-  cmpReg <- nextFreeReg
   successLabel <- nextLabel
   endLabel <- nextLabel
   eInstrs <- transExp e dst

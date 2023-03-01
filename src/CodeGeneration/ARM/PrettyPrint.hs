@@ -47,8 +47,8 @@ showInstr (Jl l) = "blt " <> l
 showInstr (Jg l) = "bgt " <> l
 showInstr (Jle l) = "ble " <> l
 showInstr (Jge l) = "bge " <> l
-showInstr (Push o) = "push " <> showOp o
-showInstr (Pop o) = "pop " <> showOp o
+showInstr (Push o) = "push " <> "{" <> showOp o <> "}"
+showInstr (Pop o) = "pop " <> "{" <> showOp o <> "}"
 showInstr (Comment t) = "@ " <> t
 showInstr (Define l) = l <> ":"
 
@@ -57,7 +57,7 @@ showOps = T.intercalate ", " . map showOp
 
 showOp :: Operand ArmReg -> T.Text
 showOp (Reg r) = T.toLower (T.pack (show r))
-showOp (Regs rs) = "{" <> T.intercalate ", " (map (showOp . Reg) rs) <> "}"
+showOp (Regs rs) = T.intercalate ", " (map (showOp . Reg) rs)
 showOp (Imm i) = "#" <> T.pack (show i)
 showOp (Abs i) = "=" <> i
 showOp (Ind r) = "[" <> showOp (Reg r) <> "]"
