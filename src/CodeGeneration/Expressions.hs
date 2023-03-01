@@ -51,8 +51,10 @@ transExp (Not e _) dst = do
   makeRegAvailable eReg
   return $ exprInstrs ++ [Cmp (Reg dst) (Imm 1), Je trueLabel, Mov (Reg eReg) (Imm 1), Jmp endLabel, Define trueLabel, Mov (Reg eReg) (Imm 0), Define endLabel, Mov (Reg dst) (Reg eReg)]
 transExp (Neg e _) dst = do
+  eReg <- nextFreeReg
   exprInstrs <- transExp e dst
-  return $ exprInstrs ++ [Sub (Reg dst) (Reg dst) (Imm 0)]
+  makeRegAvailable eReg
+  return $ exprInstrs ++ [Mov (Reg dst) (Imm 0), Sub (Reg dst) (Reg dst) (Reg eReg)]
 transExp (Len e _) dst = transExp e dst <++ [Load (Reg dst) (ImmOffset dst (- (typeSize WInt)))]
 transExp (Ord e _) dst = transExp e dst
 transExp (Chr e _) dst = return []
