@@ -57,9 +57,9 @@ transSection (Section d (Body label global instrs))
 
 transAndAddMemoryInstrs :: Instr IRReg -> ArmTranslator ArmInstrs
 transAndAddMemoryInstrs instr = do
-  (translatedInstr, (loadInstrs, storeInstrs, rs)) <- runWriterT (transInstr instr)
+  (translatedInstr, (prefixInstrs, suffixInstrs, rs)) <- runWriterT (transInstr instr)
   _ <- mapM makeScratchAvailable $ S.toList rs
-  return $ loadInstrs ++ [translatedInstr] ++ storeInstrs
+  return $ prefixInstrs ++ [translatedInstr] ++ suffixInstrs
 
 transInstr :: Instr IRReg -> ArmMemoryAllocator ArmInstr
 transInstr (Load o1 o2) = Load <$> transOperand o1 False <*> transOperand o2 True
