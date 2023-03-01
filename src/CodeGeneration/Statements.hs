@@ -63,7 +63,9 @@ transStat (Print e) = do
   addHelperFunc helperFuncType
   return eInstrs
 transStat (Println e) = do
-  eInstrs <- withReg (\r -> transExp e r <++ [Mov (Reg (IRParam 0)) (Reg r), Jsr (showHelperLabel HPrintln)])
+  helperFuncType <- HPrint . fromWType <$> exprType e 
+  eInstrs <- withReg (\r -> transExp e r <++ [Mov (Reg (IRParam 0)) (Reg r), Jsr (showHelperLabel helperFuncType), Jsr (showHelperLabel HPrintln)])
+  addHelperFunc helperFuncType
   addHelperFunc HPrintln
   return eInstrs
 transStat (If e ss _ ss' _ _) = do
