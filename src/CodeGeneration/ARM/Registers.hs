@@ -6,6 +6,7 @@ import CodeGeneration.IR
 
 import Control.Monad.State
 import Control.Monad.Writer
+import Data.Map ((!))
 
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -93,7 +94,8 @@ transOperand (Abs l) _ = return $ Abs l
 
 transIRReg :: IRReg -> Bool -> ArmMemoryAllocator ArmReg
 transIRReg tr@(TmpReg _) isDst = allocateRegLoc tr generalRegs >> transDynamicReg tr isDst
-transIRReg pr@(IRParam _) isDst = allocateRegLoc pr paramRegs >> transDynamicReg pr isDst
+-- transIRReg pr@(IRParam _) isDst = allocateRegLoc pr paramRegs >> transDynamicReg pr isDst
+transIRReg pr@(IRParam _) isDst = allocateParamRegLoc pr >> transDynamicReg pr isDst
 transIRReg IRScratch1 _ = return $ S.elemAt 0 scratchRegs
 transIRReg IRScratch2 _ = return $ S.elemAt 1 scratchRegs
 transIRReg IRScratch3 _ = return $ S.elemAt 2 scratchRegs
@@ -102,6 +104,14 @@ transIRReg IRSP _ = return SP
 transIRReg IRLR _ = return LR 
 transIRReg IRPC _ = return PC
 transIRReg IRRet _ = return retReg
+
+allocateParamRegLoc :: IRReg -> ArmMemoryAllocator ()
+allocateParamRegLoc r@(IRParam n)
+  | n < length paramRegs = modify (\a@Aux {regLocs = locs} -> a {regLocs = M.insert r (Left (paramRegMappings ! r)) locs}) 
+  | otherwise = modify (\a@Aux {regLocs = locs, nextFPOffset = fpOff} -> a {regLocs = M.insert r (Right fpOff) locs, nextFPOffset = fpOff - 4})
+  where
+    paramRegMappings = M.fromList [(IRParam 0, R0), (IRParam 1, R1), (IRParam 2, R2), (IRParam 3, R3)]
+allocateParamRegLoc _ = undefined
 
 transDynamicReg :: IRReg -> Bool -> ArmMemoryAllocator ArmReg
 transDynamicReg r isDst = do
