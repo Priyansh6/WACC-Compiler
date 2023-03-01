@@ -16,7 +16,7 @@ TIMEOUT_DURATION = 2 # seconds
 
 ################################################################################
 
-from os import path as os_path, remove as os_remove, scandir
+from os import path as os_path, remove as os_remove, scandir, system
 from pathlib import Path
 import subprocess
 from itertools import chain
@@ -84,8 +84,7 @@ def integrationTests():
 			basename = os_path.splitext(os_path.basename(waccFilename))[0]
 
 			if shouldTestOutput(waccFilename):
-				expectedInput, expectedOutput = getWaccFileIO(waccFilename)
-				expectedExit = 255 if "#runtime_error#" in expectedOutput else 0
+				expectedInput, expectedOutput, expectedExit = getWaccFileIO(waccFilename)
 				try:
 					actualOutput, actualExit = getActualOutput(basename, expectedInput)
 					if actualExit == expectedExit:
@@ -157,13 +156,14 @@ def getWaccFileIO(waccFilename):
 	waccCode = open(f"{waccFilename}", 'r').read()
 	waccFileOutputRaw = extract(waccCode, "# Output:", "\n\n")
 	expectedInput = extract(waccCode, "# Input: ", "\n")
+	expectedExit = int(extract(waccCode, "# Exit:\n# ", "\n") or 0)
 	expectedOutput = '\n'.join(line[2:] for line in waccFileOutputRaw.split("\n")) if waccFileOutputRaw else ""
 	if expectedOutput:
 		if expectedOutput[0] == '\n':
 			expectedOutput = expectedOutput[1:]
 		if expectedOutput[-1] == '\n':
 			expectedOutput = expectedOutput[:-1]
-	return expectedInput, expectedOutput
+	return expectedInput, expectedOutput, expectedExit
 
 def getActualOutput(basename, waccInput):
 	try:
@@ -239,8 +239,5 @@ def runRefEmulator(assemblyFile, assemblyInput):
 	return output, int(exitCode)
 
 integrationTests()
-test = os.listdir(".")
 
-for item in test:
-    if item.endswith(".s"):
-        os.remove(item)
+system("rm -fr *.s")
