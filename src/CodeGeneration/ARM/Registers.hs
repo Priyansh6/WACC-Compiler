@@ -75,7 +75,7 @@ transAndAddMemoryInstrs instr = do
         Mov (Reg R0) o2, 
         Mov (Reg R1) o3, 
         Cmp (Reg R1) (Imm 0), 
-        Jle (showHelperLabel ErrDivZero),
+        Je (showHelperLabel ErrDivZero),
         Jsr divModLabel,
         Mov o1 (Reg R0)
       ]
@@ -84,7 +84,7 @@ transAndAddMemoryInstrs instr = do
         Mov (Reg R0) o2, 
         Mov (Reg R1) o3, 
         Cmp (Reg R1) (Imm 0), 
-        Jle (showHelperLabel ErrDivZero),
+        Je (showHelperLabel ErrDivZero),
         Jsr divModLabel,
         Mov o1 (Reg R1)
       ]
