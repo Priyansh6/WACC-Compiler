@@ -4,15 +4,13 @@ VIEW_STDERR = 1
 
 # specify any test paths to run any tests on
 TESTS = [
-	"valid/basic/",
-	"valid/expressions/"
+	"valid",
 	# "invalid"
 ]
 # specify any test paths in test/integration to test emulation on
 # WARNING: if qemu not found, it uses the slow refEmulate
 QEMU_TESTS = [
-	"valid/basic/",
-	"valid/expressions/"
+	"valid",
 ]
 TIMEOUT_DURATION = 2 # seconds
 
@@ -182,7 +180,8 @@ def getActualOutput(basename, waccInput):
 			input=(waccInput or '') + '\n',
 			capture_output=True,
 			text=True,
-			timeout=TIMEOUT_DURATION
+			timeout=TIMEOUT_DURATION,
+			universal_newlines=True
 		)
 		return result2.stdout, result2.returncode
 	except FileNotFoundError as e:
@@ -192,6 +191,10 @@ def getActualOutput(basename, waccInput):
 			return runRefEmulator(basename + ".s", waccInput)
 		else:
 			raise e
+	except UnicodeDecodeError as e:
+		if VIEW_STDERR:
+			print(e)
+		return str(e), 0
 
 def addTestResult(result, testname='', expected='', actual=''):
 	print(result, end='', flush=True)
