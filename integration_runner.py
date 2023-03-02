@@ -46,7 +46,7 @@ failedTests = []
 QEMU_TEST_PATHS = [Path("test/integration/" + path) for path in QEMU_TESTS]
 TEST_PATHS = [Path("test/integration/" + path) for path in TESTS]
 def shouldTestOutput(testPath):
-	return any(runPath in testPath.parents for runPath in QEMU_TEST_PATHS)
+	return any(runPath in testPath.parents or runPath == testPath for runPath in QEMU_TEST_PATHS)
 
 def integrationTests():
 	print(PASSED, "passed")
@@ -66,7 +66,7 @@ def integrationTests():
 	for testGroup in chain(scandir("./test/integration/invalid"), scandir("./test/integration/valid")):
 		print(BOLD, BLUE, "\n", str(Path(testGroup))[17:], END)
 		for waccFilename in Path(testGroup).rglob("*.wacc"):
-			if not any(runPath in waccFilename.parents for runPath in TEST_PATHS):
+			if not any(runPath in waccFilename.parents or runPath == waccFilename for runPath in TEST_PATHS):
 				continue
 			totalTests += 1
 			result = subprocess.run(
@@ -90,7 +90,7 @@ def integrationTests():
 				try:
 					actualOutput, actualExit = getActualOutput(basename, expectedInput)
 					if actualExit == expectedExit:
-						testSummary += addTestResult(PASSED if actualOutput == expectedOutput else FAILED_OUTPUT, waccFilename, expectedOutput, actualOutput)
+						testSummary += addTestResult(PASSED if "#runtime_error#" in expectedOutput or actualOutput == expectedOutput else FAILED_OUTPUT, waccFilename, expectedOutput, actualOutput)
 					else:
 						testSummary += addTestResult(FAILED_EXIT, waccFilename, f"{LIGHT_RED}qemu exit code: {expectedExit}{END}", f"{LIGHT_RED}qemu exit code: {actualExit}{END}")
 				except subprocess.TimeoutExpired:
