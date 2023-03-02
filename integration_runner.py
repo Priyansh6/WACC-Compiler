@@ -156,10 +156,12 @@ def getExpectedExit(waccFilename):
 
 def getWaccFileIO(waccFilename):
 	waccCode = open(f"{waccFilename}", 'r').read()
-	waccFileOutputRaw = extract(waccCode, "# Output:\n", "\n\n")
+	waccFileOutputRaw = extract(waccCode, "# Output:", "\n\n")
 	expectedInput = extract(waccCode, "# Input: ", "\n")
 	expectedExit = int(extract(waccCode, "# Exit:\n# ", "\n") or 0)
 	expectedOutput = '\n'.join(line[2:] for line in waccFileOutputRaw.split("\n")) if waccFileOutputRaw else ""
+	if expectedOutput and expectedOutput[0] == '\n':
+		expectedOutput = expectedOutput[1:]
 	return expectedInput, expectedOutput, expectedExit
 
 def getActualOutput(basename, waccInput):
