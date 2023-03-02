@@ -27,7 +27,9 @@ transStat (DecAssign t (AST.Ident i _) r _) = do
   makeRegAvailable rReg
   insertVarReg (Ident i) varReg
   return $ rInstrs ++ [Mov (Reg varReg) (Reg rReg)]
-transStat (Assign l@(LIdent _) r _) = withReg (\lReg -> withReg (\rReg -> transLVal l lReg <++> transRVal r rReg <++ [Mov (Reg lReg) (Reg rReg)]))
+transStat (Assign l@(LIdent (AST.Ident i _)) r _) = do
+  varReg <- getVarReg (Ident i)
+  withReg (\rReg -> transRVal r rReg <++ [Mov (Reg varReg) (Reg rReg)])
 transStat (Assign l r _) = withReg (\lReg -> withReg (\rReg -> transLVal l lReg <++> transRVal r rReg <++ [Store (Reg rReg) (Ind lReg)]))
 transStat (Read l _) = do
   helperFuncType <- lValWType l <&> HRead . fromWType
@@ -142,7 +144,6 @@ transRVal (Call (AST.Ident i _) es _) dst = do
   return $ movParamInstrs ++ [Comment "We push the dst register despite it containing uninitialised data. Thus we have to pop and then move the return register into dst.", Push (Regs regsInUse), Jsr i, Pop (Regs regsInUse), Mov (Reg dst) (Reg IRRet)] 
 
 transLVal :: LVal -> IRReg -> IRStatementGenerator IRInstrs
-transLVal (LIdent (AST.Ident i _)) dst = getVarReg (Ident i) >>= (\r -> return [Mov (Reg dst) (Reg r)])
 transLVal (LPair pe) dst = withReg (\r -> transLPair pe r <++ [Mov (Reg dst) (Reg r)])
   where
     transLPair :: PairElem -> IRReg -> IRStatementGenerator IRInstrs
@@ -155,6 +156,7 @@ transLVal (LPair pe) dst = withReg (\r -> transLPair pe r <++ [Mov (Reg dst) (Re
     transLPair (Snd (LPair pe') _) dst' = withReg (\r -> transLPair pe' r <++> checkNull dst' <++ [Mov (Reg dst') (ImmOffset r (typeSize WUnit))])
     transLPair _ _ = undefined
 transLVal (LArray ae) dst = withReg (\r -> transArrayElem ae r <++ [Mov (Reg dst) (Reg r)])
+transLVal _ _ = undefined
 
 transMallocCall :: Int -> IRReg -> IRStatementGenerator IRInstrs
 transMallocCall size dst = return [Mov (Reg (IRParam 0)) (Imm size), Jsr "malloc", Mov (Reg dst) (Reg IRRet)]
