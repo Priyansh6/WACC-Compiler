@@ -16,7 +16,7 @@ showSection (Section ds body) =
 showData :: [Data] -> [T.Text]
 showData ds =
   [".data" | not (null ds)]
-    ++ map (\(StringData l v) -> l <> ":\n\t.asciz \"" <> v <> "\"") ds
+    ++ map (\(StringData l v) -> "\t.word " <> T.pack (show (T.length v)) <> "\n" <> l <> ":\n\t.asciz \"" <> v <> "\"") ds
 
 showBody :: Body ArmReg -> T.Text
 showBody (Body l g instrs) =
