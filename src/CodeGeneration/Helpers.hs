@@ -39,6 +39,7 @@ fromWType WInt = HInt
 fromWType WBool = HBool
 fromWType WChar = HChar
 fromWType WStr = HString
+fromWType (WArr WChar _) = HString
 fromWType (WArr _ _) = HPointer
 fromWType (WPair _ _) = HPointer
 

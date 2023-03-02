@@ -156,7 +156,7 @@ transMallocCall size dst = return [Mov (Reg (IRParam 0)) (Imm size), Jsr "malloc
 transArrayCreation :: Int -> Int -> IRReg -> IRStatementGenerator IRInstrs
 transArrayCreation size len dst = do
   sizeReg <- nextFreeReg
-  mallocInstrs <- transMallocCall (typeSize WInt + size) dst
+  mallocInstrs <- transMallocCall (typeSize WInt + size * len) dst
   makeRegAvailable sizeReg
   return $ mallocInstrs ++ [Mov (Reg sizeReg) (Imm len), Store (Reg sizeReg) (Ind dst), Add (Reg dst) (Reg dst) (Imm $ typeSize WInt)]
 
