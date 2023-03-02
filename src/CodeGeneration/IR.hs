@@ -93,6 +93,7 @@ showInstr (Add rd rn o2) = "add " <> showOps [rd, rn, o2]
 showInstr (Sub rd rn o2) = "sub " <> showOps [rd, rn, o2]
 showInstr (Mul rd rm rs) = "mul " <> showOps [rd, rm, rs]
 showInstr (Div {}) = "@ TODO - div"
+showInstr (Mod {}) = "@ TODO - mod"
 showInstr (Cmp rn o2) = "cmp " <> showOps [rn, o2]
 showInstr (Jmp l) = "b " <> l
 showInstr (Jsr l) = "bl " <> l

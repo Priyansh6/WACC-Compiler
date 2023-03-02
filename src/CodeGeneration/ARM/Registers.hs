@@ -60,7 +60,7 @@ transSection :: Section IRReg -> ArmTranslator (Section ArmReg)
 transSection (Section d (Body label global instrs)) = do
   section <- concat <$> mapM transAndAddMemoryInstrs instrs
   fpOff <- gets nextFPOffset
-  return (Section d (Body label global ([Push (Regs [FP, LR]), Mov (Reg FP) (Reg SP), Add (Reg SP) (Reg SP) (Imm fpOff)] ++ section ++ [Pop (Regs [FP, PC])])))
+  return (Section d (Body label global ([Push (Regs [FP, LR]), Mov (Reg FP) (Reg SP), Add (Reg SP) (Reg SP) (Imm fpOff)] ++ section ++ [Sub (Reg SP) (Reg SP) (Imm fpOff), Pop (Regs [FP, PC])])))
 
 transAndAddMemoryInstrs :: Instr IRReg -> ArmTranslator ArmInstrs
 transAndAddMemoryInstrs instr = do
@@ -98,7 +98,6 @@ transInstr (Add o1 o2 o3) = Add <$> transOperand o1 True <*> transOperand o2 Fal
 transInstr (Sub o1 o2 o3) = Sub <$> transOperand o1 True <*> transOperand o2 False <*> transOperand o3 False 
 transInstr (Mul o1 o2 o3) = Mul <$> transOperand o1 True <*> transOperand o2 False <*> transOperand o3 False 
 transInstr (Div o1 o2 o3) = Div <$> transOperand o1 True <*> transOperand o2 False <*> transOperand o3 False
-transInstr (Cmp o1 o2) = Cmp <$> transOperand o1 False <*> transOperand o2 False
 transInstr (Mod o1 o2 o3) = Mod <$> transOperand o1 True <*> transOperand o2 False <*> transOperand o3 False
 transInstr (Cmp o1 o2) = Cmp <$> transOperand o1 False <*> transOperand o2 False
 transInstr (Jsr l) = return $ Jsr l

@@ -97,7 +97,6 @@ generateHelperFunc hf@(HPrint HBool)
     ]
     (Body boolLabel False
       [ 
-        Push (Regs [IRLR]),
         Cmp (Reg (IRParam 0)) (Imm 0),
         Jne boolLabel0,
         Load (Reg (IRParam 2)) (Abs boolStr0),
@@ -109,8 +108,7 @@ generateHelperFunc hf@(HPrint HBool)
         Load (Reg (IRParam 0)) (Abs boolStr2),
         Jsr printfLabel,
         Mov (Reg (IRParam 0)) (Imm 0),
-        Jsr fflushLabel,
-        Pop (Regs [IRPC])
+        Jsr fflushLabel
       ]
     )
     where
@@ -124,14 +122,12 @@ generateHelperFunc hf@(HPrint hType)
   = Section 
     [ StringData strLabel (showHelperOption hType) ] 
     (Body (showHelperLabel hf) False $
-      [ Push (Regs [IRLR]) ]
-      ++ setupParams
+      setupParams
       ++ [
         Load (Reg (IRParam 0)) (Abs strLabel),
         Jsr printfLabel,
         Mov (Reg (IRParam 0)) (Imm 0),
-        Jsr fflushLabel,
-        Pop (Regs [IRPC])
+        Jsr fflushLabel
       ]
     )
   where
@@ -148,12 +144,10 @@ generateHelperFunc HPrintln
     [ StringData strLabel "" ]
     (Body (showHelperLabel HPrintln) False
       [
-        Push (Regs [IRLR]),
         Load (Reg (IRParam 0)) (Abs strLabel),
         Jsr putsLabel,
         Mov (Reg (IRParam 0)) (Imm 0),
-        Jsr fflushLabel,
-        Pop (Regs [IRPC])
+        Jsr fflushLabel
       ]
     )
     where
@@ -163,15 +157,13 @@ generateHelperFunc hf@(HRead hType)
     [ StringData strLabel (spaceIfChar <> showHelperOption hType) ]
     (Body (showHelperLabel hf) False
       [
-        Push (Regs [IRLR]),
         Sub (Reg IRSP) (Reg IRSP) (Imm intSize),
         Store (Reg (IRParam 0)) (Ind IRSP),
         Mov (Reg (IRParam 1)) (Reg IRSP),
         Load (Reg (IRParam 0)) (Abs strLabel),
         Jsr scanfLabel,
         Load (Reg (IRParam 0)) (Ind IRSP),
-        Add (Reg IRSP) (Reg IRSP) (Imm intSize),
-        Pop (Regs [IRPC])
+        Add (Reg IRSP) (Reg IRSP) (Imm intSize)
       ]
     )
   where
@@ -183,7 +175,6 @@ generateHelperFunc FreePair
   = Section [] 
     (Body (showHelperLabel FreePair) False 
       [
-        Push (Regs [IRLR]),
         Mov (Reg IRLR) (Reg (IRParam 0)),
         Cmp (Reg IRLR) (Imm 0),
         Jle (showHelperLabel ErrNull),
@@ -192,20 +183,17 @@ generateHelperFunc FreePair
         Load (Reg (IRParam 0)) (ImmOffset IRLR maxRegSize),
         Jsr freeLabel,
         Mov (Reg (IRParam 0)) (Reg IRLR),
-        Jsr freeLabel,
-        Pop (Regs [IRPC])
+        Jsr freeLabel
       ]
     )
 generateHelperFunc FreeArr
   = Section [] 
     (Body (showHelperLabel FreeArr) False 
       [
-        Push (Regs [IRLR]),
         Mov (Reg IRLR) (Reg (IRParam 0)),
         Comment "Array pointers are shifted forward by 4 bytes, so correct it back to original pointer before free",
         Sub (Reg (IRParam 0)) (Reg IRLR) (Imm intSize),
-        Jsr freeLabel,
-        Pop (Regs [IRPC])
+        Jsr freeLabel
       ]
     )
 generateHelperFunc hf
@@ -213,7 +201,6 @@ generateHelperFunc hf
     = Section []
       (Body (showHelperLabel hf) False
         [
-          Push (Regs [IRLR]),
           Cmp (Reg (IRParam 1)) (Imm 0),
           Jl (showHelperLabel BoundsCheck),
           Load (Reg IRLR) (ImmOffset (IRParam 0) (-intSize)),
@@ -222,8 +209,7 @@ generateHelperFunc hf
           Mov (Reg IRScratch1) (Imm maxRegSize),
           Mul (Reg (IRParam 1)) (Reg (IRParam 1)) (Reg IRScratch1),
           Add (Reg (IRParam 0)) (Reg (IRParam 0)) (Reg (IRParam 1)),
-          arrInstr,
-          Pop (Regs [IRPC])
+          arrInstr
         ]
       )
   | isErrHelperFunc hf 

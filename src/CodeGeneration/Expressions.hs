@@ -53,7 +53,7 @@ transExp (Neg e _) dst = do
   return $ exprInstrs ++ [Mov (Reg IRScratch1) (Imm 0), Sub (Reg dst) (Reg IRScratch1) (Reg dst)]
 transExp (Len e _) dst = transExp e dst <++ [Load (Reg dst) (ImmOffset dst (- (typeSize WInt)))]
 transExp (Ord e _) dst = transExp e dst
-transExp (Chr e _) dst = return []
+transExp (Chr e _) dst = transExp e dst
 transExp ((:*:) e e' _) dst = transNumOp Mul e e' dst
 transExp ((:/:) e e' _) dst = addHelperFunc ErrDivZero >> transNumOp Div e e' dst
 transExp ((:%:) e e' _) dst = addHelperFunc ErrDivZero >> transNumOp Mod e e' dst
