@@ -165,11 +165,11 @@ generateHelperFunc hf@(HRead hType)
       [
         Push (Regs [IRLR]),
         Sub (Reg IRSP) (Reg IRSP) (Imm intSize),
-        Store (Reg (IRParam 0)) (Reg IRSP),
+        Store (Reg (IRParam 0)) (Ind IRSP),
         Mov (Reg (IRParam 1)) (Reg IRSP),
         Load (Reg (IRParam 0)) (Abs strLabel),
         Jsr scanfLabel,
-        Load (Reg (IRParam 0)) (Reg IRSP),
+        Load (Reg (IRParam 0)) (Ind IRSP),
         Add (Reg IRSP) (Reg IRSP) (Imm intSize),
         Pop (Regs [IRPC])
       ]
