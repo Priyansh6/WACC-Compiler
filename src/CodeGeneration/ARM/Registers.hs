@@ -54,9 +54,9 @@ transProg = map (flip evalState initAux . transSection)
 
 transSection :: Section IRReg -> ArmTranslator (Section ArmReg)
 transSection (Section d (Body label global instrs)) = do
-  (pushes:fp:rest) <- concat <$> mapM transAndAddMemoryInstrs instrs
+  section <- concat <$> mapM transAndAddMemoryInstrs instrs
   fpOff <- gets nextFPOffset
-  return (Section d (Body label global ((concat armInstrs))))
+  return (Section d (Body label global ([Push (Regs [FP, LR]), Mov (Reg FP) (Reg SP), Add (Reg SP) (Reg SP) (Imm fpOff)] ++ section ++ [Pop (Regs [FP, PC])])))
 
 transAndAddMemoryInstrs :: Instr IRReg -> ArmTranslator ArmInstrs
 transAndAddMemoryInstrs instr = do
