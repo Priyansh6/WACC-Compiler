@@ -120,6 +120,7 @@ transCmpOp cons e e' dst = do
 transArrayElem :: ArrayElem -> IRReg -> IRStatementGenerator IRInstrs
 transArrayElem (ArrayElem (AST.Ident i _) exprs _) dst = do
   addHelperFunc BoundsCheck
+  addHelperFunc ArrLoad
   varReg <- getVarReg (Ident i)
   concat <$> mapM (`transArrExpr` varReg) exprs
   where

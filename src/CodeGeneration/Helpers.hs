@@ -219,7 +219,8 @@ generateHelperFunc hf
           Load (Reg IRLR) (ImmOffset (IRParam 0) (-intSize)),
           Cmp (Reg (IRParam 1)) (Reg IRLR),
           Jge (showHelperLabel BoundsCheck),
-          Mul (Reg (IRParam 1)) (Reg (IRParam 1)) (Imm maxRegSize),
+          Mov (Reg IRScratch1) (Imm maxRegSize),
+          Mul (Reg (IRParam 1)) (Reg (IRParam 1)) (Reg IRScratch1),
           Add (Reg (IRParam 0)) (Reg (IRParam 0)) (Reg (IRParam 1)),
           arrInstr,
           Pop (Regs [IRPC])
@@ -239,8 +240,8 @@ generateHelperFunc hf
   | otherwise = error "Unsupported helper function for generation"
   where 
     arrInstr = case hf of
-      ArrStore -> Store (Reg (IRParam 2)) (Reg (IRParam 0))
-      ArrLoad  -> Load (Reg IRRet) (Reg (IRParam 0))
+      ArrStore -> Store (Reg (IRParam 2)) (Ind (IRParam 0))
+      ArrLoad  -> Load (Reg IRRet) (Ind (IRParam 0))
       _        -> error "Can't have non ArrStore or ArrLoad array helper function"
     errInstrs = case hf of
       BoundsCheck -> [

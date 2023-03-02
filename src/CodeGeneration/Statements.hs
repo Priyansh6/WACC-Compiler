@@ -98,6 +98,7 @@ transRVal :: RVal -> IRReg -> IRStatementGenerator IRInstrs
 transRVal (RExpr e) dst = transExp e dst
 transRVal (ArrayLiter [] _) dst = transArrayCreation 0 0 dst
 transRVal (ArrayLiter elems@(e:_) _) dst = do
+  addHelperFunc ArrStore
   eType <- exprType e
   let eSize = typeSize eType
   transArrayCreation eSize (length elems) dst <++> (concat <$> zipWithM transArrLiterElem elems [0..])
@@ -124,14 +125,14 @@ transRVal (NewPair e e' _) dst = do
   evalSndInstrs <- transExp e' eReg' <++ mallocSnd ++ [Store (Reg eReg') (Ind ePtrReg')]
   makeRegsAvailable [eReg, eReg', ePtrReg, ePtrReg']
   return $ evalFstInstrs ++ evalSndInstrs ++ mallocPair ++ movePointers
-transRVal (RPair pe) dst = transPair pe Store dst
+transRVal (RPair pe) dst = transPair pe Load dst
 transRVal (Call (AST.Ident i _) es _) dst = do
   movParamInstrs <- concat <$> zipWithM transExp es [IRParam x | x <- [0..]]
   regsInUse <- gets inUse
   return $ movParamInstrs ++ [Comment "We push the dst register despite it containing uninitialised data. Thus we have to pop and then move the return register into dst.", Push (Regs regsInUse), Jsr i, Pop (Regs regsInUse), Mov (Reg dst) (Reg IRRet)] 
 
 transLVal :: LVal -> IRReg -> IRStatementGenerator IRInstrs
-transLVal (LPair pe) dst = withReg (\r -> transPair pe Load r <++ [Mov (Reg dst) (Reg r)])
+transLVal (LPair pe) dst = withReg (\r -> transPair pe Store r <++ [Mov (Reg dst) (Reg r)])
 transLVal (LArray ae) dst = withReg (\r -> transArrayElem ae r <++ [Mov (Reg dst) (Reg r)])
 transLVal _ _ = undefined
 
