@@ -31,6 +31,7 @@ import Data.Functor ((<&>))
 import Data.Map ((!))
 import qualified Data.Map as M
 import qualified Data.Text as T
+import qualified Data.List as L
 
 import AST hiding (Ident)
 import qualified AST (Ident (Ident))
@@ -61,7 +62,7 @@ nextFreeReg :: IRStatementGenerator IRReg
 nextFreeReg = state (\a@Aux {available = (nxt:rst), inUse = rs} -> (nxt, a {available = rst, inUse = nxt:rs}))
 
 makeRegAvailable :: IRReg -> IRStatementGenerator ()
-makeRegAvailable r = modify (\a@Aux {available = rs, inUse = (_:rs')} -> a {available = r:rs, inUse = rs'})
+makeRegAvailable r = modify (\a@Aux {available = rs, inUse = rs'} -> a {available = r:rs, inUse = (rs' L.\\ [r])})
 
 makeRegsAvailable :: [IRReg] -> IRStatementGenerator ()
 makeRegsAvailable = mapM_ makeRegAvailable
