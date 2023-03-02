@@ -128,7 +128,13 @@ exprType (CharLiter _ _) = return WChar
 exprType (StrLiter _ _) = return WStr
 exprType (PairLiter _) = return WUnit
 exprType (IdentExpr (AST.Ident i _) _) = getWType (Ident i)
-exprType (ArrayExpr (ArrayElem (AST.Ident i _) _ _) _) = getWType (Ident i)
+exprType (ArrayExpr (ArrayElem (AST.Ident i _) [] _) _) = error "Can't have empty index in ArrayElem"
+exprType (ArrayExpr (ArrayElem (AST.Ident i _) is _) _) = do
+  wType <- getWType (Ident i)
+  let dim = length is
+  case wType of
+    WArr t dim    -> return t
+    WArr t arrDim -> return $ WArr t (arrDim - dim)
 exprType (Not _ _) = return WBool
 exprType (Neg _ _) = return WInt
 exprType (Len _ _) = return WInt
