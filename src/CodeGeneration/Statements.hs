@@ -4,7 +4,9 @@ module CodeGeneration.Statements (transStats) where
 
 import Control.Monad
 import Control.Monad.State
+import Control.Monad.Trans
 import Data.Functor ((<&>))
+import Data.Maybe
 
 import AST hiding (Ident)
 import qualified AST (Ident (Ident))
@@ -68,7 +70,7 @@ transStat (Println e) = do
   addHelperFunc helperFuncType
   addHelperFunc HPrintln
   return eInstrs
-transStat (If e ss _ ss' _ _) = do
+transStat (If e ss scopeId ss' scopeId' _) = do
   eReg <- nextFreeReg
   eInstrs <- transExp e eReg
   branchLabel <- nextLabel
@@ -77,11 +79,11 @@ transStat (If e ss _ ss' _ _) = do
   ssInstrs' <- transStats ss'
   endLabel <- nextLabel
   let condJumpInstrs = [Cmp (Reg eReg) (Imm 1), Jne branchLabel']
-      branchInstrs = [Define branchLabel] ++ ssInstrs ++ [Jmp endLabel]
-      branchInstrs' = Define branchLabel' : ssInstrs'
+  branchInstrs <- [Define branchLabel] ++> lift (wrapScope (fromJust scopeId) ssInstrs) <++ [Jmp endLabel]
+  branchInstrs' <- [Define branchLabel'] ++> lift (wrapScope (fromJust scopeId') ssInstrs')
   makeRegAvailable eReg
   return $ eInstrs ++ condJumpInstrs ++ branchInstrs ++ branchInstrs' ++ [Define endLabel]
-transStat (While e ss _ _) = do
+transStat (While e ss scopeId _) = do
   eReg <- nextFreeReg
   eInstrs <- transExp e eReg
   ssInstrs <- transStats ss
@@ -89,8 +91,8 @@ transStat (While e ss _ _) = do
   condLabel <- nextLabel
   makeRegAvailable eReg
   let condJumpInstrs = [Cmp (Reg eReg) (Imm 1), Je startLabel]
-  return $ [Jmp condLabel, Define startLabel] ++ ssInstrs ++ [Define condLabel] ++ eInstrs ++ condJumpInstrs
-transStat (Begin ss _) = transStats ss
+  [Jmp condLabel, Define startLabel] ++> lift (wrapScope (fromJust scopeId) ssInstrs) <++ [Define condLabel] ++ eInstrs ++ condJumpInstrs
+transStat (Begin ss scopeId) = transStats ss >>= (\ss' -> lift $ wrapScope (fromJust scopeId) ss')
 
 transRVal :: RVal -> IRReg -> IRStatementGenerator IRInstrs
 transRVal (RExpr e) dst = transExp e dst

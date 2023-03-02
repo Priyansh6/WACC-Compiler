@@ -17,6 +17,7 @@ module CodeGeneration.Utils
     nextFreeReg,
     nextLabel,
     typeSize,
+    wrapScope,
     (<++>),
     (++>),
     (<++),
@@ -26,6 +27,7 @@ where
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.Functor ((<&>))
+import Data.Map ((!))
 import qualified Data.Map as M
 import qualified Data.Text as T
 
@@ -134,3 +136,10 @@ exprType ((:==:) {}) = return WBool
 exprType ((:!=:) {}) = return WBool
 exprType ((:&&:) {}) = return WBool
 exprType ((:||:) {}) = return WBool
+
+wrapScope :: Int -> IRInstrs -> IRSectionGenerator IRInstrs
+wrapScope scopeId instrs = do
+  (st, sm) <- ask
+  let ids = sm ! scopeId
+      stackSize = sum [typeSize (fromIdentType (st ! i)) | i <- ids]
+  return $ [Sub (Reg IRSP) (Reg IRSP) (Imm stackSize)] ++ instrs ++ [Add (Reg IRSP) (Reg IRSP) (Imm stackSize)]
