@@ -29,7 +29,7 @@ transMain ss = do
   bodyInstrs' <- wrapScope 0 bodyInstrs
   case bodyInstrs of 
     [] -> return (Section dataSection (Body name True (wrapSectionBody [Mov (Reg IRRet) (Imm 0)])), helperFuncs aux)
-    _ -> return (Section dataSection (Body name True (wrapSectionBody bodyInstrs')), helperFuncs aux)
+    _ -> return (Section dataSection (Body name True (wrapSectionBody (bodyInstrs' ++ [Mov (Reg IRRet) (Imm 0)]))), helperFuncs aux)
 
 transFunc :: AST.Func -> IRSectionGenerator (Section IRReg, HelperFuncs)
 transFunc (AST.Func _ (AST.Ident i _) params ss scopeId _) = do
