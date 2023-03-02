@@ -101,7 +101,7 @@ transRVal (ArrayLiter [] _) dst = transArrayCreation 0 0 dst
 transRVal (ArrayLiter elems@(e:_) _) dst = do
   addHelperFunc ArrStore
   eType <- exprType e
-  let eSize = typeSize eType
+  let eSize = heapTypeSize eType
   transArrayCreation eSize (length elems) dst <++> (concat <$> zipWithM transArrLiterElem elems [0..])
   where
     transArrLiterElem :: Expr -> Int -> IRStatementGenerator IRInstrs
@@ -118,10 +118,10 @@ transRVal (NewPair e e' _) dst = do
   eType <- exprType e
   eType' <- exprType e'
   let pType = AST.WPair eType eType'
-      movePointers = [Store (Reg ePtrReg) (ImmOffset dst 0), Store (Reg ePtrReg') (ImmOffset dst (typeSize eType))]
-  mallocFst <- transMallocCall (typeSize eType) ePtrReg
-  mallocSnd <- transMallocCall (typeSize eType) ePtrReg'
-  mallocPair <- transMallocCall (typeSize pType) dst
+      movePointers = [Store (Reg ePtrReg) (ImmOffset dst 0), Store (Reg ePtrReg') (ImmOffset dst (heapTypeSize eType))]
+  mallocFst <- transMallocCall (heapTypeSize eType) ePtrReg
+  mallocSnd <- transMallocCall (heapTypeSize eType') ePtrReg'
+  mallocPair <- transMallocCall (heapTypeSize pType) dst
   evalFstInstrs <- transExp e eReg <++ mallocFst ++ [Store (Reg eReg) (Ind ePtrReg)] -- not sure if Ind as the dst of a Mov is dodgy or not
   evalSndInstrs <- transExp e' eReg' <++ mallocSnd ++ [Store (Reg eReg') (Ind ePtrReg')]
   makeRegsAvailable [eReg, eReg', ePtrReg, ePtrReg']
@@ -146,9 +146,9 @@ transPair (Fst (LArray ae) _) dst' = transArrayElem ae dst' <++> checkNull dst' 
 transPair (Snd (LIdent (AST.Ident i _)) _) dst' = do
   varReg <- getVarReg (Ident i) 
   aType <- getWType (Ident i)
-  checkNull varReg <++ [Load (Reg dst') (ImmOffset varReg (typeSize aType))]
-transPair (Snd (LPair pe') _) dst' = transPair pe' dst' <++> checkNull dst' <++ [Load (Reg dst') (ImmOffset dst' (typeSize WUnit))]
-transPair (Snd (LArray ae) _) dst' = transArrayElem ae dst' <++> checkNull dst' <++ [Load (Reg dst') (ImmOffset dst' (typeSize WUnit))]
+  checkNull varReg <++ [Load (Reg dst') (ImmOffset varReg (heapTypeSize aType))]
+transPair (Snd (LPair pe') _) dst' = transPair pe' dst' <++> checkNull dst' <++ [Load (Reg dst') (ImmOffset dst' (heapTypeSize WUnit))]
+transPair (Snd (LArray ae) _) dst' = transArrayElem ae dst' <++> checkNull dst' <++ [Load (Reg dst') (ImmOffset dst' (heapTypeSize WUnit))]
 
 transMallocCall :: Int -> IRReg -> IRStatementGenerator IRInstrs
 transMallocCall size dst = return [Mov (Reg (IRParam 0)) (Imm size), Jsr "malloc", Mov (Reg dst) (Reg IRRet)]
@@ -156,9 +156,9 @@ transMallocCall size dst = return [Mov (Reg (IRParam 0)) (Imm size), Jsr "malloc
 transArrayCreation :: Int -> Int -> IRReg -> IRStatementGenerator IRInstrs
 transArrayCreation size len dst = do
   sizeReg <- nextFreeReg
-  mallocInstrs <- transMallocCall (typeSize WInt + size * len) dst
+  mallocInstrs <- transMallocCall (heapTypeSize WInt + size * len) dst
   makeRegAvailable sizeReg
-  return $ mallocInstrs ++ [Mov (Reg sizeReg) (Imm len), Store (Reg sizeReg) (Ind dst), Add (Reg dst) (Reg dst) (Imm $ typeSize WInt)]
+  return $ mallocInstrs ++ [Mov (Reg sizeReg) (Imm len), Store (Reg sizeReg) (Ind dst), Add (Reg dst) (Reg dst) (Imm $ heapTypeSize WInt)]
 
 checkNull :: IRReg -> IRStatementGenerator IRInstrs
 checkNull toCheck = addHelperFunc ErrNull *> (nextLabel <&> (\notNullLabel -> [Cmp (Reg toCheck) (Imm 0), Jge notNullLabel, Jsr (showHelperLabel ErrNull), Define notNullLabel]))

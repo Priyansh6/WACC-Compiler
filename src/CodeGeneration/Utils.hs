@@ -16,7 +16,8 @@ module CodeGeneration.Utils
     withReg,
     nextFreeReg,
     nextLabel,
-    typeSize,
+    stackTypeSize,
+    heapTypeSize,
     wrapScope,
     (<++>),
     (++>),
@@ -101,14 +102,23 @@ infixr 5 ++>
 a <++ b = (++) <$> a  <*> pure b
 infixr 5 <++
 
-typeSize :: WType -> Int
-typeSize WUnit = 4
-typeSize WInt = 4
-typeSize WBool = 4
-typeSize WChar = 4
-typeSize WStr = 4
-typeSize (WArr _ _) = 4
-typeSize (WPair _ _) = 8
+stackTypeSize :: WType -> Int
+stackTypeSize WUnit = 4
+stackTypeSize WInt = 4
+stackTypeSize WBool = 4
+stackTypeSize WChar = 4
+stackTypeSize WStr = 4
+stackTypeSize (WArr _ _) = 4
+stackTypeSize (WPair _ _) = 8
+
+heapTypeSize :: WType -> Int
+heapTypeSize WUnit = 4
+heapTypeSize WInt = 4
+heapTypeSize WBool = 1
+heapTypeSize WChar = 1
+heapTypeSize WStr = 4
+heapTypeSize (WArr _ _) = 4
+heapTypeSize (WPair _ _) = 8
 
 exprType :: Expr -> IRStatementGenerator WType
 exprType (IntLiter _ _) = return WInt

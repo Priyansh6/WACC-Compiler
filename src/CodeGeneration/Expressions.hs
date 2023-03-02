@@ -15,7 +15,7 @@ import CodeGeneration.Utils
     getVarReg,
     addHelperFunc,
     Aux (..),
-    typeSize )
+    heapTypeSize )
 import CodeGeneration.Helpers (HelperFunc(ArrLoad, ErrDivZero, BoundsCheck), showHelperLabel)
 import Data.Char (ord)
 
@@ -51,7 +51,7 @@ transExp (Not e _) dst = do
 transExp (Neg e _) dst = do
   exprInstrs <- transExp e dst
   return $ exprInstrs ++ [Mov (Reg IRScratch1) (Imm 0), Sub (Reg dst) (Reg IRScratch1) (Reg dst)]
-transExp (Len e _) dst = transExp e dst <++ [Load (Reg dst) (ImmOffset dst (- (typeSize WInt)))]
+transExp (Len e _) dst = transExp e dst <++ [Load (Reg dst) (ImmOffset dst (-(heapTypeSize WInt)))]
 transExp (Ord e _) dst = transExp e dst
 transExp (Chr e _) dst = transExp e dst
 transExp ((:*:) e e' _) dst = transNumOp Mul e e' dst
