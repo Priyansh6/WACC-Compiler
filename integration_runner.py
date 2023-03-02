@@ -22,6 +22,7 @@ from os import path as os_path, remove as os_remove, scandir, system
 from pathlib import Path
 import subprocess
 from itertools import chain
+import re
 
 global QEMU_NOT_FOUND
 QEMU_NOT_FOUND = False
@@ -90,7 +91,7 @@ def integrationTests():
 				try:
 					actualOutput, actualExit = getActualOutput(basename, expectedInput)
 					if actualExit == expectedExit:
-						testSummary += addTestResult(PASSED if "#runtime_error#" in expectedOutput or actualOutput == expectedOutput else FAILED_OUTPUT, waccFilename, expectedOutput, actualOutput)
+						testSummary += addTestResult(PASSED if "#runtime_error#" in expectedOutput or checkOutput(expectedOutput, actualOutput) else FAILED_OUTPUT, waccFilename, expectedOutput, actualOutput)
 					else:
 						testSummary += addTestResult(FAILED_EXIT, waccFilename, f"{LIGHT_RED}qemu exit code: {expectedExit}{END}", f"{LIGHT_RED}qemu exit code: {actualExit}{END}")
 				except subprocess.TimeoutExpired:
@@ -139,6 +140,9 @@ def integrationTests():
 
 	exit(0 if len(failedTests) == 0 else 1)
 
+
+def checkOutput(expectedOutput, actualOutput):
+	return expectedOutput == re.sub(r"0x[\da-fA-F]+", "#addrs#", actualOutput)
 
 def extract(text, startText, endText=None):
 	start = text.find(startText)
@@ -240,3 +244,4 @@ def runRefEmulator(assemblyFile, assemblyInput):
 integrationTests()
 
 system("rm -fr *.s")
+
