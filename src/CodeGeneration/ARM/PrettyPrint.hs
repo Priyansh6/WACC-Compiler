@@ -3,7 +3,7 @@
 module CodeGeneration.ARM.PrettyPrint (showArm) where
 
 import CodeGeneration.ARM.Registers
-import CodeGeneration.IR
+import CodeGeneration.IR hiding (showData, showSection, showBody, showInstr, showOps, showOp, showIndentedInstr)
 import qualified Data.Text as T
 
 showArm :: Program ArmReg -> T.Text

@@ -61,7 +61,7 @@ transStat (Exit e _) = do
   return $ eis ++ [Mov (Reg $ IRParam 0) (Reg dst), Jsr "exit"]
 transStat (Print e) = do
   helperFuncType <- HPrint . fromWType <$> exprType e 
-  eInstrs <- withReg (\r -> transExp e r <++ [Mov (Reg (IRParam 0)) (Reg r), Jsr (showHelperLabel helperFuncType)])
+  eInstrs <- withReg (\r -> transExp e r <++ [Mov (Reg (IRParam 0)) (Reg r), Jsr (showHelperLabel helperFuncType), Comment "end of print"])
   addHelperFunc helperFuncType
   return eInstrs
 transStat (Println e) = do
@@ -94,6 +94,7 @@ transStat (While e ss scopeId _) = do
   [Jmp condLabel, Define startLabel] ++> lift (wrapScope (fromJust scopeId) ssInstrs) <++ [Define condLabel] ++ eInstrs ++ condJumpInstrs
 transStat (Begin ss scopeId) = transStats ss >>= (\ss' -> lift $ wrapScope (fromJust scopeId) ss')
 
+-- transRVal translates rval and puts the VALUE into dst
 transRVal :: RVal -> IRReg -> IRStatementGenerator IRInstrs
 transRVal (RExpr e) dst = transExp e dst
 transRVal (ArrayLiter [] _) dst = transArrayCreation 0 0 dst
@@ -117,35 +118,37 @@ transRVal (NewPair e e' _) dst = do
   eType <- exprType e
   eType' <- exprType e'
   let pType = AST.WPair eType eType'
-      movePointers = [Store (Reg eReg) (ImmOffset dst 0), Store (Reg eReg') (ImmOffset dst (typeSize eType))]
+      movePointers = [Store (Reg ePtrReg) (ImmOffset dst 0), Store (Reg ePtrReg') (ImmOffset dst (typeSize eType))]
   mallocFst <- transMallocCall (typeSize eType) ePtrReg
   mallocSnd <- transMallocCall (typeSize eType) ePtrReg'
   mallocPair <- transMallocCall (typeSize pType) dst
   evalFstInstrs <- transExp e eReg <++ mallocFst ++ [Store (Reg eReg) (Ind ePtrReg)] -- not sure if Ind as the dst of a Mov is dodgy or not
   evalSndInstrs <- transExp e' eReg' <++ mallocSnd ++ [Store (Reg eReg') (Ind ePtrReg')]
   makeRegsAvailable [eReg, eReg', ePtrReg, ePtrReg']
-  return $ evalFstInstrs ++ evalSndInstrs ++ mallocPair ++ movePointers
-transRVal (RPair pe) dst = transPair pe Load dst
+  return $ evalFstInstrs ++ evalSndInstrs ++ mallocPair ++ movePointers ++ [Comment "end of newpair"]
+transRVal (RPair pe) dst = transPair pe dst <++ [Load (Reg dst) (Ind dst)]
 transRVal (Call (AST.Ident i _) es _) dst = do
   movParamInstrs <- concat <$> zipWithM transExp es [IRParam x | x <- [0..]]
   regsInUse <- gets inUse
   return $ movParamInstrs ++ [Comment "We push the dst register despite it containing uninitialised data. Thus we have to pop and then move the return register into dst.", Push (Regs regsInUse), Jsr i, Pop (Regs regsInUse), Mov (Reg dst) (Reg IRRet)] 
 
+-- Puts the address (which we will load into later) into dst
 transLVal :: LVal -> IRReg -> IRStatementGenerator IRInstrs
-transLVal (LPair pe) dst = withReg (\r -> transPair pe Store r <++ [Mov (Reg dst) (Reg r)])
+transLVal (LPair pe) dst = withReg (\r -> transPair pe r <++ [Mov (Reg dst) (Reg r)])
 transLVal (LArray ae) dst = withReg (\r -> transArrayElem ae r <++ [Mov (Reg dst) (Reg r)])
 transLVal _ _ = undefined
 
-transPair :: PairElem -> (Operand IRReg -> Operand IRReg -> Instr IRReg) -> IRReg -> IRStatementGenerator IRInstrs
-transPair (Fst (LIdent (AST.Ident i _)) _) cons dst' = getVarReg (Ident i) >>= (\r -> checkNull r <++ [cons (Reg dst') (Ind r)])
-transPair (Fst (LPair pe') _) cons dst' = transPair pe' cons dst' <++> checkNull dst' <++ [cons (Reg dst') (Ind dst')]
-transPair (Fst (LArray ae) _) cons dst' = transArrayElem ae dst' <++> checkNull dst' <++ [cons (Reg dst') (Ind dst')]
-transPair (Snd (LIdent (AST.Ident i _)) _) cons dst' = do
+-- takes pairElem and puts address of element into dst
+transPair :: PairElem -> IRReg -> IRStatementGenerator IRInstrs
+transPair (Fst (LIdent (AST.Ident i _)) _) dst' = getVarReg (Ident i) >>= (\r -> checkNull r <++ [Load (Reg dst') (Ind r)])
+transPair (Fst (LPair pe') _) dst' = transPair pe' dst' <++> checkNull dst' <++ [Load (Reg dst') (Ind dst')]
+transPair (Fst (LArray ae) _) dst' = transArrayElem ae dst' <++> checkNull dst' <++ [Load (Reg dst') (Ind dst')]
+transPair (Snd (LIdent (AST.Ident i _)) _) dst' = do
   varReg <- getVarReg (Ident i) 
   aType <- getWType (Ident i)
-  checkNull varReg <++ [cons (Reg dst') (ImmOffset varReg (typeSize aType))]
-transPair (Snd (LPair pe') _) cons dst' = transPair pe' cons dst' <++> checkNull dst' <++ [cons (Reg dst') (ImmOffset dst' (typeSize WUnit))]
-transPair (Snd (LArray ae) _) cons dst' = transArrayElem ae dst' <++> checkNull dst' <++ [cons (Reg dst') (ImmOffset dst' (typeSize WUnit))]
+  checkNull varReg <++ [Load (Reg dst') (ImmOffset varReg (typeSize aType))]
+transPair (Snd (LPair pe') _) dst' = transPair pe' dst' <++> checkNull dst' <++ [Load (Reg dst') (ImmOffset dst' (typeSize WUnit))]
+transPair (Snd (LArray ae) _) dst' = transArrayElem ae dst' <++> checkNull dst' <++ [Load (Reg dst') (ImmOffset dst' (typeSize WUnit))]
 
 transMallocCall :: Int -> IRReg -> IRStatementGenerator IRInstrs
 transMallocCall size dst = return [Mov (Reg (IRParam 0)) (Imm size), Jsr "malloc", Mov (Reg dst) (Reg IRRet)]

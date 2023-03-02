@@ -53,8 +53,10 @@ transProg :: Program IRReg -> Program ArmReg
 transProg = map (flip evalState initAux . transSection)
 
 transSection :: Section IRReg -> ArmTranslator (Section ArmReg)
-transSection (Section d (Body label global instrs)) 
-  = Section d . Body label global . concat <$> mapM transAndAddMemoryInstrs instrs
+transSection (Section d (Body label global instrs)) = do
+  (pushes:fp:rest) <- concat <$> mapM transAndAddMemoryInstrs instrs
+  fpOff <- gets nextFPOffset
+  return (Section d (Body label global ((concat armInstrs))))
 
 transAndAddMemoryInstrs :: Instr IRReg -> ArmTranslator ArmInstrs
 transAndAddMemoryInstrs instr = do
@@ -63,17 +65,17 @@ transAndAddMemoryInstrs instr = do
   return $ prefixInstrs ++ [translatedInstr] ++ suffixInstrs
 
 transInstr :: Instr IRReg -> ArmMemoryAllocator ArmInstr
-transInstr (Load o1 o2) = Load <$> transOperand o1 False <*> transOperand o2 True
-transInstr (Store o1 o2) = Store <$> transOperand o1 True <*> transOperand o2 False
+transInstr (Load o1 o2) = Load <$> transOperand o1 True <*> transOperand o2 False
+transInstr (Store o1 o2) = Store <$> transOperand o1 False <*> transOperand o2 True
 transInstr (Mov o1 o2) = Mov <$> transOperand o1 True <*> transOperand o2 False 
 transInstr (Add o1 o2 o3) = Add <$> transOperand o1 True <*> transOperand o2 False <*> transOperand o3 False 
 transInstr (Sub o1 o2 o3) = Sub <$> transOperand o1 True <*> transOperand o2 False <*> transOperand o3 False 
 transInstr (Mul o1 o2 o3) = Mul <$> transOperand o1 True <*> transOperand o2 False <*> transOperand o3 False 
 transInstr (Div o1 o2 o3) = Div <$> transOperand o1 True <*> transOperand o2 False <*> transOperand o3 False
-transInstr (Cmp o1 o2) = Cmp <$> transOperand o1 True <*> transOperand o2 False
+transInstr (Cmp o1 o2) = Cmp <$> transOperand o1 False <*> transOperand o2 False
 transInstr (Jsr l) = return $ Jsr l
 transInstr (Push o) = Push <$> transOperand o False
-transInstr (Pop o) = Pop <$> transOperand o False
+transInstr (Pop o) = Pop <$> transOperand o True
 transInstr (Jmp l) = return $ Jmp l
 transInstr (Je l) = return $ Je l
 transInstr (Jne l) = return $ Jne l
@@ -87,8 +89,8 @@ transInstr (Comment c) = return $ Comment c
 transOperand :: Operand IRReg -> Bool -> ArmMemoryAllocator (Operand ArmReg)
 transOperand (Reg r) isDst = Reg <$> transIRReg r isDst
 transOperand (Regs rs) isDst = Regs <$> mapM (flip transIRReg isDst) rs
-transOperand (Ind r) isDst = Ind <$> transIRReg r isDst
-transOperand (ImmOffset r offset) isDst = flip ImmOffset offset <$> transIRReg r isDst
+transOperand (Ind r) _ = Ind <$> transIRReg r False
+transOperand (ImmOffset r offset) _ = flip ImmOffset offset <$> transIRReg r False
 transOperand (Imm i) _ = return $ Imm i
 transOperand (Abs l) _ = return $ Abs l
 

@@ -104,11 +104,11 @@ infixr 5 <++
 typeSize :: WType -> Int
 typeSize WUnit = 4
 typeSize WInt = 4
-typeSize WBool = 1
-typeSize WChar = 1
+typeSize WBool = 4
+typeSize WChar = 4
 typeSize WStr = 4
 typeSize (WArr _ _) = 4
-typeSize (WPair _ _) = 4
+typeSize (WPair _ _) = 8
 
 exprType :: Expr -> IRStatementGenerator WType
 exprType (IntLiter _ _) = return WInt
@@ -143,5 +143,6 @@ wrapScope scopeId instrs = do
   case M.lookup scopeId sm of
     Nothing -> return instrs
     Just ids -> do 
-                  let stackSize = sum [typeSize (fromIdentType t) | (Just t) <- map ((flip M.lookup) st) ids ] 
+                  -- let stackSize = sum [typeSize (fromIdentType t) | (Just t) <- map ((flip M.lookup) st) ids ] 
+                  let stackSize = 4 * (length ids)
                   return $ [Sub (Reg IRSP) (Reg IRSP) (Imm stackSize)] ++ instrs ++ [Add (Reg IRSP) (Reg IRSP) (Imm stackSize)]

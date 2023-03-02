@@ -6,6 +6,7 @@ import qualified Lexer as L
 import CodeGeneration.ARM.PrettyPrint (showArm)
 import CodeGeneration.ARM.Registers (transProg)
 import CodeGeneration.Program (transProg)
+import CodeGeneration.IR (showIR)
 import Syntax.Program (program)
 import Semantic.Errors (printSemanticErrors)
 import Semantic.Rename.Program (rename)
@@ -35,6 +36,7 @@ main = do
         Left err -> printSemanticErrors [err] contents fname >> exitWith (ExitFailure 200)
         Right symbolTable -> do
           let irProg = runReader (CodeGeneration.Program.transProg renamedAST) (symbolTable, scopeMap)
+          TIO.writeFile (takeBaseName fname ++ "_ir.s") (showIR irProg)
           let armProg = CodeGeneration.ARM.Registers.transProg irProg
           TIO.writeFile (takeBaseName fname ++ ".s") (showArm armProg) >> exitSuccess
       ((_, errs), _) -> printSemanticErrors errs contents fname >> exitWith (ExitFailure 200)
