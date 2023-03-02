@@ -106,9 +106,9 @@ typeSize WUnit = 4
 typeSize WInt = 4
 typeSize WBool = 1
 typeSize WChar = 1
-typeSize WStr = error "size not known"
-typeSize (WArr _ _) = error "size not known"
-typeSize (WPair _ _) = 8
+typeSize WStr = 4
+typeSize (WArr _ _) = 4
+typeSize (WPair _ _) = 4
 
 exprType :: Expr -> IRStatementGenerator WType
 exprType (IntLiter _ _) = return WInt
@@ -140,6 +140,8 @@ exprType ((:||:) {}) = return WBool
 wrapScope :: Int -> IRInstrs -> IRSectionGenerator IRInstrs
 wrapScope scopeId instrs = do
   (st, sm) <- ask
-  let ids = sm ! scopeId
-      stackSize = sum [typeSize (fromIdentType (st ! i)) | i <- ids]
-  return $ [Sub (Reg IRSP) (Reg IRSP) (Imm stackSize)] ++ instrs ++ [Add (Reg IRSP) (Reg IRSP) (Imm stackSize)]
+  case M.lookup scopeId sm of
+    Nothing -> return instrs
+    Just ids -> do 
+                  let stackSize = sum [typeSize (fromIdentType t) | (Just t) <- map ((flip M.lookup) st) ids ] 
+                  return $ [Sub (Reg IRSP) (Reg IRSP) (Imm stackSize)] ++ instrs ++ [Add (Reg IRSP) (Reg IRSP) (Imm stackSize)]
