@@ -31,6 +31,7 @@ data Instr a
   | Sub (Operand a) (Operand a) (Operand a)
   | Mul (Operand a) (Operand a) (Operand a)
   | Div (Operand a) (Operand a) (Operand a)
+  | Mod (Operand a) (Operand a) (Operand a)
   | Cmp (Operand a) (Operand a)
   | Jmp Label -- Jump to generic label
   | Jsr Label -- Jump to subroutine (updates LR)

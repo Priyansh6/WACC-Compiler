@@ -2,6 +2,7 @@
 
 module CodeGeneration.ARM.Registers (ArmInstr, ArmInstrs, ArmReg (..), transProg) where
 
+import CodeGeneration.Helpers (HelperFunc (..), showHelperLabel)
 import CodeGeneration.IR
 
 import Control.Monad.State
@@ -49,6 +50,9 @@ scratchRegs = S.fromList [R8, R10, R12]
 retReg :: ArmReg
 retReg = R0
 
+divModLabel :: Label
+divModLabel = "__aeabi_idivmod"
+
 transProg :: Program IRReg -> Program ArmReg
 transProg = map (flip evalState initAux . transSection)
 
@@ -62,7 +66,29 @@ transAndAddMemoryInstrs :: Instr IRReg -> ArmTranslator ArmInstrs
 transAndAddMemoryInstrs instr = do
   (translatedInstr, (prefixInstrs, suffixInstrs, rs)) <- runWriterT (transInstr instr)
   _ <- mapM makeScratchAvailable $ S.toList rs
-  return $ prefixInstrs ++ [translatedInstr] ++ suffixInstrs
+  let translatedInstrs = transDivMod translatedInstr
+  return $ prefixInstrs ++ translatedInstrs ++ suffixInstrs
+  where
+    transDivMod :: ArmInstr -> ArmInstrs
+    transDivMod (Div o1 o2 o3)
+      = [
+        Mov (Reg R0) o2, 
+        Mov (Reg R1) o3, 
+        Cmp (Reg R1) (Imm 0), 
+        Jle (showHelperLabel ErrDivZero),
+        Jsr divModLabel,
+        Mov o1 (Reg R0)
+      ]
+    transDivMod (Mod o1 o2 o3)
+      = [
+        Mov (Reg R0) o2, 
+        Mov (Reg R1) o3, 
+        Cmp (Reg R1) (Imm 0), 
+        Jle (showHelperLabel ErrDivZero),
+        Jsr divModLabel,
+        Mov o1 (Reg R1)
+      ]
+    transDivMod i = [i]
 
 transInstr :: Instr IRReg -> ArmMemoryAllocator ArmInstr
 transInstr (Load o1 o2) = Load <$> transOperand o1 True <*> transOperand o2 False
@@ -72,6 +98,8 @@ transInstr (Add o1 o2 o3) = Add <$> transOperand o1 True <*> transOperand o2 Fal
 transInstr (Sub o1 o2 o3) = Sub <$> transOperand o1 True <*> transOperand o2 False <*> transOperand o3 False 
 transInstr (Mul o1 o2 o3) = Mul <$> transOperand o1 True <*> transOperand o2 False <*> transOperand o3 False 
 transInstr (Div o1 o2 o3) = Div <$> transOperand o1 True <*> transOperand o2 False <*> transOperand o3 False
+transInstr (Cmp o1 o2) = Cmp <$> transOperand o1 False <*> transOperand o2 False
+transInstr (Mod o1 o2 o3) = Mod <$> transOperand o1 True <*> transOperand o2 False <*> transOperand o3 False
 transInstr (Cmp o1 o2) = Cmp <$> transOperand o1 False <*> transOperand o2 False
 transInstr (Jsr l) = return $ Jsr l
 transInstr (Push o) = Push <$> transOperand o False
