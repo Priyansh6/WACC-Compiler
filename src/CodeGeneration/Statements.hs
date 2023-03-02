@@ -124,37 +124,27 @@ transRVal (NewPair e e' _) dst = do
   evalSndInstrs <- transExp e' eReg' <++ mallocSnd ++ [Store (Reg eReg') (Ind ePtrReg')]
   makeRegsAvailable [eReg, eReg', ePtrReg, ePtrReg']
   return $ evalFstInstrs ++ evalSndInstrs ++ mallocPair ++ movePointers
-transRVal (RPair pe) dst = transPairElem pe dst
-  where 
-    -- gets the VALUE/ptr at fst pair and puts it in dst'
-    transPairElem :: PairElem -> IRReg -> IRStatementGenerator IRInstrs 
-    transPairElem (Fst (LIdent (AST.Ident i _)) _) dst' = getVarReg (Ident i) >>= (\r -> checkNull r <++ [Load (Reg dst') (Ind r)])
-    transPairElem (Fst (LPair pe') _) dst' = transPairElem pe' dst' <++> checkNull dst' <++ [Load (Reg dst') (Ind dst')]
-    transPairElem (Snd (LIdent (AST.Ident i _)) _) dst' = do
-      varReg <- getVarReg (Ident i) 
-      aType <- getWType (Ident i)
-      checkNull varReg <++ [Load (Reg dst') (ImmOffset varReg (typeSize aType))]
-    transPairElem (Snd (LPair pe') _) dst' = transPairElem pe' dst' <++> checkNull dst' <++ [Load (Reg dst') (ImmOffset dst' $ typeSize WUnit)]
-    transPairElem _ _ = error "cannot take fst or snd of an array type"
+transRVal (RPair pe) dst = transPair pe Store dst
 transRVal (Call (AST.Ident i _) es _) dst = do
   movParamInstrs <- concat <$> zipWithM transExp es [IRParam x | x <- [0..]]
   regsInUse <- gets inUse
   return $ movParamInstrs ++ [Comment "We push the dst register despite it containing uninitialised data. Thus we have to pop and then move the return register into dst.", Push (Regs regsInUse), Jsr i, Pop (Regs regsInUse), Mov (Reg dst) (Reg IRRet)] 
 
 transLVal :: LVal -> IRReg -> IRStatementGenerator IRInstrs
-transLVal (LPair pe) dst = withReg (\r -> transLPair pe r <++ [Mov (Reg dst) (Reg r)])
-  where
-    transLPair :: PairElem -> IRReg -> IRStatementGenerator IRInstrs
-    transLPair (Fst (LIdent (AST.Ident i _)) _) dst' = getVarReg (Ident i) >>= (\vr -> checkNull vr <++ [Load (Reg dst') (Ind vr)])
-    transLPair (Fst (LPair pe') _) dst' = withReg (\r -> transLPair pe' r <++> checkNull r <++ [Load (Reg dst') (Ind r)])
-    transLPair (Snd (LIdent (AST.Ident i _)) _) dst' = do
-      vr <- getVarReg (Ident i)
-      vType <- getWType (Ident i)
-      checkNull vr <++ [Load (Reg dst') (ImmOffset vr (typeSize vType))]
-    transLPair (Snd (LPair pe') _) dst' = withReg (\r -> transLPair pe' r <++> checkNull dst' <++ [Load (Reg dst') (ImmOffset r (typeSize WUnit))])
-    transLPair _ _ = undefined
+transLVal (LPair pe) dst = withReg (\r -> transPair pe Load r <++ [Mov (Reg dst) (Reg r)])
 transLVal (LArray ae) dst = withReg (\r -> transArrayElem ae r <++ [Mov (Reg dst) (Reg r)])
 transLVal _ _ = undefined
+
+transPair :: PairElem -> (Operand IRReg -> Operand IRReg -> Instr IRReg) -> IRReg -> IRStatementGenerator IRInstrs
+transPair (Fst (LIdent (AST.Ident i _)) _) cons dst' = getVarReg (Ident i) >>= (\r -> checkNull r <++ [cons (Reg dst') (Ind r)])
+transPair (Fst (LPair pe') _) cons dst' = transPair pe' cons dst' <++> checkNull dst' <++ [cons (Reg dst') (Ind dst')]
+transPair (Fst (LArray ae) _) cons dst' = transArrayElem ae dst' <++> checkNull dst' <++ [cons (Reg dst') (Ind dst')]
+transPair (Snd (LIdent (AST.Ident i _)) _) cons dst' = do
+  varReg <- getVarReg (Ident i) 
+  aType <- getWType (Ident i)
+  checkNull varReg <++ [cons (Reg dst') (ImmOffset varReg (typeSize aType))]
+transPair (Snd (LPair pe') _) cons dst' = transPair pe' cons dst' <++> checkNull dst' <++ [cons (Reg dst') (ImmOffset dst' (typeSize WUnit))]
+transPair (Snd (LArray ae) _) cons dst' = transArrayElem ae dst' <++> checkNull dst' <++ [cons (Reg dst') (ImmOffset dst' (typeSize WUnit))]
 
 transMallocCall :: Int -> IRReg -> IRStatementGenerator IRInstrs
 transMallocCall size dst = return [Mov (Reg (IRParam 0)) (Imm size), Jsr "malloc", Mov (Reg dst) (Reg IRRet)]
@@ -174,4 +164,3 @@ lValWType (LIdent (AST.Ident i _)) = getWType (Ident i)
 lValWType (LArray (ArrayElem (AST.Ident i _) _ _)) = getWType (Ident i) >>= (\(WArr baseType _) -> return baseType)
 lValWType (LPair (Fst lval _)) = lValWType lval >>= (\(WPair wt _) -> return wt)
 lValWType (LPair (Snd lval _)) = lValWType lval >>= (\(WPair _ wt) -> return wt)
-
