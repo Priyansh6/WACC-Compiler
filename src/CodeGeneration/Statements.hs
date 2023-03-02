@@ -35,11 +35,11 @@ transStat (Read l@(LIdent (AST.Ident i _)) _) = do
   varReg <- getVarReg (Ident i)
   helperFuncType <- lValWType l <&> HRead . fromWType
   addHelperFunc helperFuncType
-  return [Mov (Reg (IRParam 0)) (Reg varReg), Jsr (showHelperLabel helperFuncType)]
+  return [Mov (Reg (IRParam 0)) (Reg varReg), Jsr (showHelperLabel helperFuncType), Mov (Reg varReg) (Reg IRRet)]
 transStat (Read l _) = do
   helperFuncType <- lValWType l <&> HRead . fromWType
   addHelperFunc helperFuncType
-  withReg (\lReg -> transLVal l lReg <++ [Mov (Reg (IRParam 0)) (Reg lReg), Jsr (showHelperLabel helperFuncType)])
+  withReg (\lReg -> transLVal l lReg <++ [Mov (Reg (IRParam 0)) (Reg lReg), Jsr (showHelperLabel helperFuncType), Mov (Reg lReg) (Reg IRRet)])
 transStat (Free e _) = do
   refReg <- nextFreeReg
   evalRefInstrs <- transExp e refReg
