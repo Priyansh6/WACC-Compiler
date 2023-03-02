@@ -135,10 +135,9 @@ exprType (IdentExpr (AST.Ident i _) _) = getWType (Ident i)
 exprType (ArrayExpr (ArrayElem (AST.Ident i _) [] _) _) = error "Can't have empty index in ArrayElem"
 exprType (ArrayExpr (ArrayElem (AST.Ident i _) is _) _) = do
   wType <- getWType (Ident i)
-  let dim = length is
   case wType of
-    WArr t dim    -> return t
-    WArr t arrDim -> return $ WArr t (arrDim - dim)
+    WArr t dim -> if dim == length is then return t else return $ WArr t (dim - length is)
+    _          -> error "Can't be non-array type"  
 exprType (Not _ _) = return WBool
 exprType (Neg _ _) = return WInt
 exprType (Len _ _) = return WInt
