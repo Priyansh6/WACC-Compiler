@@ -31,17 +31,15 @@ transStat (Assign l@(LIdent (AST.Ident i _)) r _) = do
   varReg <- getVarReg (Ident i)
   withReg (\rReg -> transRVal r rReg <++ [Mov (Reg varReg) (Reg rReg)])
 transStat (Assign l r _) = withReg (\lReg -> withReg (\rReg -> transLVal l lReg <++> transRVal r rReg <++ [Store (Reg rReg) (Ind lReg)]))
+transStat (Read l@(LIdent (AST.Ident i _)) _) = do
+  varReg <- getVarReg (Ident i)
+  helperFuncType <- lValWType l <&> HRead . fromWType
+  addHelperFunc helperFuncType
+  return [Mov (Reg (IRParam 0)) (Reg varReg), Jsr (showHelperLabel helperFuncType)]
 transStat (Read l _) = do
   helperFuncType <- lValWType l <&> HRead . fromWType
   addHelperFunc helperFuncType
   withReg (\lReg -> transLVal l lReg <++ [Mov (Reg (IRParam 0)) (Reg lReg), Jsr (showHelperLabel helperFuncType)])
-  where
-    lValWType :: LVal -> IRStatementGenerator WType
-    lValWType (LIdent (AST.Ident i _)) = getWType (Ident i)
-    lValWType (LArray (ArrayElem (AST.Ident i _) _ _)) =
-      getWType (Ident i) >>= (\(WArr baseType _) -> return baseType)
-    lValWType (LPair (Fst lval _)) = lValWType lval >>= (\(WPair wt _) -> return wt)
-    lValWType (LPair (Snd lval _)) = lValWType lval >>= (\(WPair _ wt) -> return wt)
 transStat (Free e _) = do
   refReg <- nextFreeReg
   evalRefInstrs <- transExp e refReg
@@ -170,3 +168,10 @@ transArrayCreation size len dst = do
 
 checkNull :: IRReg -> IRStatementGenerator IRInstrs
 checkNull toCheck = addHelperFunc ErrNull *> (nextLabel <&> (\notNullLabel -> [Cmp (Reg toCheck) (Imm 0), Jge notNullLabel, Jsr (showHelperLabel ErrNull), Define notNullLabel]))
+
+lValWType :: LVal -> IRStatementGenerator WType
+lValWType (LIdent (AST.Ident i _)) = getWType (Ident i)
+lValWType (LArray (ArrayElem (AST.Ident i _) _ _)) = getWType (Ident i) >>= (\(WArr baseType _) -> return baseType)
+lValWType (LPair (Fst lval _)) = lValWType lval >>= (\(WPair wt _) -> return wt)
+lValWType (LPair (Snd lval _)) = lValWType lval >>= (\(WPair _ wt) -> return wt)
+
