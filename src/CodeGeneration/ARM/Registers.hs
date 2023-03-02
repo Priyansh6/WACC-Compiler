@@ -50,6 +50,9 @@ scratchRegs = S.fromList [R8, R10, R12]
 retReg :: ArmReg
 retReg = R0
 
+regsInUse :: ArmRegs -> ArmRegs
+regsInUse available = generalRegs S.\\ available
+
 divModLabel :: Label
 divModLabel = "__aeabi_idivmod"
 
@@ -102,7 +105,11 @@ transInstr (Mul o1 o2 o3) = Mul <$> transOperand o1 True <*> transOperand o2 Fal
 transInstr (Div o1 o2 o3) = Div <$> transOperand o1 True <*> transOperand o2 False <*> transOperand o3 False
 transInstr (Mod o1 o2 o3) = Mod <$> transOperand o1 True <*> transOperand o2 False <*> transOperand o3 False
 transInstr (Cmp o1 o2) = Cmp <$> transOperand o1 False <*> transOperand o2 False
-transInstr (Jsr l) = return $ Jsr l
+transInstr (Jsr l) = do 
+  rs <- gets regsAvailable
+  let usedRs = S.toList $ regsInUse rs
+  if null usedRs then return () else tell ([Push (Regs usedRs)], [Pop (Regs usedRs)], S.empty) 
+  return $ Jsr l
 transInstr (Push o) = Push <$> transOperand o False
 transInstr (Pop o) = Pop <$> transOperand o True
 transInstr (Jmp l) = return $ Jmp l

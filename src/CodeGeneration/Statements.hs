@@ -131,7 +131,7 @@ transRVal (RPair pe) dst = transPair pe dst <++ [Load (Reg dst) (Ind dst)]
 transRVal (Call (AST.Ident i _) es _) dst = do
   movParamInstrs <- concat <$> zipWithM transExp es [IRParam x | x <- [0..]]
   regsInUse <- gets inUse
-  return $ movParamInstrs ++ [Comment "We push the dst register despite it containing uninitialised data. Thus we have to pop and then move the return register into dst.", Push (Regs regsInUse), Jsr i, Pop (Regs regsInUse), Mov (Reg dst) (Reg IRRet)] 
+  return $ movParamInstrs ++ [Jsr i, Mov (Reg dst) (Reg IRRet)] 
 
 -- Puts the address (which we will load into later) into dst
 transLVal :: LVal -> IRReg -> IRStatementGenerator IRInstrs
