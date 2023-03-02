@@ -74,7 +74,7 @@ transAndAddMemoryInstrs instr = do
         Cmp (Reg R1) (Imm 0), 
         Jle (showHelperLabel ErrDivZero),
         Jsr divModLabel,
-        Mov (Reg R0) o1
+        Mov o1 (Reg R0)
       ]
     transDivMod (Mod o1 o2 o3)
       = [
@@ -83,7 +83,7 @@ transAndAddMemoryInstrs instr = do
         Cmp (Reg R1) (Imm 0), 
         Jle (showHelperLabel ErrDivZero),
         Jsr divModLabel,
-        Mov (Reg R1) o1
+        Mov o1 (Reg R1)
       ]
     transDivMod i = [i]
 
