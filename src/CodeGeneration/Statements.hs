@@ -120,8 +120,8 @@ transRVal (NewPair e e' _) dst = do
   mallocFst <- transMallocCall (typeSize eType) ePtrReg
   mallocSnd <- transMallocCall (typeSize eType) ePtrReg'
   mallocPair <- transMallocCall (typeSize pType) dst
-  evalFstInstrs <- transExp e eReg <++ mallocFst ++ [Mov (Ind ePtrReg) (Reg eReg)] -- not sure if Ind as the dst of a Mov is dodgy or not
-  evalSndInstrs <- transExp e' eReg' <++ mallocSnd ++ [Mov (Ind ePtrReg') (Reg eReg')]
+  evalFstInstrs <- transExp e eReg <++ mallocFst ++ [Store (Reg eReg) (Ind ePtrReg)] -- not sure if Ind as the dst of a Mov is dodgy or not
+  evalSndInstrs <- transExp e' eReg' <++ mallocSnd ++ [Store (Reg eReg') (Ind ePtrReg')]
   makeRegsAvailable [eReg, eReg', ePtrReg, ePtrReg']
   return $ evalFstInstrs ++ evalSndInstrs ++ mallocPair ++ movePointers
 transRVal (RPair pe) dst = transPairElem pe dst
@@ -146,12 +146,12 @@ transLVal (LPair pe) dst = withReg (\r -> transLPair pe r <++ [Mov (Reg dst) (Re
   where
     transLPair :: PairElem -> IRReg -> IRStatementGenerator IRInstrs
     transLPair (Fst (LIdent (AST.Ident i _)) _) dst' = getVarReg (Ident i) >>= (\vr -> checkNull vr <++ [Load (Reg dst') (Ind vr)])
-    transLPair (Fst (LPair pe') _) dst' = withReg (\r -> transLPair pe' r <++> checkNull r <++ [Mov (Reg dst') (Ind r)])
+    transLPair (Fst (LPair pe') _) dst' = withReg (\r -> transLPair pe' r <++> checkNull r <++ [Load (Reg dst') (Ind r)])
     transLPair (Snd (LIdent (AST.Ident i _)) _) dst' = do
       vr <- getVarReg (Ident i)
       vType <- getWType (Ident i)
-      checkNull vr <++ [Mov (Reg dst') (ImmOffset vr (typeSize vType))]
-    transLPair (Snd (LPair pe') _) dst' = withReg (\r -> transLPair pe' r <++> checkNull dst' <++ [Mov (Reg dst') (ImmOffset r (typeSize WUnit))])
+      checkNull vr <++ [Load (Reg dst') (ImmOffset vr (typeSize vType))]
+    transLPair (Snd (LPair pe') _) dst' = withReg (\r -> transLPair pe' r <++> checkNull dst' <++ [Load (Reg dst') (ImmOffset r (typeSize WUnit))])
     transLPair _ _ = undefined
 transLVal (LArray ae) dst = withReg (\r -> transArrayElem ae r <++ [Mov (Reg dst) (Reg r)])
 transLVal _ _ = undefined
