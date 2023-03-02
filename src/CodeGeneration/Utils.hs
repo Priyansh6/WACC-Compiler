@@ -9,6 +9,7 @@ module CodeGeneration.Utils
     exprType,
     getIdentType,
     getVarReg,
+    getFuncReturnFuncName,
     getWType,
     insertVarReg,
     makeRegAvailable,
@@ -78,6 +79,9 @@ nextLabel = nextLabelId >>= toLabel
 
     toLabel :: Int -> StateT Aux (Reader (SymbolTable, ScopeMap)) Label
     toLabel i = gets (\Aux {sectionName = x} -> x <> "_l" <> T.pack (show i))
+
+getFuncReturnFuncName :: IRStatementGenerator Label
+getFuncReturnFuncName = gets (\Aux {sectionName = x} -> x <> "_return")
 
 insertVarReg :: Ident -> IRReg -> IRStatementGenerator ()
 insertVarReg i r = modify (\a@Aux {varLocs = vl} -> a {varLocs = M.insert i r vl})

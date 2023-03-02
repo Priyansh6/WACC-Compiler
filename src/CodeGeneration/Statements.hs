@@ -52,8 +52,9 @@ transStat (Free e _) = do
 transStat (Return e _) = do
   dst <- nextFreeReg
   eis <- transExp e dst
+  returnFuncName <- getFuncReturnFuncName
   makeRegAvailable dst
-  return $ eis ++ [Mov (Reg IRRet) (Reg dst)]
+  return $ eis ++ [Mov (Reg IRRet) (Reg dst), Jmp returnFuncName]
 transStat (Exit e _) = do
   dst <- nextFreeReg
   eis <- transExp e dst

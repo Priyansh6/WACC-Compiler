@@ -37,14 +37,15 @@ transFunc (AST.Func _ (AST.Ident i _) params ss scopeId _) = do
   let unlimitedRegs = map TmpReg [(length params)..]
       name = i
       (dataSection, lt) = generateDataSection ss name
+      used = [TmpReg x | x <- [0 .. (length params) - 1]]
       pushParamInstrs = [Mov (Reg (TmpReg x)) (Reg (IRParam x)) | x <- [0 .. (length params) - 1]]
       (_, paramIds) = unzip params
       paramIdents = map (\(AST.Ident id _) -> (Ident id)) paramIds
       paramRegs = zipWith (\id r -> (id, TmpReg r)) paramIdents [0 .. (length params) - 1]
-  (bodyInstrs, aux) <- runStateT (transStats ss) (Aux {available = unlimitedRegs, labelId = 0, varLocs = M.fromList paramRegs, sectionName = name, literTable = lt, helperFuncs = S.empty, inUse = []})
+  (bodyInstrs, aux) <- runStateT (transStats ss) (Aux {available = unlimitedRegs, labelId = 0, varLocs = M.fromList paramRegs, sectionName = name, literTable = lt, helperFuncs = S.empty, inUse = used})
   --bodyInstrs' <- wrapScope (fromJust scopeId)  (pushParamInstrs ++ bodyInstrs)
   -- trace (show paramRegs) $ return (Section dataSection (Body name False (pushParamInstrs ++ bodyInstrs)), helperFuncs aux)
-  return (Section dataSection (Body name False (pushParamInstrs ++ bodyInstrs)), helperFuncs aux)
+  return (Section dataSection (Body name False (pushParamInstrs ++ bodyInstrs ++ [Define (name <> "_return")])), helperFuncs aux)
 
 wrapSectionBody :: IRInstrs -> IRInstrs
 wrapSectionBody ss = [Push (Regs [IRFP, IRLR]), Mov (Reg IRFP) (Reg IRSP)] ++ ss ++ [Pop (Regs [IRFP, IRPC])]
