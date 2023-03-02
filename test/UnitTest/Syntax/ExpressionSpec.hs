@@ -26,6 +26,9 @@ spec = do
   it "int subtraction" $
     test expr "1 - 2" `shouldParse` (IntLiter 1 (1, 1) :-: IntLiter 2 (1, 5)) (1, 3)
 
+  it "strings with escaped characters" $
+    test expr "\"Should print \\\"Change n\\\" once before.\"" `shouldParse` (StrLiter "Should print \"Change n\" once before." (1, 1))
+
   it "binary op without whitespace" $
     test expr "1-2" `shouldParse` (IntLiter 1 (1, 1) :-: IntLiter 2 (1, 3)) (1, 2)
 

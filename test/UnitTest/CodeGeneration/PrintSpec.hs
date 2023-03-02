@@ -20,8 +20,10 @@ spec = do
       ]
       `shouldBe` T.unlines
         [ ".data",
+          "\t.word 9",
           "._s:",
           "\t.asciz \"bob bill3\"",
+          "\t.word 0",
           "a2_:",
           "\t.asciz \"\"",
           ".text",
@@ -190,8 +192,10 @@ spec = do
       ]
       `shouldBe` T.unlines
         [ ".data",
+          "\t.word 10",
           ".L.str0:",
           "\t.asciz \"looping...\"",
+          "\t.word 11",
           ".L.str1:",
           "\t.asciz \"end of loop\"",
           ".text",
@@ -217,6 +221,7 @@ spec = do
           "\tpop {fp, pc}",
           "",
           ".data",
+          "\t.word 4",
           ".L._prints_str0:",
           "\t.asciz \"%.*s\"",
           ".text",
@@ -231,6 +236,7 @@ spec = do
           "\tpop {pc}",
           "",
           ".data",
+          "\t.word 0",
           ".L._println_str0:",
           "\t.asciz \"\"",
           ".text",
