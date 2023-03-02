@@ -25,7 +25,9 @@ data Ident = Ident T.Text deriving (Show, Ord, Eq)
 
 data Instr a
   = Load (Operand a) (Operand a)
+  | LoadB (Operand a) (Operand a)
   | Store (Operand a) (Operand a)
+  | StoreB (Operand a) (Operand a)
   | Mov (Operand a) (Operand a)
   | Add (Operand a) (Operand a) (Operand a)
   | Sub (Operand a) (Operand a) (Operand a)
@@ -88,6 +90,8 @@ showIndentedInstr i = "\t" <> showInstr i
 showInstr :: Instr IRReg -> T.Text
 showInstr (Load rd a) = "ldr " <> showOps [rd, a]
 showInstr (Store rd a) = "str " <> showOps [rd, a]
+showInstr (LoadB rd a) = "ldrb " <> showOps [rd, a]
+showInstr (StoreB rd a) = "strb " <> showOps [rd, a]
 showInstr (Mov rd o2) = "mov " <> showOps [rd, o2]
 showInstr (Add rd rn o2) = "add " <> showOps [rd, rn, o2]
 showInstr (Sub rd rn o2) = "sub " <> showOps [rd, rn, o2]

@@ -33,6 +33,8 @@ showIndentedInstr i = "\t" <> showInstr i
 showInstr :: ArmInstr -> T.Text
 showInstr (Load rd a) = "ldr " <> showOps [rd, a]
 showInstr (Store rd a) = "str " <> showOps [rd, a]
+showInstr (LoadB rd a) = "ldrb " <> showOps [rd, a]
+showInstr (StoreB rd a) = "strb " <> showOps [rd, a]
 showInstr (Mov rd o2) = "mov " <> showOps [rd, o2]
 showInstr (Add rd rn o2) = "add " <> showOps [rd, rn, o2]
 showInstr (Sub rd rn o2) = "sub " <> showOps [rd, rn, o2]

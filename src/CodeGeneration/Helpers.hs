@@ -23,8 +23,10 @@ data HelperFunc
   | HRead HelperType
   | FreePair
   | FreeArr
-  | ArrStore   
+  | ArrStore 
   | ArrLoad
+  | ArrStoreB
+  | ArrLoadB
   | BoundsCheck
   | ErrDivZero
   | ErrOverflow
@@ -49,6 +51,8 @@ dependencyMap = M.fromList
     (FreePair, [ErrNull]),
     (ArrStore, [BoundsCheck]),
     (ArrLoad, [BoundsCheck]),
+    (ArrStoreB, [BoundsCheck]),
+    (ArrLoadB, [BoundsCheck]),
     (ErrDivZero, [HPrint HString]),
     (ErrOverflow, [HPrint HString]),
     (ErrNull, [HPrint HString])
@@ -75,6 +79,8 @@ freeLabel = "free"
 isArrHelperFunc :: HelperFunc -> Bool
 isArrHelperFunc ArrStore = True
 isArrHelperFunc ArrLoad = True
+isArrHelperFunc ArrStoreB = True
+isArrHelperFunc ArrLoadB = True
 isArrHelperFunc _ = False
 
 isErrHelperFunc :: HelperFunc -> Bool
@@ -207,7 +213,7 @@ generateHelperFunc hf
           Load (Reg IRLR) (ImmOffset (IRParam 0) (-intSize)),
           Cmp (Reg (IRParam 1)) (Reg IRLR),
           Jge (showHelperLabel BoundsCheck),
-          Mov (Reg IRScratch1) (Imm maxRegSize),
+          Mov (Reg IRScratch1) (Imm arrSize),
           Mul (Reg (IRParam 1)) (Reg (IRParam 1)) (Reg IRScratch1),
           Add (Reg (IRParam 0)) (Reg (IRParam 0)) (Reg (IRParam 1)),
           arrInstr
@@ -226,10 +232,16 @@ generateHelperFunc hf
       )
   | otherwise = error "Unsupported helper function for generation"
   where 
+    arrSize = case hf of
+      ArrStoreB -> 1
+      ArrLoadB  -> 1
+      _         -> maxRegSize
     arrInstr = case hf of
-      ArrStore -> Store (Reg (IRParam 2)) (Ind (IRParam 0))
-      ArrLoad  -> Load (Reg IRRet) (Ind (IRParam 0))
-      _        -> error "Can't have non ArrStore or ArrLoad array helper function"
+      ArrStore  -> Store (Reg (IRParam 2)) (Ind (IRParam 0))
+      ArrLoad   -> Load (Reg IRRet) (Ind (IRParam 0))
+      ArrStoreB -> StoreB (Reg (IRParam 2)) (Ind (IRParam 0))
+      ArrLoadB  -> LoadB (Reg IRRet) (Ind (IRParam 0))
+      _         -> error "Can't have non ArrStore or ArrLoad array helper function"
     errInstrs = case hf of
       BoundsCheck -> [
                        Jsr printfLabel,
@@ -257,15 +269,17 @@ showHelperLabel (HPrint HPointer) = "_printp"
 showHelperLabel HPrintln          = "_println"
 showHelperLabel (HRead HInt)      = "_readi"
 showHelperLabel (HRead HChar)     = "_readc"
-showHelperLabel FreePair         = "_freepair"
-showHelperLabel FreeArr         = "_freearr"
-showHelperLabel ArrStore         = "_arrStore"
-showHelperLabel ArrLoad          = "_arrLoad"
-showHelperLabel BoundsCheck      = "_boundsCheck"
-showHelperLabel ErrDivZero       = "_errDivZero"
-showHelperLabel ErrOverflow      = "_errOverflow"
-showHelperLabel ErrNull          = "_errNull"
-showHelperLabel _                = error "Unknown Helper Function Label"
+showHelperLabel FreePair          = "_freepair"
+showHelperLabel FreeArr           = "_freearr"
+showHelperLabel ArrStore          = "_arrStore"
+showHelperLabel ArrLoad           = "_arrLoad"
+showHelperLabel ArrStoreB         = "_arrStoreB"
+showHelperLabel ArrLoadB          = "_arrLoadB"
+showHelperLabel BoundsCheck       = "_boundsCheck"
+showHelperLabel ErrDivZero        = "_errDivZero"
+showHelperLabel ErrOverflow       = "_errOverflow"
+showHelperLabel ErrNull           = "_errNull"
+showHelperLabel _                 = error "Unknown Helper Function Label"
 
 showHelperOption :: HelperType -> T.Text
 showHelperOption HInt     = "%d"

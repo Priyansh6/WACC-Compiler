@@ -93,6 +93,8 @@ transAndAddMemoryInstrs instr = do
 transInstr :: Instr IRReg -> ArmMemoryAllocator ArmInstr
 transInstr (Load o1 o2) = Load <$> transOperand o1 True <*> transOperand o2 False
 transInstr (Store o1 o2) = Store <$> transOperand o1 False <*> transOperand o2 True
+transInstr (LoadB o1 o2) = LoadB <$> transOperand o1 True <*> transOperand o2 False
+transInstr (StoreB o1 o2) = StoreB <$> transOperand o1 False <*> transOperand o2 True
 transInstr (Mov o1 o2) = Mov <$> transOperand o1 True <*> transOperand o2 False 
 transInstr (Add o1 o2 o3) = Add <$> transOperand o1 True <*> transOperand o2 False <*> transOperand o3 False 
 transInstr (Sub o1 o2 o3) = Sub <$> transOperand o1 True <*> transOperand o2 False <*> transOperand o3 False 

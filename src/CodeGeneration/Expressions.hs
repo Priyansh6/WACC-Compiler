@@ -13,10 +13,11 @@ import CodeGeneration.Utils
     makeRegAvailable,
     makeRegsAvailable,
     getVarReg,
+    getWType,
     addHelperFunc,
     Aux (..),
     heapTypeSize )
-import CodeGeneration.Helpers (HelperFunc(ArrLoad, ErrDivZero, BoundsCheck), showHelperLabel)
+import CodeGeneration.Helpers (HelperFunc(..), showHelperLabel)
 import Data.Char (ord)
 
 import qualified AST (Ident(Ident))
@@ -119,12 +120,13 @@ transCmpOp cons e e' dst = do
 
 transArrayElem :: ArrayElem -> IRReg -> IRStatementGenerator IRInstrs
 transArrayElem (ArrayElem (AST.Ident i _) exprs _) dst = do
-  addHelperFunc BoundsCheck
-  addHelperFunc ArrLoad
+  eType <- getWType (Ident i)
+  let helperFunc = if heapTypeSize eType == 1 then ArrLoadB else ArrLoad
+  addHelperFunc helperFunc
   varReg <- getVarReg (Ident i)
-  concat <$> mapM (`transArrExpr` varReg) exprs
+  concat <$> mapM (transArrExpr varReg helperFunc) exprs
   where
-    transArrExpr :: Expr -> IRReg -> IRStatementGenerator IRInstrs
-    transArrExpr e varReg' = transExp e dst <++ [Mov (Reg $ IRParam 0) (Reg varReg'), 
-                                                 Mov (Reg $ IRParam 1) (Reg dst), 
-                                                 Jsr $ showHelperLabel ArrLoad, Mov (Reg dst) (Reg IRRet)]
+    transArrExpr :: IRReg -> HelperFunc -> Expr -> IRStatementGenerator IRInstrs
+    transArrExpr varReg' hf e = transExp e dst <++ [Mov (Reg $ IRParam 0) (Reg varReg'), 
+                                                   Mov (Reg $ IRParam 1) (Reg dst), 
+                                                   Jsr $ showHelperLabel hf, Mov (Reg dst) (Reg IRRet)]

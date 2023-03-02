@@ -99,17 +99,18 @@ transRVal :: RVal -> IRReg -> IRStatementGenerator IRInstrs
 transRVal (RExpr e) dst = transExp e dst
 transRVal (ArrayLiter [] _) dst = transArrayCreation 0 0 dst
 transRVal (ArrayLiter elems@(e:_) _) dst = do
-  addHelperFunc ArrStore
   eType <- exprType e
   let eSize = heapTypeSize eType
-  transArrayCreation eSize (length elems) dst <++> (concat <$> zipWithM transArrLiterElem elems [0..])
+      helperFunc = if eSize == 1 then ArrStoreB else ArrStore
+  addHelperFunc helperFunc
+  transArrayCreation eSize (length elems) dst <++> (concat <$> zipWithM (transArrLiterElem helperFunc) elems [0..])
   where
-    transArrLiterElem :: Expr -> Int -> IRStatementGenerator IRInstrs
-    transArrLiterElem e' idx = do
+    transArrLiterElem :: HelperFunc -> Expr -> Int -> IRStatementGenerator IRInstrs
+    transArrLiterElem hf e' idx = do
       eReg <- nextFreeReg
       exprInstrs <- transExp e' eReg
       makeRegAvailable eReg
-      return $ exprInstrs ++ [Mov (Reg (IRParam 0)) (Reg dst), Mov (Reg (IRParam 1)) (Imm idx), Mov (Reg (IRParam 2)) (Reg eReg), Jsr (showHelperLabel ArrStore)]
+      return $ exprInstrs ++ [Mov (Reg (IRParam 0)) (Reg dst), Mov (Reg (IRParam 1)) (Imm idx), Mov (Reg (IRParam 2)) (Reg eReg), Jsr (showHelperLabel hf)]
 transRVal (NewPair e e' _) dst = do
   eReg <- nextFreeReg
   ePtrReg <- nextFreeReg
