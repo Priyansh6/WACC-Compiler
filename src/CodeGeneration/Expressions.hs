@@ -88,7 +88,7 @@ transExp ((:||:) e e' _) dst = do
   let failCase = [Pop (Reg IRScratch2), 
                   Pop (Reg IRScratch1), 
                   Cmp (Reg IRScratch1) (Imm 1), 
-                  Jne successLabel, 
+                  Je successLabel, 
                   Cmp (Reg IRScratch2) (Imm 1), 
                   Je successLabel, 
                   Mov (Reg dst) (Imm 0), Jmp endLabel]
