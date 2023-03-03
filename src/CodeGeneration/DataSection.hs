@@ -22,12 +22,12 @@ data DataAux = DataAux {
 generateDataSection :: AST.Stats -> T.Text -> ([Data], LiterTable)
 generateDataSection ss name = (ds, lt)
     where 
-        dataAux = execState (generateDataSection' ss) (DataAux {labelNumber = 0, literTable = M.empty, dataSection = [], funcName = name})
+        dataAux = execState (generateStatsData ss) (DataAux {labelNumber = 0, literTable = M.empty, dataSection = [], funcName = name})
         ds = dataSection dataAux
         lt = literTable dataAux
 
-generateDataSection' :: AST.Stats -> DataSegmentGen ()
-generateDataSection' ss = mapM_ generateStatData ss 
+generateStatsData :: AST.Stats -> DataSegmentGen ()
+generateStatsData ss = mapM_ generateStatData ss 
 
 generateStatData :: AST.Stat -> DataSegmentGen ()
 generateStatData (DecAssign _ _ rval _) = generateRValData rval
@@ -35,20 +35,22 @@ generateStatData (Assign _ rval _) = generateRValData rval
 generateStatData (Return expr _) = generateExprData expr
 generateStatData (Print expr) = generateExprData expr
 generateStatData (Println expr) = generateExprData expr
-generateStatData (If expr ss1 _ ss2 _ _) = generateExprData expr >> generateDataSection' ss1 >> generateDataSection' ss2
-generateStatData (While expr ss _ _) = generateExprData expr >> generateDataSection' ss
-generateStatData (Begin ss _) = generateDataSection' ss
+generateStatData (If expr ss1 _ ss2 _ _) = generateExprData expr >> generateStatsData ss1 >> generateStatsData ss2
+generateStatData (While expr ss _ _) = generateExprData expr >> generateStatsData ss
+generateStatData (Begin ss _) = generateStatsData ss
 generateStatData _ = return ()
 
 generateRValData :: AST.RVal -> DataSegmentGen ()
 generateRValData (RExpr expr ) = generateExprData expr
 generateRValData (NewPair e1 e2 _) = generateExprData e1 >> generateExprData e2
 generateRValData (Call _ exprs _) = mapM_ generateExprData exprs
+generateRValData (ArrayLiter exprs _) = mapM_ generateExprData exprs
 generateRValData _ = return ()
 
 generateExprData :: AST.Expr -> DataSegmentGen ()
-generateExprData (StrLiter text _) = do
-  updateAuxData text
+generateExprData (StrLiter text _) = updateAuxData text
+generateExprData ((:==:) e1 e2 _) = generateExprData e1 >> generateExprData e2
+generateExprData ((:!=:) e1 e2 _) = generateExprData e1 >> generateExprData e2
 generateExprData _ = return ()
 
 updateAuxData :: T.Text -> DataSegmentGen ()
