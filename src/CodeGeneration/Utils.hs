@@ -131,6 +131,7 @@ heapTypeSize WBool = 1
 heapTypeSize WChar = 1
 heapTypeSize WStr = 4
 heapTypeSize (WArr _ _) = 4
+heapTypeSize (WPair WUnit WUnit) = 4
 heapTypeSize (WPair _ _) = 8
 
 exprType :: Expr -> IRStatementGenerator WType

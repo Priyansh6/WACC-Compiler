@@ -182,14 +182,14 @@ generateHelperFunc FreePair
   = Section [] 
     (Body (showHelperLabel FreePair) False 
       [
-        Mov (Reg IRLR) (Reg (IRParam 0)),
-        Cmp (Reg IRLR) (Imm 0),
+        Mov (Reg IRScratch1) (Reg (IRParam 0)),
+        Cmp (Reg IRScratch1) (Imm 0),
         Jle (showHelperLabel ErrNull),
-        Load (Reg (IRParam 0)) (ImmOffset IRLR 0),
+        Load (Reg (IRParam 0)) (Ind IRScratch1),
         Jsr freeLabel,
-        Load (Reg (IRParam 0)) (ImmOffset IRLR maxRegSize),
+        Load (Reg (IRParam 0)) (ImmOffset IRScratch1 maxRegSize),
         Jsr freeLabel,
-        Mov (Reg (IRParam 0)) (Reg IRLR),
+        Mov (Reg (IRParam 0)) (Reg IRScratch1),
         Jsr freeLabel
       ]
     )
