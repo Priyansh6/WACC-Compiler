@@ -63,7 +63,10 @@ transSection :: Section IRReg -> ArmTranslator (Section ArmReg)
 transSection (Section d (Body label global instrs)) = do
   section <- concat <$> mapM transAndAddMemoryInstrs instrs
   fpOff <- gets nextFPOffset
-  return (Section d (Body label global ([Push (Regs [FP, LR]), Mov (Reg FP) (Reg SP), Add (Reg SP) (Reg SP) (Imm fpOff)] ++ section ++ [Sub (Reg SP) (Reg SP) (Imm fpOff), Pop (Regs [FP, PC])])))
+  rs <- gets regsAvailable
+  let usedRs = S.toList $ regsInUse rs
+      (pushes, pops) = if null usedRs then ([], []) else ([Push (Regs usedRs)], [Pop (Regs usedRs)])
+  return (Section d (Body label global ([Push (Regs [FP, LR])] ++ pushes ++ [Mov (Reg FP) (Reg SP), Add (Reg SP) (Reg SP) (Imm fpOff)] ++ section ++ [Sub (Reg SP) (Reg SP) (Imm fpOff)] ++ pops ++ [Pop (Regs [FP, PC])])))
 
 transAndAddMemoryInstrs :: Instr IRReg -> ArmTranslator ArmInstrs
 transAndAddMemoryInstrs instr = do
@@ -105,11 +108,7 @@ transInstr (Mul o1 o2 o3) = Mul <$> transOperand o1 True <*> transOperand o2 Fal
 transInstr (Div o1 o2 o3) = Div <$> transOperand o1 True <*> transOperand o2 False <*> transOperand o3 False
 transInstr (Mod o1 o2 o3) = Mod <$> transOperand o1 True <*> transOperand o2 False <*> transOperand o3 False
 transInstr (Cmp o1 o2) = Cmp <$> transOperand o1 False <*> transOperand o2 False
-transInstr (Jsr l) = do 
-  rs <- gets regsAvailable
-  let usedRs = S.toList $ regsInUse rs
-  if null usedRs then return () else tell ([Push (Regs usedRs)], [Pop (Regs usedRs)], S.empty) 
-  return $ Jsr l
+transInstr (Jsr l) = return $ Jsr l
 transInstr (Push o) = Push <$> transOperand o False
 transInstr (Pop o) = Pop <$> transOperand o True
 transInstr (Jmp l) = return $ Jmp l
