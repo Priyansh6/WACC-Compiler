@@ -1,4 +1,4 @@
-module Semantic.Rename.Program where
+module Semantic.Rename.Program (module Semantic.Rename.Program) where
 
 import qualified Data.List as L
 import qualified Data.Map as M

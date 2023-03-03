@@ -1,4 +1,4 @@
-module Semantic.Rename.RLValExpr where 
+module Semantic.Rename.RLValExpr (module Semantic.Rename.RLValExpr) where 
 
 import qualified Data.List as L
 import Data.Maybe

@@ -31,7 +31,6 @@ where
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.Functor ((<&>))
-import Data.Map ((!))
 import qualified Data.Map as M
 import qualified Data.Text as T
 import qualified Data.List as L
@@ -140,7 +139,7 @@ exprType (CharLiter _ _) = return WChar
 exprType (StrLiter _ _) = return WStr
 exprType (PairLiter _) = return WUnit
 exprType (IdentExpr (AST.Ident i _) _) = getWType (Ident i)
-exprType (ArrayExpr (ArrayElem (AST.Ident i _) [] _) _) = error "Can't have empty index in ArrayElem"
+exprType (ArrayExpr (ArrayElem _ [] _) _) = error "Can't have empty index in ArrayElem"
 exprType (ArrayExpr (ArrayElem (AST.Ident i _) is _) _) = do
   wType <- getWType (Ident i)
   case wType of
@@ -167,7 +166,7 @@ exprType ((:||:) {}) = return WBool
 
 wrapScope :: Int -> IRInstrs -> IRSectionGenerator IRInstrs
 wrapScope scopeId instrs = do
-  (st, sm) <- ask
+  (_ , sm) <- ask
   case M.lookup scopeId sm of
     Nothing -> return instrs
     Just ids -> do 

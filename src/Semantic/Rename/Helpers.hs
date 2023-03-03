@@ -1,6 +1,5 @@
-module Semantic.Rename.Helpers where
-
-import Data.Set (Set)
+module Semantic.Rename.Helpers (module Semantic.Rename.Helpers) where
+  
 import qualified Data.Text as T
 
 import AST

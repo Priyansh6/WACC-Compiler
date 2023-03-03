@@ -49,9 +49,6 @@ retReg, overflowReg :: ArmReg
 retReg = R0
 overflowReg = R9
 
-regsInUse :: ArmRegs -> ArmRegs
-regsInUse available = generalRegs S.\\ available
-
 divModLabel :: Label
 divModLabel = "__aeabi_idivmod"
 
@@ -66,9 +63,9 @@ transSection (Section d (Body label global instrs)) = do
                                             Push (Regs [FP, LR]), 
                                             Push (Regs (S.toList generalRegs)), 
                                             Mov (Reg FP) (Reg SP), 
-                                            Add (Reg SP) (Reg SP) (Imm (fpOff + 4))] 
+                                            Add (Reg SP) (Reg SP) (Imm fpOff)] 
                                        ++ section 
-                                       ++ [ Sub (Reg SP) (Reg SP) (Imm (fpOff + 4)), 
+                                       ++ [ Sub (Reg SP) (Reg SP) (Imm fpOff), 
                                             Pop (Regs (S.toList generalRegs)),
                                             Pop (Regs [FP, PC])]))
 

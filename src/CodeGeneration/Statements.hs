@@ -4,9 +4,7 @@ module CodeGeneration.Statements (transStats) where
 
 import Control.Monad
 import Control.Monad.State
-import Control.Monad.Trans
 import Data.Functor ((<&>))
-import Data.Maybe
 
 import AST hiding (Ident)
 import qualified AST (Ident (Ident))
@@ -20,14 +18,14 @@ transStats ss = concat <$> mapM transStat ss
 
 transStat :: Stat -> IRStatementGenerator IRInstrs
 transStat Skip = return []
-transStat (DecAssign t (AST.Ident i _) r _) = do
+transStat (DecAssign _ (AST.Ident i _) r _) = do
   varReg <- nextFreeReg
   rReg <- nextFreeReg
   rInstrs <- transRVal r rReg
   makeRegAvailable rReg
   insertVarReg (Ident i) varReg
   return $ rInstrs ++ [Mov (Reg varReg) (Reg rReg)]
-transStat (Assign l@(LIdent (AST.Ident i _)) r _) = do
+transStat (Assign (LIdent (AST.Ident i _)) r _) = do
   varReg <- getVarReg (Ident i)
   withReg (\rReg -> transRVal r rReg <++ [Mov (Reg varReg) (Reg rReg)])
 transStat (Assign l r _) = withReg (\lReg -> withReg (\rReg -> transLVal l lReg <++> transRVal r rReg <++ [Store (Reg rReg) (Ind lReg)]))

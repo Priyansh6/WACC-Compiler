@@ -1,4 +1,4 @@
-module Semantic.Rename.Function where 
+module Semantic.Rename.Function (module Semantic.Rename.Function) where 
 
 import qualified Data.List as L
 

@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Semantic.Errors where
+module Semantic.Errors (module Semantic.Errors) where
 
 import Data.List (intercalate)
 import qualified Data.Text as T

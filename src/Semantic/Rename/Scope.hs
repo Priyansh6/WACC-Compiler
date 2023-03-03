@@ -1,4 +1,4 @@
-module Semantic.Rename.Scope where 
+module Semantic.Rename.Scope (module Semantic.Rename.Scope) where 
 
 import qualified Data.List as L
 import qualified Data.Map as M
