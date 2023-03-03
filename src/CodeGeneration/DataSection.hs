@@ -2,32 +2,31 @@
 
 module CodeGeneration.DataSection (generateDataSection) where
 
-import Control.Monad.State
+import AST
 import CodeGeneration.IR
 import CodeGeneration.Utils (LiterTable)
-import AST
-
+import Control.Monad.State
 import qualified Data.Map as M
 import qualified Data.Text as T
 
 type DataSegmentGen = State DataAux
 
-data DataAux = DataAux { 
-  labelNumber :: Int,
-  literTable :: LiterTable,
-  dataSection :: [Data],
-  funcName :: T.Text
+data DataAux = DataAux
+  { labelNumber :: Int,
+    literTable :: LiterTable,
+    dataSection :: [Data],
+    funcName :: T.Text
   }
 
 generateDataSection :: AST.Stats -> T.Text -> ([Data], LiterTable)
 generateDataSection ss name = (ds, lt)
-    where 
-        dataAux = execState (generateStatsData ss) (DataAux {labelNumber = 0, literTable = M.empty, dataSection = [], funcName = name})
-        ds = dataSection dataAux
-        lt = literTable dataAux
+  where
+    dataAux = execState (generateStatsData ss) (DataAux {labelNumber = 0, literTable = M.empty, dataSection = [], funcName = name})
+    ds = dataSection dataAux
+    lt = literTable dataAux
 
 generateStatsData :: AST.Stats -> DataSegmentGen ()
-generateStatsData ss = mapM_ generateStatData ss 
+generateStatsData = mapM_ generateStatData
 
 generateStatData :: AST.Stat -> DataSegmentGen ()
 generateStatData (DecAssign _ _ rval _) = generateRValData rval
@@ -41,7 +40,7 @@ generateStatData (Begin ss _) = generateStatsData ss
 generateStatData _ = return ()
 
 generateRValData :: AST.RVal -> DataSegmentGen ()
-generateRValData (RExpr expr ) = generateExprData expr
+generateRValData (RExpr expr) = generateExprData expr
 generateRValData (NewPair e1 e2 _) = generateExprData e1 >> generateExprData e2
 generateRValData (Call _ exprs _) = mapM_ generateExprData exprs
 generateRValData (ArrayLiter exprs _) = mapM_ generateExprData exprs
@@ -63,7 +62,6 @@ insertData :: Data -> DataSegmentGen ()
 insertData d = do
   modify (\a@DataAux {dataSection = ds} -> (a {dataSection = d : ds}))
 
-
 nextLabel :: DataSegmentGen Label
 nextLabel = nextLabelId >>= toLabel
   where
@@ -75,5 +73,3 @@ nextLabel = nextLabelId >>= toLabel
 
 insertToLiterTable :: Label -> T.Text -> DataSegmentGen ()
 insertToLiterTable l t = modify (\a@DataAux {literTable = lt} -> a {literTable = M.insert t l lt})
-
-

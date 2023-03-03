@@ -7,7 +7,6 @@ import qualified Data.Text as T
 
 type Program a = [Section a]
 
--- data Section a = Section [Data] [Function a] deriving (Show, Eq)
 data Section a = Section [Data] (Body a) deriving (Show, Eq)
 
 data Body a = Body Label Global [Instr a] deriving (Show, Eq)
@@ -19,6 +18,7 @@ data Data = StringData Label T.Text deriving (Show, Eq)
 data IRReg = TmpReg Int | IRParam Int | IRScratch1 | IRScratch2 | IRScratch3 | IRFP | IRSP | IRLR | IRPC | IRRet deriving (Show, Eq, Ord)
 
 type Instrs a = [Instr a]
+
 type IRInstrs = Instrs IRReg
 
 data Ident = Ident T.Text deriving (Show, Ord, Eq)
@@ -38,7 +38,7 @@ data Instr a
   | Jmp Label -- Jump to generic label
   | Jsr Label -- Jump to subroutine (updates LR)
   | JsrVS Label -- Jump to subroutine if overflow (updates LR)
-  | JsrNE Label -- Jump to subroutine if overflow (updates LR)
+  | JsrNE Label -- Jump to subroutine if cmp returns not equals
   | Je Label
   | Jne Label
   | Jl Label
@@ -64,7 +64,6 @@ data Operand a
   deriving (Show, Eq)
 
 type FPOffsets = M.Map Ident Int
-
 
 showIR :: Program IRReg -> T.Text
 showIR = T.intercalate "\n" . map showSection

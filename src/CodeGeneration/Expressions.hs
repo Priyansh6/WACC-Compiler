@@ -3,48 +3,49 @@
 module CodeGeneration.Expressions (transExp, transArrayElem) where
 
 import AST hiding (Ident)
+import qualified AST (Ident (Ident))
+import CodeGeneration.Helpers (HelperFunc (..), showHelperLabel)
 import CodeGeneration.IR
-import Control.Monad.State
 import CodeGeneration.Utils
-  ( IRStatementGenerator,
-    (<++),
-    nextLabel,
-    nextFreeReg,
-    makeRegAvailable,
-    makeRegsAvailable,
+  ( Aux (..),
+    IRStatementGenerator,
+    addHelperFunc,
     getVarReg,
     getWType,
-    addHelperFunc,
-    Aux (..),
-    heapTypeSize )
-import CodeGeneration.Helpers (HelperFunc(..), showHelperLabel)
+    heapTypeSize,
+    makeRegAvailable,
+    nextFreeReg,
+    nextLabel,
+    (<++),
+  )
+import Control.Monad.State ( when, gets )
 import Data.Char (ord)
-
-import qualified AST (Ident(Ident))
 import qualified Data.Map as M
 import qualified Data.Text as T
 
 type NumInstrCons a = Operand a -> Operand a -> Operand a -> Instr a
+
 type BranchInstrCons a = Label -> Instr a
 
 transExp :: Expr -> IRReg -> IRStatementGenerator IRInstrs
 transExp (IntLiter x _) dst = return [Load (Reg IRScratch1) (Abs $ T.pack $ show x), Mov (Reg dst) (Reg IRScratch1)]
-transExp (BoolLiter True _) dst
-  = return [Mov (Reg dst) true]
+transExp (BoolLiter True _) dst =
+  return [Mov (Reg dst) true]
   where
     true = Imm 1
-transExp (BoolLiter False _) dst
-  = return [Mov (Reg dst) false]
+transExp (BoolLiter False _) dst =
+  return [Mov (Reg dst) false]
   where
     false = Imm 0
 transExp (CharLiter c _) dst = return [Mov (Reg dst) (Imm (ord c))]
-transExp (StrLiter t _) dst = (gets (\Aux {literTable = lt} -> lt M.! t)) >>= (\label -> return [Load (Reg dst) (Abs label)])
-transExp (PairLiter _) dst
-  = return [Mov (Reg dst) nullptr]
+transExp (StrLiter t _) dst = gets (\Aux {literTable = lt} -> lt M.! t) >>= (\label -> return [Load (Reg dst) (Abs label)])
+transExp (PairLiter _) dst =
+  return [Mov (Reg dst) nullptr]
   where
     nullptr = Imm 0
 transExp (IdentExpr (AST.Ident i _) _) dst = getVarReg (Ident i) >>= (\r -> return [Mov (Reg dst) (Reg r)])
-transExp (ArrayExpr l@(ArrayElem (AST.Ident i _) es@(e:_) _) _) dst = do
+transExp (ArrayExpr (ArrayElem _ [] _) _) _ = error "accessing array at no indices is semantically incorrect"
+transExp (ArrayExpr l@(ArrayElem (AST.Ident i _) es@(e : _) _) _) dst = do
   lInstrs <- transArrayElem l (IRParam 0)
   eInstrs <- transExp e (IRParam 1)
   wType <- getWType (Ident i)
@@ -93,13 +94,16 @@ transExp ((:&&:) e e' _) dst = do
   endLabel <- nextLabel
   eInstrs <- transExp e dst
   eInstrs' <- transExp e' dst
-  let successCase = [Pop (Reg IRScratch2), 
-                     Pop (Reg IRScratch1), 
-                     Cmp (Reg IRScratch1) (Imm 1), 
-                     Jne failLabel, 
-                     Cmp (Reg IRScratch2) (Imm 1), 
-                     Jne failLabel, 
-                     Mov (Reg dst) (Imm 1), Jmp endLabel]
+  let successCase =
+        [ Pop (Reg IRScratch2),
+          Pop (Reg IRScratch1),
+          Cmp (Reg IRScratch1) (Imm 1),
+          Jne failLabel,
+          Cmp (Reg IRScratch2) (Imm 1),
+          Jne failLabel,
+          Mov (Reg dst) (Imm 1),
+          Jmp endLabel
+        ]
       failCase = [Define failLabel, Mov (Reg dst) (Imm 0)]
       end = [Define endLabel]
   return $ eInstrs ++ [Push (Reg dst)] ++ eInstrs' ++ [Push (Reg dst)] ++ successCase ++ failCase ++ end
@@ -108,13 +112,16 @@ transExp ((:||:) e e' _) dst = do
   endLabel <- nextLabel
   eInstrs <- transExp e dst
   eInstrs' <- transExp e' dst
-  let failCase = [Pop (Reg IRScratch2), 
-                  Pop (Reg IRScratch1), 
-                  Cmp (Reg IRScratch1) (Imm 1), 
-                  Je successLabel, 
-                  Cmp (Reg IRScratch2) (Imm 1), 
-                  Je successLabel, 
-                  Mov (Reg dst) (Imm 0), Jmp endLabel]
+  let failCase =
+        [ Pop (Reg IRScratch2),
+          Pop (Reg IRScratch1),
+          Cmp (Reg IRScratch1) (Imm 1),
+          Je successLabel,
+          Cmp (Reg IRScratch2) (Imm 1),
+          Je successLabel,
+          Mov (Reg dst) (Imm 0),
+          Jmp endLabel
+        ]
       successCase = [Define successLabel, Mov (Reg dst) (Imm 1)]
       end = [Define endLabel]
   return $ eInstrs ++ [Push (Reg dst)] ++ eInstrs' ++ [Push (Reg dst)] ++ failCase ++ successCase ++ end
@@ -139,30 +146,39 @@ transCmpOp cons e e' dst = do
       end = [Define endLabel]
   eInstrs <- transExp e dst
   eInstrs' <- transExp e' dst
-  return $ eInstrs ++ [Push (Reg dst)] ++ eInstrs' ++ [Push (Reg dst), 
-                                                       Pop (Reg IRScratch2), 
-                                                       Pop (Reg IRScratch1), 
-                                                       Cmp (Reg IRScratch1) (Reg IRScratch2), 
-                                                       cons greaterLabel] ++ otherCase ++ greaterCase ++ end
+  return $
+    eInstrs
+      ++ [Push (Reg dst)]
+      ++ eInstrs'
+      ++ [ Push (Reg dst),
+           Pop (Reg IRScratch2),
+           Pop (Reg IRScratch1),
+           Cmp (Reg IRScratch1) (Reg IRScratch2),
+           cons greaterLabel
+         ]
+      ++ otherCase
+      ++ greaterCase
+      ++ end
 
 transArrayElem :: ArrayElem -> IRReg -> IRStatementGenerator IRInstrs
 transArrayElem (ArrayElem (AST.Ident i _) exprs _) dst = do
-  if length exprs > 1 then addHelperFunc ArrLoad else return ()
+  when (length exprs > 1) $ addHelperFunc ArrLoad
   varReg <- getVarReg (Ident i)
   transArrExpr varReg exprs dst
   where
     transArrExpr :: IRReg -> [Expr] -> IRReg -> IRStatementGenerator IRInstrs
-    transArrExpr arrPtr [e]    arrDst = return [Mov (Reg arrDst) (Reg arrPtr)]
-    transArrExpr arrPtr (e:es) arrDst = do 
+    transArrExpr _ [] _ = error "semantically incorrect"
+    transArrExpr arrPtr [_] arrDst = return [Mov (Reg arrDst) (Reg arrPtr)]
+    transArrExpr arrPtr (e : es) arrDst = do
       eDst <- nextFreeReg
       eInstrs <- transExp e eDst
       indexArrayInstrs <- transArrExpr arrDst es arrDst
       _ <- makeRegAvailable eDst
-      return $ eInstrs 
-            ++ [
-                 Mov (Reg $ IRParam 0) (Reg arrPtr),
-                 Mov (Reg $ IRParam 1) (Reg eDst),
-                 Jsr $ showHelperLabel ArrLoad,
-                 Mov (Reg arrDst) (Reg IRRet)
-               ]
-            ++ indexArrayInstrs
+      return $
+        eInstrs
+          ++ [ Mov (Reg $ IRParam 0) (Reg arrPtr),
+               Mov (Reg $ IRParam 1) (Reg eDst),
+               Jsr $ showHelperLabel ArrLoad,
+               Mov (Reg arrDst) (Reg IRRet)
+             ]
+          ++ indexArrayInstrs

@@ -28,22 +28,21 @@ module CodeGeneration.Utils
   )
 where
 
-import Control.Monad.Reader
-import Control.Monad.State
-import Data.Functor ((<&>))
-import Data.Map ((!))
-import qualified Data.Map as M
-import qualified Data.Text as T
-import qualified Data.List as L
-
 import AST hiding (Ident)
 import qualified AST (Ident (Ident))
 import CodeGeneration.Helpers
 import CodeGeneration.IR
-import Semantic.Rename.Scope
+import Control.Monad.Reader
+import Control.Monad.State
+import Data.Functor ((<&>))
+import qualified Data.List as L
+import qualified Data.Map as M
+import qualified Data.Text as T
+import Semantic.Rename.Scope ( ScopeMap )
 import Semantic.Type.SymbolTable (IdentType, SymbolTable, fromIdentType)
 
 type IRStatementGenerator a = StateT Aux (Reader (SymbolTable, ScopeMap)) a
+
 type IRSectionGenerator a = (Reader (SymbolTable, ScopeMap)) a
 
 type LiterTable = M.Map T.Text Label
@@ -68,10 +67,10 @@ addHelperFunc :: HelperFunc -> IRStatementGenerator ()
 addHelperFunc hf = modify (\a@(Aux {helperFuncs = hfs}) -> a {helperFuncs = insertHelperFunc hf hfs})
 
 nextFreeReg :: IRStatementGenerator IRReg
-nextFreeReg = state (\a@Aux {available = (nxt:rst), inUse = rs} -> (nxt, a {available = rst, inUse = nxt:rs}))
+nextFreeReg = state (\a@Aux {available = (nxt : rst), inUse = rs} -> (nxt, a {available = rst, inUse = nxt : rs}))
 
 makeRegAvailable :: IRReg -> IRStatementGenerator ()
-makeRegAvailable r = modify (\a@Aux {available = rs, inUse = rs'} -> a {available = r:rs, inUse = (rs' L.\\ [r])})
+makeRegAvailable r = modify (\a@Aux {available = rs, inUse = rs'} -> a {available = r : rs, inUse = rs' L.\\ [r]})
 
 makeRegsAvailable :: [IRReg] -> IRStatementGenerator ()
 makeRegsAvailable = mapM_ makeRegAvailable
@@ -105,14 +104,17 @@ getWType = (<&> fromIdentType) . getIdentType
 
 (<++>) :: Applicative m => m [a] -> m [a] -> m [a]
 a <++> b = (++) <$> a <*> b
+
 infixr 5 <++>
 
 (++>) :: Applicative m => [a] -> m [a] -> m [a]
 a ++> b = (++) a <$> b
+
 infixr 5 ++>
 
 (<++) :: Applicative m => m [a] -> [a] -> m [a]
-a <++ b = (++) <$> a  <*> pure b
+a <++ b = (++) <$> a <*> pure b
+
 infixr 5 <++
 
 stackTypeSize :: WType -> Int
@@ -141,12 +143,12 @@ exprType (CharLiter _ _) = return WChar
 exprType (StrLiter _ _) = return WStr
 exprType (PairLiter _) = return $ WPair WUnit WUnit
 exprType (IdentExpr (AST.Ident i _) _) = getWType (Ident i)
-exprType (ArrayExpr (ArrayElem (AST.Ident i _) [] _) _) = error "Can't have empty index in ArrayElem"
+exprType (ArrayExpr (ArrayElem _ [] _) _) = error "Can't have empty index in ArrayElem"
 exprType (ArrayExpr (ArrayElem (AST.Ident i _) is _) _) = do
   wType <- getWType (Ident i)
   case wType of
     WArr t dim -> if dim == length is then return t else return $ WArr t (dim - length is)
-    _          -> error "Can't be non-array type"  
+    _ -> error "Can't be non-array type"
 exprType (Not _ _) = return WBool
 exprType (Neg _ _) = return WInt
 exprType (Len _ _) = return WInt
@@ -168,10 +170,9 @@ exprType ((:||:) {}) = return WBool
 
 wrapScope :: Int -> IRInstrs -> IRSectionGenerator IRInstrs
 wrapScope scopeId instrs = do
-  (st, sm) <- ask
+  (_, sm) <- ask
   case M.lookup scopeId sm of
     Nothing -> return instrs
-    Just ids -> do 
-                  -- let stackSize = sum [typeSize (fromIdentType t) | (Just t) <- map ((flip M.lookup) st) ids ] 
-                  let stackSize = 4 * (length ids)
-                  return $ [Sub (Reg IRSP) (Reg IRSP) (Imm stackSize)] ++ instrs ++ [Add (Reg IRSP) (Reg IRSP) (Imm stackSize)]
+    Just ids -> do
+      let stackSize = 4 * length ids
+      return $ [Sub (Reg IRSP) (Reg IRSP) (Imm stackSize)] ++ instrs ++ [Add (Reg IRSP) (Reg IRSP) (Imm stackSize)]

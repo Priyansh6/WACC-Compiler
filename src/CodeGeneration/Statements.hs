@@ -2,18 +2,15 @@
 
 module CodeGeneration.Statements (transStats) where
 
-import Control.Monad
-import Control.Monad.State
-import Control.Monad.Trans
-import Data.Functor ((<&>))
-import Data.Maybe
-
 import AST hiding (Ident)
 import qualified AST (Ident (Ident))
 import CodeGeneration.Expressions (transArrayElem, transExp)
 import CodeGeneration.Helpers
 import CodeGeneration.IR
 import CodeGeneration.Utils
+import Control.Monad ( zipWithM )
+import Control.Monad.State ( gets )
+import Data.Functor ((<&>))
 
 pointerSize :: Int
 pointerSize = 4
@@ -33,7 +30,7 @@ transStat (DecAssign t (AST.Ident i _) r _) = do
 transStat (Assign l@(LIdent (AST.Ident i _)) r _) = do
   varReg <- getVarReg (Ident i)
   withReg (\rReg -> transRVal r rReg <++ [Mov (Reg varReg) (Reg rReg)])
-transStat (Assign l@(LArray (ArrayElem (AST.Ident i _) es@(e:_) _)) r _) = do
+transStat (Assign l@(LArray (ArrayElem (AST.Ident i _) es@(e : _) _)) r _) = do
   lInstrs <- transLVal l (IRParam 0)
   eInstrs <- transExp e (IRParam 1)
   rInstrs <- transRVal r (IRParam 2)
@@ -43,24 +40,51 @@ transStat (Assign l@(LArray (ArrayElem (AST.Ident i _) es@(e:_) _)) r _) = do
       tSize = heapTypeSize accType
       hf = if tSize == 1 then ArrStoreB else ArrStore
   return $ lInstrs ++ eInstrs ++ rInstrs ++ [Jsr (showHelperLabel hf)]
-transStat (Assign l r _) = withReg (\lReg -> withReg (\rReg -> transLVal l lReg <++> transRVal r rReg <++ [Store (Reg rReg) (Ind lReg)]))
+transStat (Assign l r _) =
+  withReg
+    ( \lReg ->
+        withReg (\rReg -> transLVal l lReg <++> transRVal r rReg <++ [Store (Reg rReg) (Ind lReg)])
+    )
 transStat (Read l@(LIdent (AST.Ident i _)) _) = do
   varReg <- getVarReg (Ident i)
   helperFuncType <- lValWType l <&> HRead . fromWType
   addHelperFunc helperFuncType
-  return [Mov (Reg (IRParam 0)) (Reg varReg), Jsr (showHelperLabel helperFuncType), Mov (Reg varReg) (Reg IRRet)]
+  return
+    [ Mov (Reg (IRParam 0)) (Reg varReg),
+      Jsr (showHelperLabel helperFuncType),
+      Mov (Reg varReg) (Reg IRRet)
+    ]
 transStat (Read l _) = do
   helperFuncType <- lValWType l <&> HRead . fromWType
   addHelperFunc helperFuncType
-  withReg (\lReg -> transLVal l lReg <++ [Mov (Reg (IRParam 0)) (Reg lReg), Jsr (showHelperLabel helperFuncType), Mov (Reg lReg) (Reg IRRet)])
+  withReg
+    ( \lReg ->
+        transLVal l lReg
+          <++ [ Mov (Reg (IRParam 0)) (Reg lReg),
+                Jsr (showHelperLabel helperFuncType),
+                Mov (Reg lReg) (Reg IRRet)
+              ]
+    )
 transStat (Free e _) = do
   refReg <- nextFreeReg
   evalRefInstrs <- transExp e refReg
   eType <- exprType e
   makeRegAvailable refReg
   case eType of
-    WPair _ _ -> addHelperFunc FreePair >> evalRefInstrs ++> checkNull refReg <++ [Mov (Reg IRRet) (Reg refReg), Jsr (showHelperLabel FreePair)]
-    WArr _ _ -> addHelperFunc FreeArr >> return (evalRefInstrs ++ [Mov (Reg IRRet) (Reg refReg), Jsr (showHelperLabel FreeArr)])
+    WPair _ _ ->
+      addHelperFunc FreePair
+        >> evalRefInstrs ++> checkNull refReg
+          <++ [ Mov (Reg IRRet) (Reg refReg),
+                Jsr (showHelperLabel FreePair)
+              ]
+    WArr _ _ ->
+      addHelperFunc FreeArr
+        >> return
+          ( evalRefInstrs
+              ++ [ Mov (Reg IRRet) (Reg refReg),
+                   Jsr (showHelperLabel FreeArr)
+                 ]
+          )
     _ -> undefined
 transStat (Return e _) = do
   dst <- nextFreeReg
@@ -74,13 +98,29 @@ transStat (Exit e _) = do
   makeRegAvailable dst
   return $ eis ++ [Mov (Reg $ IRParam 0) (Reg dst), Jsr "exit"]
 transStat (Print e) = do
-  helperFuncType <- HPrint . fromWType <$> exprType e 
-  eInstrs <- withReg (\r -> transExp e r <++ [Mov (Reg (IRParam 0)) (Reg r), Jsr (showHelperLabel helperFuncType), Comment "end of print"])
+  helperFuncType <- HPrint . fromWType <$> exprType e
+  eInstrs <-
+    withReg
+      ( \r ->
+          transExp e r
+            <++ [ Mov (Reg (IRParam 0)) (Reg r),
+                  Jsr (showHelperLabel helperFuncType),
+                  Comment "end of print"
+                ]
+      )
   addHelperFunc helperFuncType
   return eInstrs
 transStat (Println e) = do
-  helperFuncType <- HPrint . fromWType <$> exprType e 
-  eInstrs <- withReg (\r -> transExp e r <++ [Mov (Reg (IRParam 0)) (Reg r), Jsr (showHelperLabel helperFuncType), Jsr (showHelperLabel HPrintln)])
+  helperFuncType <- HPrint . fromWType <$> exprType e
+  eInstrs <-
+    withReg
+      ( \r ->
+          transExp e r
+            <++ [ Mov (Reg (IRParam 0)) (Reg r),
+                  Jsr (showHelperLabel helperFuncType),
+                  Jsr (showHelperLabel HPrintln)
+                ]
+      )
   addHelperFunc helperFuncType
   addHelperFunc HPrintln
   return eInstrs
@@ -112,12 +152,12 @@ transStat (Begin ss _) = transStats ss
 transRVal :: RVal -> IRReg -> IRStatementGenerator IRInstrs
 transRVal (RExpr e) dst = transExp e dst
 transRVal (ArrayLiter [] _) dst = transArrayCreation 0 0 dst
-transRVal (ArrayLiter elems@(e:_) _) dst = do
+transRVal (ArrayLiter elems@(e : _) _) dst = do
   eType <- exprType e
   let eSize = heapTypeSize eType
       helperFunc = if eSize == 1 then ArrStoreB else ArrStore
   addHelperFunc helperFunc
-  transArrayCreation eSize (length elems) dst <++> (concat <$> zipWithM (transArrLiterElem helperFunc) elems [0..])
+  transArrayCreation eSize (length elems) dst <++> (concat <$> zipWithM (transArrLiterElem helperFunc) elems [0 ..])
   where
     transArrLiterElem :: HelperFunc -> Expr -> Int -> IRStatementGenerator IRInstrs
     transArrLiterElem hf e' idx = do
@@ -155,7 +195,7 @@ transRVal (Call (AST.Ident i _) exps _) dst = do
 
     prepareParams :: [Expr] -> Int -> Int -> IRStatementGenerator (IRInstrs, Int)
     prepareParams [] _ stackOff = return ([], stackOff)
-    prepareParams (e:es) paramNum stackOff = do
+    prepareParams (e : es) paramNum stackOff = do
       paramInstrs <- transExp e IRScratch1
       (remainingInstrs, finalStackOff) <- prepareParams es (paramNum - 1) stackOff'
       return (paramInstrs ++ [Push (Reg IRScratch1)] ++ remainingInstrs ++ popInstrs, finalStackOff)
@@ -171,8 +211,16 @@ transLVal _ _ = undefined
 
 -- takes pairElem and puts address of element into dst
 transPair :: PairElem -> IRReg -> IRStatementGenerator IRInstrs
-transPair (Fst (LIdent (AST.Ident i _)) _) dst' = getVarReg (Ident i) >>= (\r -> checkNull r <++ [Load (Reg dst') (Ind r)])
-transPair (Snd (LIdent (AST.Ident i _)) _) dst' = getVarReg (Ident i) >>= (\r -> checkNull r <++ [Load (Reg dst') (ImmOffset r pointerSize)])
+transPair (Fst (LIdent (AST.Ident i _)) _) dst' =
+  getVarReg (Ident i)
+    >>= (\r -> checkNull r <++ [Load (Reg dst') (Ind r)])
+transPair (Snd (LIdent (AST.Ident i _)) _) dst' =
+  getVarReg (Ident i)
+    >>= ( \r ->
+            checkNull r
+              <++ [ Load (Reg dst') (ImmOffset r pointerSize)
+                  ]
+        )
 transPair (Fst (LPair pe') _) dst' = transPair pe' dst' <++> checkNull dst' <++ [Load (Reg dst') (Ind dst')]
 transPair (Snd (LPair pe') _) dst' = transPair pe' dst' <++> checkNull dst' <++ [Load (Reg dst') (ImmOffset dst' pointerSize)]
 transPair (Fst (LArray ae) _) dst' = transArrayElem ae dst' <++> checkNull dst' <++ [Load (Reg dst') (Ind dst')]
@@ -187,10 +235,25 @@ transArrayCreation size len dst = do
   mallocInstrs <- transMallocCall (heapTypeSize WInt + size * len) dst
   makeRegAvailable sizeReg
   addHelperFunc ErrOverflow
-  return $ mallocInstrs ++ [Mov (Reg sizeReg) (Imm len), Store (Reg sizeReg) (Ind dst), Add (Reg dst) (Reg dst) (Imm $ heapTypeSize WInt)]
+  return $
+    mallocInstrs
+      ++ [ Mov (Reg sizeReg) (Imm len),
+           Store (Reg sizeReg) (Ind dst),
+           Add (Reg dst) (Reg dst) (Imm $ heapTypeSize WInt)
+         ]
 
 checkNull :: IRReg -> IRStatementGenerator IRInstrs
-checkNull toCheck = addHelperFunc ErrNull *> (nextLabel <&> (\notNullLabel -> [Cmp (Reg toCheck) (Imm 0), Jge notNullLabel, Jsr (showHelperLabel ErrNull), Define notNullLabel]))
+checkNull toCheck =
+  addHelperFunc ErrNull
+    *> ( nextLabel
+           <&> ( \notNullLabel ->
+                   [ Cmp (Reg toCheck) (Imm 0),
+                     Jge notNullLabel,
+                     Jsr (showHelperLabel ErrNull),
+                     Define notNullLabel
+                   ]
+               )
+       )
 
 lValWType :: LVal -> IRStatementGenerator WType
 lValWType (LIdent (AST.Ident i _)) = getWType (Ident i)
