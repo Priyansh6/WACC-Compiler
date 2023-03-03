@@ -123,7 +123,7 @@ transRVal (NewPair e e' _) dst = do
   eType <- exprType e
   eType' <- exprType e'
   let pType = AST.WPair eType eType'
-      movePointers = [Store (Reg ePtrReg) (ImmOffset dst 0), Store (Reg ePtrReg') (ImmOffset dst (heapTypeSize eType))]
+      movePointers = [Store (Reg ePtrReg) (ImmOffset dst 0), Store (Reg ePtrReg') (ImmOffset dst pointerSize)]
   mallocFst <- transMallocCall (heapTypeSize eType) ePtrReg
   mallocSnd <- transMallocCall (heapTypeSize eType') ePtrReg'
   mallocPair <- transMallocCall (heapTypeSize pType) dst
