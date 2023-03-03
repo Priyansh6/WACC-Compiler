@@ -15,6 +15,9 @@ import CodeGeneration.Helpers
 import CodeGeneration.IR
 import CodeGeneration.Utils
 
+pointerSize :: Int
+pointerSize = 4
+
 transStats :: Stats -> IRStatementGenerator IRInstrs
 transStats ss = concat <$> mapM transStat ss
 
@@ -81,7 +84,7 @@ transStat (If e ss _ ss' _ _) = do
   endLabel <- nextLabel
   let condJumpInstrs = [Cmp (Reg eReg) (Imm 1), Jne branchLabel']
       branchInstrs = [Define branchLabel] ++ ssInstrs ++ [Jmp endLabel]
-      branchInstrs' = [Define branchLabel'] ++ ssInstrs'
+      branchInstrs' = Define branchLabel' : ssInstrs'
   makeRegAvailable eReg
   return $ eInstrs ++ condJumpInstrs ++ branchInstrs ++ branchInstrs' ++ [Define endLabel]
 transStat (While e ss _ _) = do
@@ -120,7 +123,7 @@ transRVal (NewPair e e' _) dst = do
   eType <- exprType e
   eType' <- exprType e'
   let pType = AST.WPair eType eType'
-      movePointers = [Store (Reg ePtrReg) (ImmOffset dst 0), Store (Reg ePtrReg') (ImmOffset dst (heapTypeSize eType))]
+      movePointers = [Store (Reg ePtrReg) (ImmOffset dst 0), Store (Reg ePtrReg') (ImmOffset dst pointerSize)]
   mallocFst <- transMallocCall (heapTypeSize eType) ePtrReg
   mallocSnd <- transMallocCall (heapTypeSize eType') ePtrReg'
   mallocPair <- transMallocCall (heapTypeSize pType) dst
@@ -159,14 +162,11 @@ transLVal _ _ = undefined
 -- takes pairElem and puts address of element into dst
 transPair :: PairElem -> IRReg -> IRStatementGenerator IRInstrs
 transPair (Fst (LIdent (AST.Ident i _)) _) dst' = getVarReg (Ident i) >>= (\r -> checkNull r <++ [Load (Reg dst') (Ind r)])
+transPair (Snd (LIdent (AST.Ident i _)) _) dst' = getVarReg (Ident i) >>= (\r -> checkNull r <++ [Load (Reg dst') (ImmOffset r pointerSize)])
 transPair (Fst (LPair pe') _) dst' = transPair pe' dst' <++> checkNull dst' <++ [Load (Reg dst') (Ind dst')]
+transPair (Snd (LPair pe') _) dst' = transPair pe' dst' <++> checkNull dst' <++ [Load (Reg dst') (ImmOffset dst' pointerSize)]
 transPair (Fst (LArray ae) _) dst' = transArrayElem ae dst' <++> checkNull dst' <++ [Load (Reg dst') (Ind dst')]
-transPair (Snd (LIdent (AST.Ident i _)) _) dst' = do
-  varReg <- getVarReg (Ident i) 
-  aType <- getWType (Ident i)
-  checkNull varReg <++ [Load (Reg dst') (ImmOffset varReg (heapTypeSize aType))]
-transPair (Snd (LPair pe') _) dst' = transPair pe' dst' <++> checkNull dst' <++ [Load (Reg dst') (ImmOffset dst' (heapTypeSize WUnit))]
-transPair (Snd (LArray ae) _) dst' = transArrayElem ae dst' <++> checkNull dst' <++ [Load (Reg dst') (ImmOffset dst' (heapTypeSize WUnit))]
+transPair (Snd (LArray ae) _) dst' = transArrayElem ae dst' <++> checkNull dst' <++ [Load (Reg dst') (ImmOffset dst' pointerSize)]
 
 transMallocCall :: Int -> IRReg -> IRStatementGenerator IRInstrs
 transMallocCall size dst = return [Mov (Reg (IRParam 0)) (Imm size), Jsr "malloc", Mov (Reg dst) (Reg IRRet)]

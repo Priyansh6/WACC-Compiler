@@ -131,6 +131,7 @@ heapTypeSize WBool = 1
 heapTypeSize WChar = 1
 heapTypeSize WStr = 4
 heapTypeSize (WArr _ _) = 4
+heapTypeSize (WPair WUnit WUnit) = 4
 heapTypeSize (WPair _ _) = 8
 
 exprType :: Expr -> IRStatementGenerator WType
@@ -138,7 +139,7 @@ exprType (IntLiter _ _) = return WInt
 exprType (BoolLiter _ _) = return WBool
 exprType (CharLiter _ _) = return WChar
 exprType (StrLiter _ _) = return WStr
-exprType (PairLiter _) = return WUnit
+exprType (PairLiter _) = return $ WPair WUnit WUnit
 exprType (IdentExpr (AST.Ident i _) _) = getWType (Ident i)
 exprType (ArrayExpr (ArrayElem (AST.Ident i _) [] _) _) = error "Can't have empty index in ArrayElem"
 exprType (ArrayExpr (ArrayElem (AST.Ident i _) is _) _) = do
