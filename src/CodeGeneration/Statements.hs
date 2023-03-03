@@ -129,10 +129,25 @@ transRVal (NewPair e e' _) dst = do
   makeRegsAvailable [eReg, eReg', ePtrReg, ePtrReg']
   return $ evalFstInstrs ++ evalSndInstrs ++ mallocPair ++ movePointers ++ [Comment "end of newpair"]
 transRVal (RPair pe) dst = transPair pe dst <++ [Load (Reg dst) (Ind dst)]
-transRVal (Call (AST.Ident i _) es _) dst = do
-  movParamInstrs <- concat <$> zipWithM transExp es [IRParam x | x <- [0..]]
-  regsInUse <- gets inUse
-  return $ movParamInstrs ++ [Jsr i, Mov (Reg dst) (Reg IRRet)] 
+transRVal (Call (AST.Ident i _) exps _) dst = do
+  usedRs <- gets inUse
+  let paramsInUse = [irp | irp@(IRParam _) <- usedRs]
+      pushParams = if null paramsInUse then [] else [Push (Regs paramsInUse)]
+      popParams = if null paramsInUse then [] else [Pop (Regs paramsInUse)]
+  (preparedParams, sOff) <- prepareParams (reverse exps) (numParams - 1) 0
+  return $ pushParams ++ preparedParams ++ [Jsr i, Mov (Reg dst) (Reg IRRet), Add (Reg IRSP) (Reg IRSP) (Imm sOff)] ++ popParams
+  where
+    numParams = length exps
+
+    prepareParams :: [Expr] -> Int -> Int -> IRStatementGenerator (IRInstrs, Int)
+    prepareParams [] _ stackOff = return ([], stackOff)
+    prepareParams (e:es) paramNum stackOff = do
+      paramInstrs <- transExp e IRScratch1
+      (remainingInstrs, finalStackOff) <- prepareParams es (paramNum - 1) stackOff'
+      return (paramInstrs ++ [Push (Reg IRScratch1)] ++ remainingInstrs ++ popInstrs, finalStackOff)
+      where
+        popInstrs = if paramNum >= numParamRegs then [] else [Pop (Regs [IRParam paramNum])]
+        stackOff' = if paramNum >= numParamRegs then stackOff + 4 else stackOff
 
 -- Puts the address (which we will load into later) into dst
 transLVal :: LVal -> IRReg -> IRStatementGenerator IRInstrs

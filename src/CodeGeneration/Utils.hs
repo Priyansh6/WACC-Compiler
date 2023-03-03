@@ -5,6 +5,8 @@ module CodeGeneration.Utils
     IRSectionGenerator,
     IRStatementGenerator,
     LiterTable,
+    numParamRegs,
+    numGeneralRegs,
     addHelperFunc,
     exprType,
     getIdentType,
@@ -55,6 +57,12 @@ data Aux = Aux
     literTable :: LiterTable,
     helperFuncs :: HelperFuncs
   }
+
+numParamRegs :: Int
+numParamRegs = 4
+
+numGeneralRegs :: Int
+numGeneralRegs = 4
 
 addHelperFunc :: HelperFunc -> IRStatementGenerator ()
 addHelperFunc hf = modify (\a@(Aux {helperFuncs = hfs}) -> a {helperFuncs = insertHelperFunc hf hfs})

@@ -38,6 +38,9 @@ initAux = Aux {
     regLocs = M.empty
   }
 
+allRegs :: ArmRegs
+allRegs = S.fromList [R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, FP, R12, SP, LR, PC]
+
 generalRegs :: ArmRegs
 generalRegs = S.fromList [R4, R5, R6, R7]
 
@@ -63,10 +66,15 @@ transSection :: Section IRReg -> ArmTranslator (Section ArmReg)
 transSection (Section d (Body label global instrs)) = do
   section <- concat <$> mapM transAndAddMemoryInstrs instrs
   fpOff <- gets nextFPOffset
-  rs <- gets regsAvailable
-  let usedRs = S.toList $ regsInUse rs
-      (pushes, pops) = if null usedRs then ([], []) else ([Push (Regs usedRs)], [Pop (Regs usedRs)])
-  return (Section d (Body label global ([Push (Regs [FP, LR])] ++ pushes ++ [Mov (Reg FP) (Reg SP), Add (Reg SP) (Reg SP) (Imm fpOff)] ++ section ++ [Sub (Reg SP) (Reg SP) (Imm fpOff)] ++ pops ++ [Pop (Regs [FP, PC])])))
+  return $ Section d (Body label global ( [
+                                            Push (Regs [FP, LR]), 
+                                            Push (Regs (S.toList generalRegs)), 
+                                            Mov (Reg FP) (Reg SP), 
+                                            Add (Reg SP) (Reg SP) (Imm (fpOff + 4))] 
+                                       ++ section 
+                                       ++ [ Sub (Reg SP) (Reg SP) (Imm (fpOff + 4)), 
+                                            Pop (Regs (S.toList generalRegs)),
+                                            Pop (Regs [FP, PC])]))
 
 transAndAddMemoryInstrs :: Instr IRReg -> ArmTranslator ArmInstrs
 transAndAddMemoryInstrs instr = do
@@ -123,7 +131,7 @@ transInstr (Comment c) = return $ Comment c
 
 transOperand :: Operand IRReg -> Bool -> ArmMemoryAllocator (Operand ArmReg)
 transOperand (Reg r) isDst = Reg <$> transIRReg r isDst
-transOperand (Regs rs) isDst = Regs <$> mapM (flip transIRReg isDst) rs
+transOperand (Regs rs) isDst = Regs . filter (`S.member` allRegs) <$> mapM (flip transIRReg isDst) rs
 transOperand (Ind r) _ = Ind <$> transIRReg r False
 transOperand (ImmOffset r offset) _ = flip ImmOffset offset <$> transIRReg r False
 transOperand (Imm i) _ = return $ Imm i
