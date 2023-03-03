@@ -62,6 +62,7 @@ showOps = T.intercalate ", " . map showOp
 
 showOp :: Operand ArmReg -> T.Text
 showOp (Reg r) = T.toLower (T.pack (show r))
+showOp (Regs []) = error "Expected a non-empty list of registers"
 showOp (Regs rs) = T.intercalate ", " (map (showOp . Reg) rs)
 showOp (Imm i) = "#" <> T.pack (show i)
 showOp (Abs i) = "=" <> i
