@@ -43,7 +43,16 @@ transExp (PairLiter _) dst
   where
     nullptr = Imm 0
 transExp (IdentExpr (AST.Ident i _) _) dst = getVarReg (Ident i) >>= (\r -> return [Mov (Reg dst) (Reg r)])
-transExp (ArrayExpr ae _) dst = transArrayElem ae dst
+transExp (ArrayExpr l@(ArrayElem (AST.Ident i _) es@(e:_) _) _) dst = do
+  lInstrs <- transArrayElem l (IRParam 0)
+  eInstrs <- transExp e (IRParam 1)
+  wType <- getWType (Ident i)
+  let (WArr t dim) = wType
+      accType = if dim == length es then t else WArr t (dim - length es)
+      tSize = heapTypeSize accType
+      hf = if tSize == 1 then ArrLoadB else ArrLoad
+  addHelperFunc hf
+  return $ lInstrs ++ eInstrs ++ [Jsr (showHelperLabel hf), Mov (Reg dst) (Reg IRRet)]
 transExp (Not e _) dst = do
   trueLabel <- nextLabel
   endLabel <- nextLabel
@@ -120,13 +129,22 @@ transCmpOp cons e e' dst = do
 
 transArrayElem :: ArrayElem -> IRReg -> IRStatementGenerator IRInstrs
 transArrayElem (ArrayElem (AST.Ident i _) exprs _) dst = do
-  eType <- getWType (Ident i)
-  let helperFunc = if heapTypeSize eType == 1 then ArrLoadB else ArrLoad
-  addHelperFunc helperFunc
+  if length exprs > 1 then addHelperFunc ArrLoad else return ()
   varReg <- getVarReg (Ident i)
-  concat <$> mapM (transArrExpr varReg helperFunc) exprs
+  transArrExpr varReg exprs dst
   where
-    transArrExpr :: IRReg -> HelperFunc -> Expr -> IRStatementGenerator IRInstrs
-    transArrExpr varReg' hf e = transExp e dst <++ [Mov (Reg $ IRParam 0) (Reg varReg'), 
-                                                   Mov (Reg $ IRParam 1) (Reg dst), 
-                                                   Jsr $ showHelperLabel hf, Mov (Reg dst) (Reg IRRet)]
+    transArrExpr :: IRReg -> [Expr] -> IRReg -> IRStatementGenerator IRInstrs
+    transArrExpr arrPtr [e]    arrDst = return [Mov (Reg arrDst) (Reg arrPtr)]
+    transArrExpr arrPtr (e:es) arrDst = do 
+      eDst <- nextFreeReg
+      eInstrs <- transExp e eDst
+      indexArrayInstrs <- transArrExpr arrDst es arrDst
+      _ <- makeRegAvailable eDst
+      return $ eInstrs 
+            ++ [
+                 Mov (Reg $ IRParam 0) (Reg arrPtr),
+                 Mov (Reg $ IRParam 1) (Reg eDst),
+                 Jsr $ showHelperLabel ArrLoad,
+                 Mov (Reg arrDst) (Reg IRRet)
+               ]
+            ++ indexArrayInstrs

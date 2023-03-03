@@ -30,6 +30,16 @@ transStat (DecAssign t (AST.Ident i _) r _) = do
 transStat (Assign l@(LIdent (AST.Ident i _)) r _) = do
   varReg <- getVarReg (Ident i)
   withReg (\rReg -> transRVal r rReg <++ [Mov (Reg varReg) (Reg rReg)])
+transStat (Assign l@(LArray (ArrayElem (AST.Ident i _) es@(e:_) _)) r _) = do
+  lInstrs <- transLVal l (IRParam 0)
+  eInstrs <- transExp e (IRParam 1)
+  rInstrs <- transRVal r (IRParam 2)
+  wType <- getWType (Ident i)
+  let (WArr t dim) = wType
+      accType = if dim == length es then t else WArr t (dim - length es)
+      tSize = heapTypeSize accType
+      hf = if tSize == 1 then ArrStoreB else ArrStore
+  return $ lInstrs ++ eInstrs ++ rInstrs ++ [Jsr (showHelperLabel hf)]
 transStat (Assign l r _) = withReg (\lReg -> withReg (\rReg -> transLVal l lReg <++> transRVal r rReg <++ [Store (Reg rReg) (Ind lReg)]))
 transStat (Read l@(LIdent (AST.Ident i _)) _) = do
   varReg <- getVarReg (Ident i)
@@ -151,8 +161,8 @@ transRVal (Call (AST.Ident i _) exps _) dst = do
 
 -- Puts the address (which we will load into later) into dst
 transLVal :: LVal -> IRReg -> IRStatementGenerator IRInstrs
-transLVal (LPair pe) dst = withReg (\r -> transPair pe r <++ [Mov (Reg dst) (Reg r)])
-transLVal (LArray ae) dst = withReg (\r -> transArrayElem ae r <++ [Mov (Reg dst) (Reg r)])
+transLVal (LPair pe) dst = transPair pe dst
+transLVal (LArray ae) dst = transArrayElem ae dst
 transLVal _ _ = undefined
 
 -- takes pairElem and puts address of element into dst
