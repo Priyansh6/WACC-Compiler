@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module CodeGeneration.Intermediate.IR (module CodeGeneration.Intermediate.IR) where
+-- Defining the intermediate representation's instructions --
 
 import qualified Data.Map as M
 import qualified Data.Text as T

@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module CodeGeneration.Intermediate.Helpers (module CodeGeneration.Intermediate.Helpers) where
+-- Generating helper functions to handle errors and IO --
 
 import AST ( WType(..) )
 import CodeGeneration.Intermediate.IR
@@ -13,6 +14,9 @@ intSize = 4
 
 maxRegSize :: Int
 maxRegSize = 4
+
+runtimeError :: Int
+runtimeError = 255
 
 type HelperFuncs = S.Set HelperFunc
 
@@ -44,8 +48,8 @@ fromWType (WArr WChar _) = HString
 fromWType (WArr _ _) = HPointer
 fromWType (WPair _ _) = HPointer
 
-dependencyMap :: M.Map HelperFunc [HelperFunc]
-dependencyMap =
+getHelperDependencies :: M.Map HelperFunc [HelperFunc]
+getHelperDependencies =
   M.fromList
     [ (FreePair, [ErrNull]),
       (ArrStore, [BoundsCheck]),
@@ -64,10 +68,7 @@ insertHelperFunc hf hfs
   | hf `S.member` hfs = hfs
   | otherwise = foldr insertHelperFunc (S.insert hf hfs) hfDependencies
   where
-    hfDependencies = M.findWithDefault [] hf dependencyMap
-
-errorCode :: Int
-errorCode = 255
+    hfDependencies = M.findWithDefault [] hf getHelperDependencies
 
 printfLabel, putsLabel, fflushLabel, scanfLabel, exitLabel, freeLabel :: Label
 printfLabel = "printf"
@@ -177,9 +178,7 @@ generateHelperFunc hf@(HRead hType) =
     )
   where
     strLabel = showStrLabel hf 0
-    spaceIfChar = case hType of
-      HChar -> " "
-      _ -> ""
+    spaceIfChar = if hType == HChar then " " else ""
 generateHelperFunc FreePair =
   Section
     []
@@ -233,7 +232,7 @@ generateHelperFunc hf
         ( Body (showHelperLabel hf) False $
             [Load (Reg (IRParam 0)) (Abs errStrLabel)]
               ++ errInstrs
-              ++ [ Mov (Reg (IRParam 0)) (Imm errorCode),
+              ++ [ Mov (Reg (IRParam 0)) (Imm runtimeError),
                    Jsr exitLabel
                  ]
         )

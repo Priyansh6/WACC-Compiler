@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module CodeGeneration.ARM.Registers (ArmInstr, ArmInstrs, ArmReg (..), transProg, overflowReg) where
+-- Convert IR to ARM / Allocate ARM registers from an intermediate respresentation --
 
 import AST (WType (WInt))
 import CodeGeneration.Intermediate.Helpers (HelperFunc (..), showHelperLabel)

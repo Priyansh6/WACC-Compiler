@@ -21,6 +21,7 @@ import System.Exit
 import System.FilePath ( takeBaseName )
 import Text.Megaparsec
 
+syntaxError, semanticError :: ExitCode
 syntaxError = ExitFailure 100
 semanticError = ExitFailure 200
 

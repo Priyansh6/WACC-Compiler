@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module CodeGeneration.Intermediate.Statements (transStats) where
+-- Translate statements from the AST into Intermediate instructions --
 
 import AST hiding (Ident)
 import qualified AST (Ident (Ident))
@@ -12,6 +13,7 @@ import Control.Monad ( zipWithM )
 import Control.Monad.State ( gets )
 import Data.Functor ((<&>))
 
+mallocLabel :: Label
 mallocLabel = "malloc"
 
 pointerSize :: Int
@@ -22,14 +24,14 @@ transStats ss = concat <$> mapM transStat ss
 
 transStat :: Stat -> IRStatementGenerator IRInstrs
 transStat Skip = return []
-transStat (DecAssign t (AST.Ident i _) r _) = do
+transStat (DecAssign _ (AST.Ident i _) r _) = do
   varReg <- nextFreeReg
   rReg <- nextFreeReg
   rInstrs <- transRVal r rReg
   makeRegAvailable rReg
   insertVarReg (Ident i) varReg
   return $ rInstrs ++ [Mov (Reg varReg) (Reg rReg)]
-transStat (Assign l@(LIdent (AST.Ident i _)) r _) = do
+transStat (Assign (LIdent (AST.Ident i _)) r _) = do
   varReg <- getVarReg (Ident i)
   withReg (\rReg -> transRVal r rReg <++ [Mov (Reg varReg) (Reg rReg)])
 transStat (Assign l@(LArray (ArrayElem (AST.Ident i _) es@(e : _) _)) r _) = do

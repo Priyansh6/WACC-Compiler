@@ -1,14 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module CodeGeneration.Intermediate.Program (transProg) where
+-- Translate an AST program into an intermediate program with sections --
 
 import qualified AST
-import CodeGeneration.Intermediate.Data ( generateDataSection )
+import CodeGeneration.Intermediate.Data (generateDataSection)
 import CodeGeneration.Intermediate.Helpers (HelperFunc (ErrOverflow), HelperFuncs, generateHelperFuncs, insertHelperFunc)
 import CodeGeneration.Intermediate.IR
 import CodeGeneration.Intermediate.Statements (transStats)
 import CodeGeneration.Utils (Aux (..), IRSectionGenerator, numGeneralRegs, numParamRegs)
-import Control.Monad.State ( StateT(runStateT), mapAndUnzipM )
+import Control.Monad.State (StateT (runStateT), mapAndUnzipM)
 import qualified Data.Map as M
 import qualified Data.Set as S
 
@@ -19,7 +20,9 @@ transProg :: AST.Program -> IRSectionGenerator (Program IRReg)
 transProg (AST.Program fs ss) = do
   (mainSection, hfs) <- transMain ss
   (otherSections, hfs') <- mapAndUnzipM transFunc fs
-  return $ otherSections ++ [mainSection] ++ generateHelperFuncs (S.union (insertHelperFunc ErrOverflow hfs) (S.unions hfs'))
+  -- we generate the helper funcs needed for our intermediate representation,
+  --    including the ones used to change the frame pointer
+  return $ mainSection : otherSections ++ generateHelperFuncs (S.union (insertHelperFunc ErrOverflow hfs) (S.unions hfs'))
 
 transMain :: AST.Stats -> IRSectionGenerator (Section IRReg, HelperFuncs)
 transMain ss = do
@@ -62,7 +65,17 @@ transFunc (AST.Func _ (AST.Ident name _) params ss scopeId _) = do
             inUse = map TmpReg [0 .. numParams - 1]
           }
       )
-  return (Section dataSection (Body name False (registerParamMoves ++ stackParamLoads ++ bodyInstrs ++ [Define (name <> "_return")])), helperFuncs aux)
-
-wrapSectionBody :: IRInstrs -> IRInstrs
-wrapSectionBody ss = [Push (Regs [IRFP, IRLR]), Mov (Reg IRFP) (Reg IRSP)] ++ ss ++ [Pop (Regs [IRFP, IRPC])]
+  return
+    ( Section
+        dataSection
+        ( Body
+            name
+            False
+            ( registerParamMoves
+                ++ stackParamLoads
+                ++ bodyInstrs
+                ++ [Define (name <> "_return")]
+            )
+        ),
+      helperFuncs aux
+    )

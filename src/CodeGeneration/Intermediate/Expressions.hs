@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module CodeGeneration.Intermediate.Expressions (transExp, transArrayElem) where
+-- Translate the AST's expressions into intermediate instructions --
 
 import AST hiding (Ident)
 import qualified AST (Ident (Ident))
@@ -18,7 +19,7 @@ import CodeGeneration.Utils
     nextLabel,
     (<++),
   )
-import Control.Monad.State ( when, gets )
+import Control.Monad.State (gets, when)
 import Data.Char (ord)
 import qualified Data.Map as M
 import qualified Data.Text as T
@@ -28,7 +29,11 @@ type NumInstrCons a = Operand a -> Operand a -> Operand a -> Instr a
 type BranchInstrCons a = Label -> Instr a
 
 transExp :: Expr -> IRReg -> IRStatementGenerator IRInstrs
-transExp (IntLiter x _) dst = return [Load (Reg IRScratch1) (Abs $ T.pack $ show x), Mov (Reg dst) (Reg IRScratch1)]
+transExp (IntLiter x _) dst =
+  return
+    [ Load (Reg IRScratch1) (Abs $ T.pack $ show x),
+      Mov (Reg dst) (Reg IRScratch1)
+    ]
 transExp (BoolLiter True _) dst =
   return [Mov (Reg dst) true]
   where
@@ -134,8 +139,11 @@ transNumOp cons e e' dst = do
     eInstrs
       ++ [Push (Reg dst)]
       ++ eInstrs'
-      ++ [Push (Reg dst)]
-      ++ [Pop (Reg IRScratch2), Pop (Reg IRScratch1), cons (Reg dst) (Reg IRScratch1) (Reg IRScratch2)]
+      ++ [ Push (Reg dst),
+           Pop (Reg IRScratch2),
+           Pop (Reg IRScratch1),
+           cons (Reg dst) (Reg IRScratch1) (Reg IRScratch2)
+         ]
 
 transCmpOp :: BranchInstrCons IRReg -> Expr -> Expr -> IRReg -> IRStatementGenerator IRInstrs
 transCmpOp cons e e' dst = do

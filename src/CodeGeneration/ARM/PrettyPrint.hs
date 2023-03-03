@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module CodeGeneration.ARM.PrettyPrint (showArm) where
+-- Output the ARM representation as text to write to a new file --
 
 import CodeGeneration.ARM.Registers (ArmInstr, ArmReg, overflowReg)
 import CodeGeneration.Intermediate.IR
