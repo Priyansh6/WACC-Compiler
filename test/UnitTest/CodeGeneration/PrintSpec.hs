@@ -4,7 +4,7 @@ module UnitTest.CodeGeneration.PrintSpec (spec) where
 
 import CodeGeneration.ARM.PrettyPrint
 import CodeGeneration.ARM.Registers
-import CodeGeneration.IR
+import CodeGeneration.Intermediate.IR
 import qualified Data.Text as T
 import Test.Hspec
 

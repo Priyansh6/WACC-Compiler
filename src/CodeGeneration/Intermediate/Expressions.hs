@@ -1,11 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module CodeGeneration.Expressions (transExp, transArrayElem) where
+module CodeGeneration.Intermediate.Expressions (transExp, transArrayElem) where
 
 import AST hiding (Ident)
 import qualified AST (Ident (Ident))
-import CodeGeneration.Helpers (HelperFunc (..), showHelperLabel)
-import CodeGeneration.IR
+import CodeGeneration.Intermediate.Helpers (HelperFunc (..), showHelperLabel)
+import CodeGeneration.Intermediate.IR
 import CodeGeneration.Utils
   ( Aux (..),
     IRStatementGenerator,

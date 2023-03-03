@@ -1,12 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module CodeGeneration.Program (transProg) where
+module CodeGeneration.Intermediate.Program (transProg) where
 
 import qualified AST
-import CodeGeneration.DataSection ( generateDataSection )
-import CodeGeneration.Helpers (HelperFunc (ErrOverflow), HelperFuncs, generateHelperFuncs, insertHelperFunc)
-import CodeGeneration.IR
-import CodeGeneration.Statements (transStats)
+import CodeGeneration.Intermediate.Data ( generateDataSection )
+import CodeGeneration.Intermediate.Helpers (HelperFunc (ErrOverflow), HelperFuncs, generateHelperFuncs, insertHelperFunc)
+import CodeGeneration.Intermediate.IR
+import CodeGeneration.Intermediate.Statements (transStats)
 import CodeGeneration.Utils (Aux (..), IRSectionGenerator, numGeneralRegs, numParamRegs)
 import Control.Monad.State ( StateT(runStateT), mapAndUnzipM )
 import qualified Data.Map as M

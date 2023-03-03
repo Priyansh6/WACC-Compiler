@@ -3,7 +3,7 @@
 module CodeGeneration.ARM.PrettyPrint (showArm) where
 
 import CodeGeneration.ARM.Registers (ArmInstr, ArmReg, overflowReg)
-import CodeGeneration.IR hiding (showBody, showData, showIndentedInstr, showInstr, showOp, showOps, showSection)
+import CodeGeneration.Intermediate.IR
 import qualified Data.Text as T
 
 showArm :: Program ArmReg -> T.Text
@@ -42,10 +42,10 @@ showInstr (Mul rd rm rs) = "smull " <> showOps [rd, Reg overflowReg, rm, rs]
 showInstr (Div {}) = error "div instruction not supported in ARM"
 showInstr (Mod {}) = error "mod instruction not supported in ARM"
 showInstr (Cmp rn o2) = "cmp " <> showOps [rn, o2]
-showInstr (Jmp l) = "b " <> l
 showInstr (Jsr l) = "bl " <> l
-showInstr (JsrVS l) = "blvs " <> l
+showInstr (JsrOverflow l) = "blvs " <> l
 showInstr (JsrNE l) = "blne " <> l
+showInstr (Jmp l) = "b " <> l
 showInstr (Je l) = "beq " <> l
 showInstr (Jne l) = "bne " <> l
 showInstr (Jl l) = "blt " <> l

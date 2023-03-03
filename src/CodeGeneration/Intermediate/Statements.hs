@@ -1,16 +1,18 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module CodeGeneration.Statements (transStats) where
+module CodeGeneration.Intermediate.Statements (transStats) where
 
 import AST hiding (Ident)
 import qualified AST (Ident (Ident))
-import CodeGeneration.Expressions (transArrayElem, transExp)
-import CodeGeneration.Helpers
-import CodeGeneration.IR
+import CodeGeneration.Intermediate.Expressions (transArrayElem, transExp)
+import CodeGeneration.Intermediate.Helpers
+import CodeGeneration.Intermediate.IR
 import CodeGeneration.Utils
 import Control.Monad ( zipWithM )
 import Control.Monad.State ( gets )
 import Data.Functor ((<&>))
+
+mallocLabel = "malloc"
 
 pointerSize :: Int
 pointerSize = 4
@@ -227,7 +229,7 @@ transPair (Fst (LArray ae) _) dst' = transArrayElem ae dst' <++> checkNull dst' 
 transPair (Snd (LArray ae) _) dst' = transArrayElem ae dst' <++> checkNull dst' <++ [Load (Reg dst') (ImmOffset dst' pointerSize)]
 
 transMallocCall :: Int -> IRReg -> IRStatementGenerator IRInstrs
-transMallocCall size dst = return [Mov (Reg (IRParam 0)) (Imm size), Jsr "malloc", Mov (Reg dst) (Reg IRRet)]
+transMallocCall size dst = return [Mov (Reg (IRParam 0)) (Imm size), Jsr mallocLabel, Mov (Reg dst) (Reg IRRet)]
 
 transArrayCreation :: Int -> Int -> IRReg -> IRStatementGenerator IRInstrs
 transArrayCreation size len dst = do

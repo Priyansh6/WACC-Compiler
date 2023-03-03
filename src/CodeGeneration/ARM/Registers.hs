@@ -3,8 +3,8 @@
 module CodeGeneration.ARM.Registers (ArmInstr, ArmInstrs, ArmReg (..), transProg, overflowReg) where
 
 import AST (WType (WInt))
-import CodeGeneration.Helpers (HelperFunc (..), showHelperLabel)
-import CodeGeneration.IR
+import CodeGeneration.Intermediate.Helpers (HelperFunc (..), showHelperLabel)
+import CodeGeneration.Intermediate.IR
 import CodeGeneration.Utils (heapTypeSize)
 import Control.Monad.State
 import Control.Monad.Writer
@@ -111,8 +111,8 @@ transAndAddMemoryInstrs instr = do
         Cmp (Reg overflowReg) (ASR o1 (8 * heapTypeSize WInt - 1)),
         JsrNE $ showHelperLabel ErrOverflow
       ]
-    transHandleErrors s@(Sub {}) = s : [JsrVS $ showHelperLabel ErrOverflow]
-    transHandleErrors s@(Add {}) = s : [JsrVS $ showHelperLabel ErrOverflow]
+    transHandleErrors s@(Sub {}) = s : [JsrOverflow $ showHelperLabel ErrOverflow]
+    transHandleErrors s@(Add {}) = s : [JsrOverflow $ showHelperLabel ErrOverflow]
     transHandleErrors i = [i]
 
 transInstr :: Instr IRReg -> ArmMemoryAllocator ArmInstr
@@ -128,7 +128,7 @@ transInstr (Div o1 o2 o3) = Div <$> transOperand o1 True <*> transOperand o2 Fal
 transInstr (Mod o1 o2 o3) = Mod <$> transOperand o1 True <*> transOperand o2 False <*> transOperand o3 False
 transInstr (Cmp o1 o2) = Cmp <$> transOperand o1 False <*> transOperand o2 False
 transInstr (Jsr l) = return $ Jsr l
-transInstr (JsrVS l) = return $ JsrVS l
+transInstr (JsrOverflow l) = return $ JsrOverflow l
 transInstr (JsrNE l) = return $ JsrNE l
 transInstr (Push o) = Push <$> transOperand o False
 transInstr (Pop o) = Pop <$> transOperand o True

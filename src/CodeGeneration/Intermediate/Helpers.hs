@@ -1,9 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module CodeGeneration.Helpers (module CodeGeneration.Helpers) where
+module CodeGeneration.Intermediate.Helpers (module CodeGeneration.Intermediate.Helpers) where
 
 import AST ( WType(..) )
-import CodeGeneration.IR
+import CodeGeneration.Intermediate.IR
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Text as T

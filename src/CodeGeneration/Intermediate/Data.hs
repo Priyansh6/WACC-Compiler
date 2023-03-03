@@ -1,9 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module CodeGeneration.DataSection (generateDataSection) where
+module CodeGeneration.Intermediate.Data (generateDataSection) where
 
 import AST
-import CodeGeneration.IR
+import CodeGeneration.Intermediate.IR
 import CodeGeneration.Utils (LiterTable)
 import Control.Monad.State
 import qualified Data.Map as M

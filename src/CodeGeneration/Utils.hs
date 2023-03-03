@@ -30,8 +30,8 @@ where
 
 import AST hiding (Ident)
 import qualified AST (Ident (Ident))
-import CodeGeneration.Helpers
-import CodeGeneration.IR
+import CodeGeneration.Intermediate.Helpers
+import CodeGeneration.Intermediate.IR
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.Functor ((<&>))

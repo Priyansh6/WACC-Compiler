@@ -4,8 +4,8 @@ module Main (main) where
 
 import qualified Lexer as L
 import CodeGeneration.ARM.PrettyPrint (showArm)
-import CodeGeneration.ARM.Registers (transProg)
-import CodeGeneration.Program (transProg)
+import qualified CodeGeneration.ARM.Registers as ARM (transProg)
+import qualified CodeGeneration.Intermediate.Program as IR
 import Syntax.Program (program)
 import Semantic.Errors (printSemanticErrors)
 import Semantic.Rename.Program (rename)
@@ -21,6 +21,9 @@ import System.Exit
 import System.FilePath ( takeBaseName )
 import Text.Megaparsec
 
+syntaxError = ExitFailure 100
+semanticError = ExitFailure 200
+
 main :: IO ()
 main = do 
   (fname:_) <- getArgs
@@ -29,12 +32,12 @@ main = do
   case res of
     Left err -> do
       putStrLn (errorBundlePretty err)
-      exitWith (ExitFailure 100)
+      exitWith syntaxError
     Right ast -> case rename ast of
       ((scopeMap, []), renamedAST) -> case runExcept $ execStateT (checkProg renamedAST) M.empty of
-        Left err -> printSemanticErrors [err] contents fname >> exitWith (ExitFailure 200)
+        Left err -> printSemanticErrors [err] contents fname >> exitWith semanticError
         Right symbolTable -> do
-          let irProg = runReader (CodeGeneration.Program.transProg renamedAST) (symbolTable, scopeMap)
-          let armProg = CodeGeneration.ARM.Registers.transProg irProg
+          let irProg = runReader (IR.transProg renamedAST) (symbolTable, scopeMap)
+          let armProg = ARM.transProg irProg
           TIO.writeFile (takeBaseName fname ++ ".s") (showArm armProg) >> exitSuccess
-      ((_, errs), _) -> printSemanticErrors errs contents fname >> exitWith (ExitFailure 200)
+      ((_, errs), _) -> printSemanticErrors errs contents fname >> exitWith semanticError
