@@ -2,15 +2,12 @@
 
 module CodeGeneration.Program (transProg) where
 
-import Debug.Trace
-
 import CodeGeneration.IR 
 import CodeGeneration.Statements (transStats)
 import CodeGeneration.DataSection
-import CodeGeneration.Helpers (generateHelperFuncs, HelperFuncs)
-import CodeGeneration.Utils (IRSectionGenerator, Aux(..), wrapScope, numParamRegs, numGeneralRegs)
+import CodeGeneration.Helpers (generateHelperFuncs, HelperFuncs, HelperFunc (ErrOverflow), insertHelperFunc)
+import CodeGeneration.Utils (IRSectionGenerator, Aux(..), numParamRegs, numGeneralRegs)
 import Control.Monad.State
-import Data.Maybe
 
 import qualified AST
 import qualified Data.Map as M
@@ -22,8 +19,8 @@ firstParamStackAccess = (numGeneralRegs + 2) * 4 -- offset of first stack param 
 transProg :: AST.Program -> IRSectionGenerator (Program IRReg)
 transProg (AST.Program fs ss) = do
   (mainSection, hfs) <- transMain ss
-  (otherSections, hfs') <- unzip <$> mapM transFunc fs
-  return $ otherSections ++ [mainSection] ++ generateHelperFuncs (S.union hfs (S.unions hfs'))
+  (otherSections, hfs') <- mapAndUnzipM transFunc fs
+  return $ otherSections ++ [mainSection] ++ generateHelperFuncs (S.union (insertHelperFunc ErrOverflow hfs) (S.unions hfs'))
 
 transMain :: AST.Stats -> IRSectionGenerator (Section IRReg, HelperFuncs)
 transMain ss = do 
@@ -36,7 +33,7 @@ transMain ss = do
                                                         sectionName = name, 
                                                         literTable = lt, 
                                                         helperFuncs = S.empty, 
-                                                        inUse = [] }) 
+                                                        inUse = [] })
   case bodyInstrs of 
     [] -> return (Section dataSection (Body name True [Mov (Reg IRRet) (Imm 0)]), helperFuncs aux)
     _ -> return (Section dataSection (Body name True (bodyInstrs ++ [Mov (Reg IRRet) (Imm 0)])), helperFuncs aux)
