@@ -132,9 +132,10 @@ transRVal (RPair pe) dst = transPair pe dst <++ [Load (Reg dst) (Ind dst)]
 transRVal (Call (AST.Ident i _) exps _) dst = do
   usedRs <- gets inUse
   let paramsInUse = [irp | irp@(IRParam _) <- usedRs]
-      pushParams = if null paramsInUse then [] else [Push (Regs paramsInUse)]
-      popParams = if null paramsInUse then [] else [Pop (Regs paramsInUse)]
+      pushParams = [Push (Regs paramsInUse) | not (null paramsInUse)]
+      popParams = [Pop (Regs paramsInUse) | not (null paramsInUse)]
   (preparedParams, sOff) <- prepareParams (reverse exps) (numParams - 1) 0
+  addHelperFunc ErrOverflow
   return $ pushParams ++ preparedParams ++ [Jsr i, Mov (Reg dst) (Reg IRRet), Add (Reg IRSP) (Reg IRSP) (Imm sOff)] ++ popParams
   where
     numParams = length exps
@@ -146,7 +147,7 @@ transRVal (Call (AST.Ident i _) exps _) dst = do
       (remainingInstrs, finalStackOff) <- prepareParams es (paramNum - 1) stackOff'
       return (paramInstrs ++ [Push (Reg IRScratch1)] ++ remainingInstrs ++ popInstrs, finalStackOff)
       where
-        popInstrs = if paramNum >= numParamRegs then [] else [Pop (Regs [IRParam paramNum])]
+        popInstrs = [Pop (Regs [IRParam paramNum]) | paramNum < numParamRegs]
         stackOff' = if paramNum >= numParamRegs then stackOff + 4 else stackOff
 
 -- Puts the address (which we will load into later) into dst
@@ -175,6 +176,7 @@ transArrayCreation size len dst = do
   sizeReg <- nextFreeReg
   mallocInstrs <- transMallocCall (heapTypeSize WInt + size * len) dst
   makeRegAvailable sizeReg
+  addHelperFunc ErrOverflow
   return $ mallocInstrs ++ [Mov (Reg sizeReg) (Imm len), Store (Reg sizeReg) (Ind dst), Add (Reg dst) (Reg dst) (Imm $ heapTypeSize WInt)]
 
 checkNull :: IRReg -> IRStatementGenerator IRInstrs

@@ -37,6 +37,8 @@ data Instr a
   | Cmp (Operand a) (Operand a)
   | Jmp Label -- Jump to generic label
   | Jsr Label -- Jump to subroutine (updates LR)
+  | JsrVS Label -- Jump to subroutine if overflow (updates LR)
+  | JsrNE Label -- Jump to subroutine if overflow (updates LR)
   | Je Label
   | Jne Label
   | Jl Label
@@ -58,6 +60,7 @@ data Operand a
   | Abs Label
   | Ind a -- register indirect
   | ImmOffset a Int -- for addressing mode 2
+  | ASR a Int -- for arithmetic shifting right
   deriving (Show, Eq)
 
 type FPOffsets = M.Map Ident Int
@@ -101,6 +104,8 @@ showInstr (Mod {}) = "@ TODO - mod"
 showInstr (Cmp rn o2) = "cmp " <> showOps [rn, o2]
 showInstr (Jmp l) = "b " <> l
 showInstr (Jsr l) = "bl " <> l
+showInstr (JsrVS l) = "blvs " <> l
+showInstr (JsrNE l) = "blne " <> l
 showInstr (Je l) = "beq " <> l
 showInstr (Jne l) = "bne " <> l
 showInstr (Jl l) = "blt " <> l
@@ -122,3 +127,4 @@ showOp (Imm i) = "#" <> T.pack (show i)
 showOp (Abs i) = "=" <> i
 showOp (Ind r) = "[" <> showOp (Reg r) <> "]"
 showOp (ImmOffset r i) = "[" <> showOp (Reg r) <> ", " <> showOp (Imm i) <> "]"
+showOp (ASR r i) = showOp (Reg r) <> " asr " <> showOp (Imm i)

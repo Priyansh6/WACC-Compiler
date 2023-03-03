@@ -1,16 +1,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module CodeGeneration.ARM.Registers (ArmInstr, ArmInstrs, ArmReg (..), transProg) where
+module CodeGeneration.ARM.Registers (ArmInstr, ArmInstrs, ArmReg (..), transProg, overflowReg) where
 
 import CodeGeneration.Helpers (HelperFunc (..), showHelperLabel)
 import CodeGeneration.IR
+import CodeGeneration.Utils (heapTypeSize)
 
 import Control.Monad.State
 import Control.Monad.Writer
 import Data.Map ((!))
-
 import qualified Data.Map as M
 import qualified Data.Set as S
+import AST (WType(WInt))
 
 type ArmInstr = Instr ArmReg
 type ArmInstrs = [ArmInstr]
@@ -38,20 +39,15 @@ initAux = Aux {
     regLocs = M.empty
   }
 
-allRegs :: ArmRegs
+allRegs, generalRegs, paramRegs, scratchRegs :: ArmRegs
 allRegs = S.fromList [R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, FP, R12, SP, LR, PC]
-
-generalRegs :: ArmRegs
 generalRegs = S.fromList [R4, R5, R6, R7]
-
-paramRegs :: ArmRegs
 paramRegs = S.fromList [R0, R1, R2, R3]
-
-scratchRegs :: ArmRegs
 scratchRegs = S.fromList [R8, R10, R12]
 
-retReg :: ArmReg
+retReg, overflowReg :: ArmReg
 retReg = R0
+overflowReg = R9
 
 regsInUse :: ArmRegs -> ArmRegs
 regsInUse available = generalRegs S.\\ available
@@ -79,30 +75,35 @@ transSection (Section d (Body label global instrs)) = do
 transAndAddMemoryInstrs :: Instr IRReg -> ArmTranslator ArmInstrs
 transAndAddMemoryInstrs instr = do
   (translatedInstr, (prefixInstrs, suffixInstrs, rs)) <- runWriterT (transInstr instr)
-  _ <- mapM makeScratchAvailable $ S.toList rs
-  let translatedInstrs = transDivMod translatedInstr
+  mapM_ makeScratchAvailable $ S.toList rs
+  let translatedInstrs = transHandleErrors translatedInstr
   return $ prefixInstrs ++ translatedInstrs ++ suffixInstrs
   where
-    transDivMod :: ArmInstr -> ArmInstrs
-    transDivMod (Div o1 o2 o3)
-      = [
-        Mov (Reg R0) o2, 
-        Mov (Reg R1) o3, 
-        Cmp (Reg R1) (Imm 0), 
+    transHandleErrors :: ArmInstr -> ArmInstrs
+    transHandleErrors (Div o1 o2 o3) =
+      [ Mov (Reg R0) o2,
+        Mov (Reg R1) o3,
+        Cmp (Reg R1) (Imm 0),
         Je (showHelperLabel ErrDivZero),
         Jsr divModLabel,
         Mov o1 (Reg R0)
       ]
-    transDivMod (Mod o1 o2 o3)
-      = [
-        Mov (Reg R0) o2, 
-        Mov (Reg R1) o3, 
-        Cmp (Reg R1) (Imm 0), 
+    transHandleErrors (Mod o1 o2 o3) =
+      [ Mov (Reg R0) o2,
+        Mov (Reg R1) o3,
+        Cmp (Reg R1) (Imm 0),
         Je (showHelperLabel ErrDivZero),
         Jsr divModLabel,
         Mov o1 (Reg R1)
       ]
-    transDivMod i = [i]
+    transHandleErrors m@(Mul (Reg o1) _ _) =
+      [ m,
+        Cmp (Reg overflowReg) (ASR o1 (8 * heapTypeSize WInt - 1)),
+        JsrNE $ showHelperLabel ErrOverflow
+      ]
+    transHandleErrors s@(Sub {}) = s:[JsrVS $ showHelperLabel ErrOverflow]
+    transHandleErrors s@(Add {}) = s:[JsrVS $ showHelperLabel ErrOverflow]
+    transHandleErrors i = [i]
 
 transInstr :: Instr IRReg -> ArmMemoryAllocator ArmInstr
 transInstr (Load o1 o2) = Load <$> transOperand o1 True <*> transOperand o2 False
@@ -117,6 +118,8 @@ transInstr (Div o1 o2 o3) = Div <$> transOperand o1 True <*> transOperand o2 Fal
 transInstr (Mod o1 o2 o3) = Mod <$> transOperand o1 True <*> transOperand o2 False <*> transOperand o3 False
 transInstr (Cmp o1 o2) = Cmp <$> transOperand o1 False <*> transOperand o2 False
 transInstr (Jsr l) = return $ Jsr l
+transInstr (JsrVS l) = return $ JsrVS l
+transInstr (JsrNE l) = return $ JsrNE l
 transInstr (Push o) = Push <$> transOperand o False
 transInstr (Pop o) = Pop <$> transOperand o True
 transInstr (Jmp l) = return $ Jmp l
@@ -136,6 +139,7 @@ transOperand (Ind r) _ = Ind <$> transIRReg r False
 transOperand (ImmOffset r offset) _ = flip ImmOffset offset <$> transIRReg r False
 transOperand (Imm i) _ = return $ Imm i
 transOperand (Abs l) _ = return $ Abs l
+transOperand (ASR r offset) _ = transIRReg r False >>= (\r' -> return (ASR r' offset))
 
 transIRReg :: IRReg -> Bool -> ArmMemoryAllocator ArmReg
 transIRReg tr@(TmpReg _) isDst = allocateRegLoc tr generalRegs >> transDynamicReg tr isDst

@@ -55,7 +55,9 @@ dependencyMap = M.fromList
     (ArrLoadB, [BoundsCheck]),
     (ErrDivZero, [HPrint HString]),
     (ErrOverflow, [HPrint HString]),
-    (ErrNull, [HPrint HString])
+    (ErrNull, [HPrint HString]),
+    (HRead HInt, [ErrOverflow]),
+    (HRead HChar, [ErrOverflow])
   ]
 
 insertHelperFunc :: HelperFunc -> HelperFuncs -> HelperFuncs

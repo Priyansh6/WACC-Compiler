@@ -22,12 +22,13 @@ import Data.Char (ord)
 
 import qualified AST (Ident(Ident))
 import qualified Data.Map as M
+import qualified Data.Text as T
 
 type NumInstrCons a = Operand a -> Operand a -> Operand a -> Instr a
 type BranchInstrCons a = Label -> Instr a
 
 transExp :: Expr -> IRReg -> IRStatementGenerator IRInstrs
-transExp (IntLiter x _) dst = return [Mov (Reg dst) (Imm (fromIntegral x))]
+transExp (IntLiter x _) dst = return [Load (Reg IRScratch1) (Abs $ T.pack $ show x), Mov (Reg dst) (Reg IRScratch1)]
 transExp (BoolLiter True _) dst
   = return [Mov (Reg dst) true]
   where
@@ -48,18 +49,30 @@ transExp (Not e _) dst = do
   trueLabel <- nextLabel
   endLabel <- nextLabel
   exprInstrs <- transExp e dst
-  return $ exprInstrs ++ [Cmp (Reg dst) (Imm 1), Je trueLabel, Mov (Reg dst) (Imm 1), Jmp endLabel, Define trueLabel, Mov (Reg dst) (Imm 0), Define endLabel]
-transExp (Neg e _) dst = do
-  exprInstrs <- transExp e dst
-  return $ exprInstrs ++ [Mov (Reg IRScratch1) (Imm 0), Sub (Reg dst) (Reg IRScratch1) (Reg dst)]
+  return $
+    exprInstrs
+      ++ [ Cmp (Reg dst) (Imm 1),
+           Je trueLabel,
+           Mov (Reg dst) (Imm 1),
+           Jmp endLabel,
+           Define trueLabel,
+           Mov (Reg dst) (Imm 0),
+           Define endLabel
+         ]
+transExp (Neg e _) dst =
+  addHelperFunc ErrOverflow
+    >> transExp e dst
+      <++ [ Mov (Reg IRScratch1) (Imm 0),
+            Sub (Reg dst) (Reg IRScratch1) (Reg dst)
+          ]
 transExp (Len e _) dst = transExp e dst <++ [Load (Reg dst) (ImmOffset dst (-(heapTypeSize WInt)))]
 transExp (Ord e _) dst = transExp e dst
 transExp (Chr e _) dst = transExp e dst
-transExp ((:*:) e e' _) dst = transNumOp Mul e e' dst
+transExp ((:*:) e e' _) dst = addHelperFunc ErrOverflow >> transNumOp Mul e e' dst
+transExp ((:+:) e e' _) dst = addHelperFunc ErrOverflow >> transNumOp Add e e' dst
+transExp ((:-:) e e' _) dst = addHelperFunc ErrOverflow >> transNumOp Sub e e' dst
 transExp ((:/:) e e' _) dst = addHelperFunc ErrDivZero >> transNumOp Div e e' dst
 transExp ((:%:) e e' _) dst = addHelperFunc ErrDivZero >> transNumOp Mod e e' dst
-transExp ((:+:) e e' _) dst = transNumOp Add e e' dst
-transExp ((:-:) e e' _) dst = transNumOp Sub e e' dst
 transExp ((:>:) e e' _) dst = transCmpOp Jg e e' dst
 transExp ((:>=:) e e' _) dst = transCmpOp Jge e e' dst
 transExp ((:<:) e e' _) dst = transCmpOp Jl e e' dst
@@ -101,7 +114,12 @@ transNumOp :: NumInstrCons IRReg -> Expr -> Expr -> IRReg -> IRStatementGenerato
 transNumOp cons e e' dst = do
   eInstrs <- transExp e dst
   eInstrs' <- transExp e' dst
-  return $ eInstrs ++ [Push (Reg dst)] ++ eInstrs' ++ [Push (Reg dst)] ++ [Pop (Reg IRScratch2), Pop (Reg IRScratch1), cons (Reg dst) (Reg IRScratch1) (Reg IRScratch2)]
+  return $
+    eInstrs
+      ++ [Push (Reg dst)]
+      ++ eInstrs'
+      ++ [Push (Reg dst)]
+      ++ [Pop (Reg IRScratch2), Pop (Reg IRScratch1), cons (Reg dst) (Reg IRScratch1) (Reg IRScratch2)]
 
 transCmpOp :: BranchInstrCons IRReg -> Expr -> Expr -> IRReg -> IRStatementGenerator IRInstrs
 transCmpOp cons e e' dst = do

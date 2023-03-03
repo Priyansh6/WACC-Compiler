@@ -1,19 +1,22 @@
 # view each test's stdout and/or stderr
 VIEW_STDOUT = 0
-VIEW_STDERR = 1
+VIEW_STDERR = 0
 
 # specify any test paths to run any tests on
 TESTS = [
 	 "invalid",
-	 "valid/IO",
 	 "valid/advanced",
 	 "valid/array",
 	 "valid/basic",
 	 "valid/expressions",
 	 "valid/function",
 	 "valid/if",
+	 "valid/IO",
 	 "valid/pairs",
-	 "valid/runtimeErr",
+	 "valid/runtimeErr/arrayOutOfBounds",
+	 "valid/runtimeErr/divideByZero",
+	 "valid/runtimeErr/integerOverflow",
+	#  "valid/runtimeErr/nullDereference",
 	#  "valid/scope",
 	 "valid/sequence",
 	 "valid/variables",
@@ -22,15 +25,19 @@ TESTS = [
 # specify any test paths in test/integration to test emulation on
 # WARNING: if qemu not found, it uses the slow refEmulate
 QEMU_TESTS = [
-	"valid/IO",
-	"valid/basic",
-	"valid/sequence",
-	"valid/variables",
-	"valid/while",
-	"valid/expressions",
-	"valid/if",
-	"valid/function/nested_functions"
-]
+	#  "valid/advanced",
+	#  "valid/array",
+	 "valid/basic",
+	 "valid/expressions",
+	 "valid/function",
+	 "valid/if",
+	 "valid/IO",
+	#  "valid/pairs",
+	 "valid/runtimeErr",
+	#  "valid/scope",
+	 "valid/sequence",
+	 "valid/variables",
+	 "valid/while"]
 TIMEOUT_DURATION = 2 # seconds
 
 ################################################################################

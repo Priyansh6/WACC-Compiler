@@ -59,8 +59,8 @@ spec = do
         [ ".text",
           ".global main",
           "main:",
-          "\tadd r0, r8, r9",
-          "\tmul r0, r9, r4"
+          "\tadds r0, r8, r9",
+          "\tsmull r0, r9, r9, r4"
         ]
 
   it "pushes and pops" $
