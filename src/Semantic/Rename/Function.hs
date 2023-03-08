@@ -3,7 +3,7 @@ module Semantic.Rename.Function where
 import qualified Data.List as L
 
 import AST
-import Semantic.Rename.Helpers
+import Semantic.Rename.Utils
 import Semantic.Rename.Scope
 import Semantic.Rename.Statement
 

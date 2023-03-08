@@ -6,7 +6,7 @@ import qualified Data.Map as M
 import AST
 import Semantic.Errors
 import Semantic.Rename.Function (renameFunc)
-import Semantic.Rename.Helpers
+import Semantic.Rename.Utils
 import Semantic.Rename.Scope
 import Semantic.Rename.Statement (renameStat)
 

@@ -28,8 +28,7 @@ checkRVal (NewPair e1 e2 _) = do
   return $ WPair wtype1' wtype2'
 checkRVal (RPair pairElem) = checkPairElemType pairElem
 checkRVal (Call ident exprs pos) = do
-  st <- get
-  let identType = st ! ident
+  identType <- gets (! ident)
   case identType of
     FuncType funcType paramIdents -> do
       exprTypes <- mapM checkExprType exprs

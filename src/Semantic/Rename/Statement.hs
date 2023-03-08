@@ -5,7 +5,7 @@ import qualified Data.Map as M
 
 import AST
 import Semantic.Errors
-import Semantic.Rename.Helpers
+import Semantic.Rename.Utils
 import Semantic.Rename.RLValExpr
 import Semantic.Rename.Scope
 
@@ -42,15 +42,3 @@ renameStat scopeAccum (While expr stats _ pos) =
       (scopeAccum, While)
 renameStat scopeAccum (Begin stats _) =
   (chainResetScope scopeAccum . chainAddScope . chainNewScope (L.mapAccumL renameStat) stats) (scopeAccum, Begin)
-
-renameUndeclaredIdent :: ScopeAccum -> Ident -> (ScopeAccum, Ident)
-renameUndeclaredIdent scopeAccum name =
-  (scopeAccum'', name'')
-  where
-    s = getCurrentScope scopeAccum
-    scopeAccum' = scopeAccum {scopeMap = M.insert s (name' : getScopedVars scopeAccum s) (scopeMap scopeAccum)}
-    (scopeAccum'', name'') =
-      if name' `L.elem` getScopedVars scopeAccum s
-        then (scopeAccum {errors = VariableAlreadyDefined name : errors scopeAccum}, name)
-        else (scopeAccum', name')
-    name' = addScopeToIdent s name

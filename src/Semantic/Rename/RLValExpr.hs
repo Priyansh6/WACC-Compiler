@@ -1,64 +1,67 @@
-module Semantic.Rename.RLValExpr where 
+module Semantic.Rename.RLValExpr (module Semantic.Rename.RLValExpr) where 
 
-import qualified Data.List as L
-import Data.Maybe
+import Data.Bool
 
 import AST
 import Semantic.Errors
-import Semantic.Rename.Helpers
-import Semantic.Rename.Scope
+import Semantic.Rename.Utils
 
-renameLVal :: ScopeAccum -> LVal -> (ScopeAccum, LVal)
-renameLVal scopeAccum (LIdent i) = chain renameDeclaredIdent i (scopeAccum, LIdent)
-renameLVal scopeAccum (LArray arrayElem) = chain renameArrayElem arrayElem (scopeAccum, LArray)
-renameLVal scopeAccum (LPair pairElem) = chain renamePairElem pairElem (scopeAccum, LPair)
+renameLVal :: LVal -> Renamer LVal
+renameLVal (LIdent i) = LIdent <$> renameDeclaredIdent i
+renameLVal (LArray arrayElem) = LArray <$> renameArrayElem arrayElem
+renameLVal (LPair pairElem) = LPair <$> renamePairElem pairElem
 
-renameRVal :: ScopeAccum -> RVal -> (ScopeAccum, RVal)
-renameRVal scopeAccum (RExpr expr) = chain renameExpr expr (scopeAccum, RExpr)
-renameRVal scopeAccum (ArrayLiter exprs pos) = mapSndFunc pos $ chain (L.mapAccumL renameExpr) exprs (scopeAccum, ArrayLiter)
-renameRVal scopeAccum (NewPair expr1 expr2 pos) =
-  mapSndFunc pos $ (chain renameExpr expr2 . chain renameExpr expr1) (scopeAccum, NewPair)
-renameRVal scopeAccum (RPair pairElem) = chain renamePairElem pairElem (scopeAccum, RPair)
-renameRVal scopeAccum (Call name exprs pos) =
-  mapSndFunc pos $ chain (L.mapAccumL renameExpr) exprs (scopeAccum', Call name)
-  where
-    scopeAccum' =
-      if name `L.elem` getScopedVars scopeAccum 0
-        then scopeAccum
-        else scopeAccum {errors = FunctionNotDefined name : errors scopeAccum}
+renameRVal :: RVal -> Renamer RVal
+renameRVal (RExpr expr) = RExpr <$> renameExpr expr
+renameRVal (ArrayLiter exprs pos) = ArrayLiter <$> mapM renameExpr exprs <*> return pos
+renameRVal (NewPair expr1 expr2 pos) = NewPair <$> renameExpr expr1 <*> renameExpr expr2 <*> return pos
+renameRVal (RPair pairElem) = RPair <$> renamePairElem pairElem
+renameRVal (Call name exprs pos) = do
+  identInScope 0 name >>= bool (return ()) (addSemanticError $ FunctionNotDefined name)
+  Call <$> return name <*> mapM renameExpr exprs <*> return pos
 
-renameExpr :: ScopeAccum -> Expr -> (ScopeAccum, Expr)
-renameExpr scopeAccum (IdentExpr i pos) = mapSndFunc pos $ chain renameDeclaredIdent i (scopeAccum, IdentExpr)
-renameExpr scopeAccum (ArrayExpr arrayElem pos) = mapSndFunc pos $ chain renameArrayElem arrayElem (scopeAccum, ArrayExpr)
-renameExpr scopeAccum (Not expr pos) = mapSndFunc pos $ chain renameExpr expr (scopeAccum, Not)
-renameExpr scopeAccum (Neg expr pos) = mapSndFunc pos $ chain renameExpr expr (scopeAccum, Neg)
-renameExpr scopeAccum (Len expr pos) = mapSndFunc pos $ chain renameExpr expr (scopeAccum, Len)
-renameExpr scopeAccum (Ord expr pos) = mapSndFunc pos $ chain renameExpr expr (scopeAccum, Ord)
-renameExpr scopeAccum (Chr expr pos) = mapSndFunc pos $ chain renameExpr expr (scopeAccum, Chr)
-renameExpr scopeAccum expr
-  | isLiteralExpr expr = (scopeAccum, expr)
-  | otherwise = mapSndFunc pos $ (chain renameExpr expr2 . chain renameExpr expr1) (scopeAccum, constructor)
-  where
-    (constructor, expr1, expr2, pos) = unpackBinExpr expr
+renameExpr :: Expr -> Renamer Expr
+renameExpr (IdentExpr i pos) = IdentExpr <$> renameDeclaredIdent i <*> return pos
+renameExpr (ArrayExpr arrayElem pos) = ArrayExpr <$> renameArrayElem arrayElem <*> return pos
+renameExpr (Not expr pos) = Not <$> renameExpr expr <*> return pos
+renameExpr (Neg expr pos) = Neg <$> renameExpr expr <*> return pos
+renameExpr (Len expr pos) = Len <$> renameExpr expr <*> return pos
+renameExpr (Ord expr pos) = Ord <$> renameExpr expr <*> return pos
+renameExpr (Chr expr pos) = Chr <$> renameExpr expr <*> return pos
+renameExpr ((:*:) expr1 expr2 pos) = (:*:) <$> renameExpr expr1 <*> renameExpr expr2 <*> return pos
+renameExpr ((:/:) expr1 expr2 pos) = (:/:) <$> renameExpr expr1 <*> renameExpr expr2 <*> return pos
+renameExpr ((:%:) expr1 expr2 pos) = (:%:) <$> renameExpr expr1 <*> renameExpr expr2 <*> return pos
+renameExpr ((:+:) expr1 expr2 pos) = (:+:) <$> renameExpr expr1 <*> renameExpr expr2 <*> return pos
+renameExpr ((:-:) expr1 expr2 pos) = (:-:) <$> renameExpr expr1 <*> renameExpr expr2 <*> return pos
+renameExpr ((:>:) expr1 expr2 pos) = (:>:) <$> renameExpr expr1 <*> renameExpr expr2 <*> return pos
+renameExpr ((:>=:) expr1 expr2 pos) = (:>=:) <$> renameExpr expr1 <*> renameExpr expr2 <*> return pos
+renameExpr ((:<:) expr1 expr2 pos) = (:<:) <$> renameExpr expr1 <*> renameExpr expr2 <*> return pos
+renameExpr ((:<=:) expr1 expr2 pos) = (:<=:) <$> renameExpr expr1 <*> renameExpr expr2 <*> return pos
+renameExpr ((:==:) expr1 expr2 pos) = (:==:) <$> renameExpr expr1 <*> renameExpr expr2 <*> return pos
+renameExpr ((:!=:) expr1 expr2 pos) = (:!=:) <$> renameExpr expr1 <*> renameExpr expr2 <*> return pos
+renameExpr ((:&&:) expr1 expr2 pos) = (:&&:) <$> renameExpr expr1 <*> renameExpr expr2 <*> return pos
+renameExpr ((:||:) expr1 expr2 pos) = (:||:) <$> renameExpr expr1 <*> renameExpr expr2 <*> return pos
+renameExpr expr = return expr
 
-renameArrayElem :: ScopeAccum -> ArrayElem -> (ScopeAccum, ArrayElem)
-renameArrayElem scopeAccum (ArrayElem i exprs pos) =
-  mapSndFunc pos $ (chain (L.mapAccumL renameExpr) exprs . chain renameDeclaredIdent i) (scopeAccum, ArrayElem)
+renameArrayElem :: ArrayElem -> Renamer ArrayElem
+renameArrayElem (ArrayElem i exprs pos) = ArrayElem <$> renameDeclaredIdent i <*> mapM renameExpr exprs <*> return pos
 
-renamePairElem :: ScopeAccum -> PairElem -> (ScopeAccum, PairElem)
-renamePairElem scopeAccum (Fst lVal pos) = mapSndFunc pos $ chain renameLVal lVal (scopeAccum, Fst)
-renamePairElem scopeAccum (Snd lVal pos) = mapSndFunc pos $ chain renameLVal lVal (scopeAccum, Snd)
+renamePairElem :: PairElem -> Renamer PairElem
+renamePairElem (Fst lVal pos) = Fst <$> renameLVal lVal <*> return pos
+renamePairElem (Snd lVal pos) = Snd <$> renameLVal lVal <*> return pos
 
-renameDeclaredIdent :: ScopeAccum -> Ident -> (ScopeAccum, Ident)
-renameDeclaredIdent scopeAccum name =
-  (scopeAccum', fromMaybe name name')
-  where
-    name' = findInScopeStack (scopeStack scopeAccum) name
-    scopeAccum' = if isNothing name' then scopeAccum {errors = VariableNotDefined name : errors scopeAccum} else scopeAccum
-    findInScopeStack :: [Int] -> Ident -> Maybe Ident
-    findInScopeStack [] _ = Nothing
-    findInScopeStack (scope : scopes) ident
-      | ident' `L.elem` getScopedVars scopeAccum scope = Just ident'
-      | otherwise = findInScopeStack scopes ident
-      where
-        ident' = addScopeToIdent scope ident
+renameDeclaredIdent :: Ident -> Renamer Ident
+renameDeclaredIdent name = do
+  s <- getCurrentScope
+  let name' = addScopeToIdent s name
+  identInScopeStack name' >>= bool 
+    (addSemanticError (VariableNotDefined name) >> return name) 
+    (return name')
+
+renameUndeclaredIdent :: Ident -> Renamer Ident
+renameUndeclaredIdent name = do
+  s <- getCurrentScope
+  let name' = addScopeToIdent s name
+  identInScope s name' >>= bool 
+    (insertIdentInScopeMap s name' >> return name')
+    (addSemanticError (VariableAlreadyDefined name) >> return name)
