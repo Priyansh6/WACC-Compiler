@@ -1,44 +1,29 @@
-module Semantic.Rename.Statement where
-
-import qualified Data.List as L
-import qualified Data.Map as M
+module Semantic.Rename.Statement (renameStat) where
 
 import AST
-import Semantic.Errors
 import Semantic.Rename.Utils
 import Semantic.Rename.RLValExpr
-import Semantic.Rename.Scope
 
-renameStat :: ScopeAccum -> Stat -> (ScopeAccum, Stat)
-renameStat scopeAccum Skip = (scopeAccum, Skip)
-renameStat scopeAccum (DecAssign t ident rVal pos) =
-  mapSndFunc pos $ (chain renameUndeclaredIdent ident . chain renameRVal rVal) (scopeAccum, flip (DecAssign t))
-renameStat scopeAccum (Assign lVal rVal pos) =
-  mapSndFunc pos $ (chain renameLVal lVal . chain renameRVal rVal) (scopeAccum, flip Assign)
-renameStat scopeAccum (Read lVal pos) = mapSndFunc pos $ chain renameLVal lVal (scopeAccum, Read)
-renameStat scopeAccum (Free expr pos) = mapSndFunc pos $ chain renameExpr expr (scopeAccum, Free)
-renameStat scopeAccum (Return expr pos) = mapSndFunc pos $ chain renameExpr expr (scopeAccum, Return)
-renameStat scopeAccum (Exit expr pos) = mapSndFunc pos $ chain renameExpr expr (scopeAccum, Exit)
-renameStat scopeAccum (Print expr) = chain renameExpr expr (scopeAccum, Print)
-renameStat scopeAccum (Println expr) = chain renameExpr expr (scopeAccum, Println)
-renameStat scopeAccum (If expr stats1 _ stats2 _ pos) =
-  mapSndFunc pos $
-    ( chainResetScope scopeAccum
-        . chainAddScope
-        . chainNewScope (L.mapAccumL renameStat) stats2
-        . chainResetScope scopeAccum
-        . chainAddScope
-        . chainNewScope (L.mapAccumL renameStat) stats1
-        . chain renameExpr expr
-    )
-      (scopeAccum, If)
-renameStat scopeAccum (While expr stats _ pos) =
-  mapSndFunc pos $
-    ( chainResetScope scopeAccum
-        . chainAddScope
-        . chainNewScope (L.mapAccumL renameStat) stats
-        . chain renameExpr expr
-    )
-      (scopeAccum, While)
-renameStat scopeAccum (Begin stats _) =
-  (chainResetScope scopeAccum . chainAddScope . chainNewScope (L.mapAccumL renameStat) stats) (scopeAccum, Begin)
+renameStat :: Stat -> Renamer Stat
+renameStat Skip = return Skip
+renameStat (DecAssign t i rVal pos) = flip (DecAssign t) <$> renameRVal rVal <*> renameUndeclaredIdent i <*> return pos
+renameStat (Assign lVal rVal pos) = flip Assign <$> renameRVal rVal <*> renameLVal lVal <*> return pos
+renameStat (Read lVal pos) = Read <$> renameLVal lVal <*> return pos
+renameStat (Free expr pos) = Free <$> renameExpr expr <*> return pos
+renameStat (Return expr pos) = Return <$> renameExpr expr <*> return pos
+renameStat (Exit expr pos) = Exit <$> renameExpr expr <*> return pos
+renameStat (Print expr) = Print <$> renameExpr expr
+renameStat (Println expr) = Println <$> renameExpr expr
+renameStat (If expr stats1 _ stats2 _ pos) = do
+  expr' <- renameExpr expr
+  s1 <- nextFreeScope
+  stats1' <- prepareNewScope $ mapM renameStat stats1
+  s2 <- nextFreeScope
+  stats2' <- prepareNewScope $ mapM renameStat stats2
+  return $ If expr' stats1' (Just s1) stats2' (Just s2) pos
+renameStat (While expr stats _ pos) = do
+  expr' <- renameExpr expr
+  s <- nextFreeScope
+  stats' <- prepareNewScope $ mapM renameStat stats
+  return $ While expr' stats' (Just s) pos
+renameStat (Begin stats _) = flip Begin <$> (Just <$> nextFreeScope) <*> prepareNewScope (mapM renameStat stats)

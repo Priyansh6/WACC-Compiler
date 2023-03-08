@@ -38,7 +38,7 @@ import Data.Functor ((<&>))
 import qualified Data.List as L
 import qualified Data.Map as M
 import qualified Data.Text as T
-import Semantic.Rename.Scope ( ScopeMap )
+import Semantic.Rename.Utils ( ScopeMap )
 import Semantic.Type.SymbolTable (IdentType, SymbolTable, fromIdentType)
 
 type IRStatementGenerator a = StateT Aux (Reader (SymbolTable, ScopeMap)) a

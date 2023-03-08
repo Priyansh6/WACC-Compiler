@@ -17,7 +17,7 @@ renameRVal (ArrayLiter exprs pos) = ArrayLiter <$> mapM renameExpr exprs <*> ret
 renameRVal (NewPair expr1 expr2 pos) = NewPair <$> renameExpr expr1 <*> renameExpr expr2 <*> return pos
 renameRVal (RPair pairElem) = RPair <$> renamePairElem pairElem
 renameRVal (Call name exprs pos) = do
-  identInScope 0 name >>= bool (return ()) (addSemanticError $ FunctionNotDefined name)
+  identInScope 0 name >>= bool (addSemanticError $ FunctionNotDefined name) (return ())
   Call <$> return name <*> mapM renameExpr exprs <*> return pos
 
 renameExpr :: Expr -> Renamer Expr
@@ -63,5 +63,5 @@ renameUndeclaredIdent name = do
   s <- getCurrentScope
   let name' = addScopeToIdent s name
   identInScope s name' >>= bool 
-    (insertIdentInScopeMap s name' >> return name')
+    (insertIdentInScope s name' >> return name')
     (addSemanticError (VariableAlreadyDefined name) >> return name)

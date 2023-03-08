@@ -1,22 +1,16 @@
-module Semantic.Rename.Function where 
-
-import qualified Data.List as L
+module Semantic.Rename.Function (renameFunc) where 
 
 import AST
 import Semantic.Rename.Utils
-import Semantic.Rename.Scope
 import Semantic.Rename.Statement
+import Semantic.Rename.RLValExpr
 
-renameFunc :: ScopeAccum -> Func -> (ScopeAccum, Func)
-renameFunc scopeAccum (Func t name params stats _ pos) =
-  mapSndFunc pos $
-    ( chainResetScope scopeAccum
-        . chainAddScope
-        . chainNewScope (L.mapAccumL renameStat) stats
-        . chainNewScope (L.mapAccumL renameParam) params
-    )
-      (scopeAccum, Func t name)
+renameFunc :: Func -> Renamer Func
+renameFunc (Func t name params stats _ pos) = do
+  params' <- prepareNewScope $ mapM renameParam params
+  s <- nextFreeScope
+  stats' <- prepareNewScope $ mapM renameStat stats
+  return $ Func t name params' stats' (Just s) pos
       
-renameParam :: ScopeAccum -> (WType, Ident) -> (ScopeAccum, (WType, Ident))
-renameParam scopeAccum (t, name) =
-  mapSnd (\n -> (t, n)) (renameUndeclaredIdent scopeAccum name)
+renameParam :: (WType, Ident) -> Renamer (WType, Ident)
+renameParam (t, name) = (\n -> (t, n)) <$> renameUndeclaredIdent name

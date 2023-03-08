@@ -1,28 +1,25 @@
-module Semantic.Rename.Program where
+module Semantic.Rename.Program (rename, renameProg) where
 
-import qualified Data.List as L
-import qualified Data.Map as M
+import Control.Monad.Reader
+import Control.Monad.State
+
+import Data.Bool
 
 import AST
 import Semantic.Errors
-import Semantic.Rename.Function (renameFunc)
 import Semantic.Rename.Utils
-import Semantic.Rename.Scope
-import Semantic.Rename.Statement (renameStat)
+import Semantic.Rename.Function
+import Semantic.Rename.Statement
 
 rename :: Program -> ((ScopeMap, [SemanticError]), Program)
-rename prog =
-  mapFst (\sa -> (scopeMap sa, reverse $ errors sa)) (renameProg initialScopeAccum prog)
-
-renameProg :: ScopeAccum -> Program -> (ScopeAccum, Program)
-renameProg scopeAccum (Program funcs stats) =
-  (chain (L.mapAccumL renameStat) stats . chain (L.mapAccumL renameFunc) funcs) (scopeAccum', Program)
+rename prog = ((scopeMap finalAux, reverse $ errors finalAux), renamedProg)
   where
-    scopeAccum' = foldl addFuncName scopeAccum funcs
+    (renamedProg, finalAux) = runState (runReaderT (renameProg prog) initScopeStack) initAux
 
-addFuncName :: ScopeAccum -> Func -> ScopeAccum
-addFuncName scopeAccum (Func _ name@(Ident _ _) _ _ _ _)
-  | name `L.elem` getScopedVars scopeAccum 0 = scopeAccum {errors = FunctionAlreadyDefined name : errors scopeAccum}
-  | otherwise                                = scopeAccum'
-  where
-    scopeAccum' = scopeAccum {scopeMap = M.insert 0 (name : getScopedVars scopeAccum 0) (scopeMap scopeAccum)}
+renameProg :: Program -> Renamer Program
+renameProg (Program funcs stats) =
+  mapM addFuncName funcs >> Program <$> mapM renameFunc funcs <*> mapM renameStat stats
+
+addFuncName :: Func -> Renamer ()
+addFuncName (Func _ name@(Ident _ _) _ _ _ _) =
+  identInScope 0 name >>= bool (insertIdentInScope 0 name) (addSemanticError $ FunctionAlreadyDefined name)

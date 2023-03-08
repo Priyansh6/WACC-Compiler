@@ -26,18 +26,20 @@ initScopeStack :: ScopeStack
 initScopeStack = [0]
 
 initAux :: Aux
-initAux =
-  Aux
+initAux = Aux
     { scopeMap = M.empty,
       scopeCounter = 0,
       errors = []
     }
+
+nextFreeScope :: Renamer Int
+nextFreeScope = (+1) <$> gets scopeCounter
     
 prepareNewScope :: Renamer a -> Renamer a
 prepareNewScope renamer = do
-  count <- gets scopeCounter
-  modify (\a -> a {scopeCounter = count + 1})
-  local (count + 1 :) renamer
+  nextS <- nextFreeScope
+  modify (\a -> a {scopeCounter = nextS})
+  local (nextS :) renamer
 
 getCurrentScope :: Renamer Int
 getCurrentScope = asks head
@@ -55,8 +57,8 @@ getOriginalIdent (Ident i pos) = Ident (T.takeWhile ('-' /=) i) pos
 addSemanticError :: SemanticError -> Renamer ()
 addSemanticError e = modify (\a@Aux {errors = es} -> a {errors = e : es})
 
-insertIdentInScopeMap :: Int -> Ident -> Renamer ()
-insertIdentInScopeMap s name = do
+insertIdentInScope :: Int -> Ident -> Renamer ()
+insertIdentInScope s name = do
   sVars <- getScopedVars s
   modify (\a@Aux {scopeMap = sMap} -> a {scopeMap = M.insert s (name : sVars) sMap})
 
