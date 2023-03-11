@@ -29,16 +29,15 @@ main :: IO ()
 main = do 
   (fname:_) <- getArgs
   contents <- TIO.readFile fname
-  let res = runParser (L.fully program) fname contents
-  case res of
+  case runParser (L.fully program) fname contents of
     Left err -> do
       putStrLn (errorBundlePretty err)
       exitWith syntaxError
     Right ast -> case rename ast of
-      ((scopeMap, []), renamedAST) -> case runExcept $ execStateT (checkProg renamedAST) M.empty of
+      Left errs -> printSemanticErrors errs contents fname >> exitWith semanticError
+      Right (scopeMap, renamedAST) -> case runExcept $ execStateT (checkProg renamedAST) M.empty of
         Left err -> printSemanticErrors [err] contents fname >> exitWith semanticError
         Right symbolTable -> do
           let irProg = runReader (IR.transProg renamedAST) (symbolTable, scopeMap)
           let armProg = ARM.transProg irProg
           TIO.writeFile (takeBaseName fname ++ ".s") (showArm armProg) >> exitSuccess
-      ((_, errs), _) -> printSemanticErrors errs contents fname >> exitWith semanticError

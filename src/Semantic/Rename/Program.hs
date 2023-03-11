@@ -11,9 +11,12 @@ import Semantic.Rename.Utils
 import Semantic.Rename.Function
 import Semantic.Rename.Statement
 
-rename :: Program -> ((ScopeMap, [SemanticError]), Program)
-rename prog = ((scopeMap finalAux, reverse $ errors finalAux), renamedProg)
+rename :: Program -> Either [SemanticError] (ScopeMap, Program)
+rename prog
+  | null es   = Right (scopeMap finalAux, renamedProg)
+  | otherwise = Left $ reverse es
   where
+    es = errors finalAux
     (renamedProg, finalAux) = runState (runReaderT (renameProg prog) initScopeStack) initAux
 
 renameProg :: Program -> Renamer Program
