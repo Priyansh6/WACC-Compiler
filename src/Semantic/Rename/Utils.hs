@@ -5,7 +5,6 @@ import Control.Monad.State
 
 import qualified Data.Text as T
 import qualified Data.Map as M
-import Data.Bool
 
 import AST
 import Semantic.Errors
@@ -39,7 +38,7 @@ prepareNewScope :: Renamer a -> Renamer a
 prepareNewScope renamer = do
   nextS <- nextFreeScope
   modify (\a -> a {scopeCounter = nextS})
-  local (nextS :) renamer
+  local (nextS:) renamer
 
 getCurrentScope :: Renamer Int
 getCurrentScope = asks head
@@ -67,9 +66,14 @@ identInScope s name = do
   sVars <- getScopedVars s
   return $ name `elem` sVars
 
-identInScopeStack :: Ident -> Renamer Bool
-identInScopeStack name = do
+getIdentFromScopeStack :: Ident -> Renamer (Maybe Ident)
+getIdentFromScopeStack name = do
   stack <- ask
   case stack of
-    [] -> return False
-    (s:_) -> identInScope s name >>= bool (local tail $ identInScopeStack name) (return True)
+    [] -> return Nothing
+    (s:_) -> do
+      let name' = addScopeToIdent s name
+      declared <- identInScope s name' 
+      if declared 
+        then return $ Just name'
+        else local tail $ getIdentFromScopeStack name

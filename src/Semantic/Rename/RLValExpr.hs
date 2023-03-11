@@ -51,12 +51,8 @@ renamePairElem (Fst lVal pos) = Fst <$> renameLVal lVal <*> return pos
 renamePairElem (Snd lVal pos) = Snd <$> renameLVal lVal <*> return pos
 
 renameDeclaredIdent :: Ident -> Renamer Ident
-renameDeclaredIdent name = do
-  s <- getCurrentScope
-  let name' = addScopeToIdent s name
-  identInScopeStack name' >>= bool 
-    (addSemanticError (VariableNotDefined name) >> return name) 
-    (return name')
+renameDeclaredIdent name =
+  getIdentFromScopeStack name >>= maybe (addSemanticError (VariableNotDefined name) >> return name) return
 
 renameUndeclaredIdent :: Ident -> Renamer Ident
 renameUndeclaredIdent name = do
