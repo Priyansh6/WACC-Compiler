@@ -2,7 +2,7 @@
 
 module UnitTest.CodeGeneration.ControlFlowSpec (spec) where
 
-import CodeGeneration.Intermediate.ControlFlow
+import CodeGeneration.Intermediate.ControlFlow 
 import CodeGeneration.Intermediate.IR
 import Data.Map ((!))
 import Test.Hspec
@@ -15,23 +15,23 @@ spec = do
   let is1 = [Mov (Reg (TmpReg 1)) (Imm 8)]
       cfg1 = toCFG is1
   it "constructs a singleton node for a body of one instruction" $ 
-    (nodes cfg1) ! (Right 0) `shouldBe` CFGNode {instr = Mov (Reg (TmpReg 1)) (Imm 8)}
+    (nodes cfg1) ! (Right 0) `shouldBe` mkCFGNode (Mov (Reg (TmpReg 1)) (Imm 8))
   it "adds no edges for a body of one instruction" $ 
     edges cfg1 `shouldBe` Set.empty
 
   let is2 = [Define "label"] :: IRInstrs
       cfg2 = toCFG is2
   it "constructs nodes with a label id for define instructions" $ 
-    (nodes cfg2) ! (Left "label") `shouldBe` CFGNode {instr = Define "label"}
+    (nodes cfg2) ! (Left "label") `shouldBe` mkCFGNode (Define "label")
 
   let is3 = [ Mov (Reg (TmpReg 1)) (Imm 8)
             , Mov (Reg (TmpReg 2)) (Imm 7) 
             , Add (Reg (TmpReg 1)) (Reg (TmpReg 2)) (Reg (TmpReg 1)) ]
       cfg3 = toCFG is3
   it "constructs multiple nodes for a body of multiple instructions" $ 
-    nodes cfg3 `shouldBe` M.fromList [ (Right 0, CFGNode {instr = Mov (Reg (TmpReg 1)) (Imm 8)})
-                                     , (Right 1, CFGNode {instr = Mov (Reg (TmpReg 2)) (Imm 7)})
-                                     , (Right 2, CFGNode {instr = Add (Reg (TmpReg 1)) (Reg (TmpReg 2)) (Reg (TmpReg 1))}) ]
+    nodes cfg3 `shouldBe` M.fromList [ (Right 0, mkCFGNode (Mov (Reg (TmpReg 1)) (Imm 8)))
+                                     , (Right 1, mkCFGNode (Mov (Reg (TmpReg 2)) (Imm 7)))
+                                     , (Right 2, mkCFGNode (Add (Reg (TmpReg 1)) (Reg (TmpReg 2)) (Reg (TmpReg 1)))) ]
   it "constructs nodes pointing in sequence for a linear control flow" $ 
     edges cfg3 `shouldBe` Set.fromList [(Right 0,Right 1),(Right 1,Right 2)]
 

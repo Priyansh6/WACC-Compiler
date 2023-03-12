@@ -1,6 +1,12 @@
-{-# LANGUAGE NamedFieldPuns #-}
-
-module CodeGeneration.Intermediate.ControlFlow where
+module CodeGeneration.Intermediate.ControlFlow 
+  ( CFG (..)
+  , CFGNode (..)  
+  , toCFG
+  , mkCFGNode
+  , predecessors
+  , successors 
+  )
+where
 
 import CodeGeneration.Intermediate.IR
 import Data.Map (Map, (!))
@@ -22,7 +28,8 @@ data CFG a
 
 data CFGNode a
   = CFGNode {
-    instr :: Instr a
+    instr :: Instr a,
+    dominators :: Set Id
   } deriving (Show, Eq)
 
 toCFG :: Instrs a -> CFG a
@@ -32,7 +39,11 @@ toCFG instrs
     edges = findEdges labelledInstrs
   }
   where
-    labelledInstrs = zipWith (\n instr -> (assignId instr n, CFGNode{ instr })) [0..] instrs 
+    labelledInstrs = zipWith (\n instr -> (assignId instr n, mkCFGNode instr)) [0..] instrs 
+
+mkCFGNode :: Instr a -> CFGNode a
+mkCFGNode instr 
+  = CFGNode { instr = instr, dominators = Set.empty }
 
 findEdges :: [(Id, CFGNode a)] -> Set (Id, Id)
 findEdges ((i, CFGNode {instr = instr}):xs@((i', _):_)) 
@@ -74,3 +85,15 @@ getLabel (Jg l) = l
 getLabel (Jle l) = l
 getLabel (Jge l) = l
 getLabel _ = error "can't get the label of a non jump instruction"
+
+successors :: Id -> CFG a -> [CFGNode a]
+successors id cfg 
+  = map ((nodes cfg) !) succIds
+  where
+    succIds = [dst | (src, dst) <- Set.toList (edges cfg), src == id]
+
+predecessors :: Id -> CFG a -> [CFGNode a]
+predecessors id cfg 
+  = map ((nodes cfg) !) predIds
+  where
+    predIds = [src | (src, dst) <- Set.toList (edges cfg), dst == id]
