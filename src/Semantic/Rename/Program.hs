@@ -24,5 +24,5 @@ renameProg (Program funcs stats) =
   mapM addFuncName funcs >> Program <$> mapM renameFunc funcs <*> mapM renameStat stats
 
 addFuncName :: Func -> Renamer ()
-addFuncName (Func _ name@(Ident _ _) _ _ _ _) =
-  identInScope 0 name >>= bool (insertIdentInScope 0 name) (addSemanticError $ FunctionAlreadyDefined name)
+addFuncName f@(Func _ name ps _ _ _) = 
+  funcExists f >>= bool (addFuncIdent f) (addSemanticError $ FunctionAlreadyDefined name (fst (unzip ps)))

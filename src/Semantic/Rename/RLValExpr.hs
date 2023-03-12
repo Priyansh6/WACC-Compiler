@@ -16,9 +16,7 @@ renameRVal (RExpr expr) = RExpr <$> renameExpr expr
 renameRVal (ArrayLiter exprs pos) = ArrayLiter <$> mapM renameExpr exprs <*> return pos
 renameRVal (NewPair expr1 expr2 pos) = NewPair <$> renameExpr expr1 <*> renameExpr expr2 <*> return pos
 renameRVal (RPair pairElem) = RPair <$> renamePairElem pairElem
-renameRVal (Call name exprs pos) = do
-  identInScope 0 name >>= bool (addSemanticError $ FunctionNotDefined name) (return ())
-  Call <$> return name <*> mapM renameExpr exprs <*> return pos
+renameRVal (Call name exprs pos) = Call name <$> mapM renameExpr exprs <*> return pos
 
 renameExpr :: Expr -> Renamer Expr
 renameExpr (IdentExpr i pos) = IdentExpr <$> renameDeclaredIdent i <*> return pos

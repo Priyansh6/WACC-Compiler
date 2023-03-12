@@ -2,7 +2,9 @@
 
 module UnitTest.Semantic.RenamerSpec (spec) where
 
-import Data.Map
+import qualified Data.Map as M
+import qualified Data.Set as S
+
 import Test.Hspec
 
 import AST
@@ -15,19 +17,19 @@ import Semantic.Rename.Statement
 import UnitTest.Semantic.Test
 
 xAux :: Aux
-xAux = initAux {scopeMap = fromList [(0, [Ident "x-0" (0, 0)])]}
+xAux = initAux {scopeMap = M.fromList [(0, S.fromList [Ident "x-0" (0, 0)])]}
 
-funcAux :: Aux
-funcAux = initAux {scopeMap = fromList [(0, [Ident "func" (0, 0)])]}
+doubleXAux :: Aux
+doubleXAux = initAux {scopeMap = M.fromList [(0, S.fromList [Ident "x-0" (0, 0)]), (1, S.fromList [Ident "x-1" (0, 0)])]}
 
 xFuncAux :: Aux
-xFuncAux = initAux {scopeMap = fromList [(0, [(Ident "func" (0, 0)), (Ident "x-0" (0, 0))])]}
+xFuncAux = initAux {funcSet = S.fromList [(Ident "func?int" (0, 0))], scopeMap = M.fromList [(0, S.fromList [Ident "x-0" (0, 0)])]}
 
 spec :: Spec
 spec = do
   it "renames program functions" $
     test initAux renameProg (Program [Func WInt (Ident "func" (0, 0)) [(WInt, Ident "x" (0, 0))] [] Nothing (0, 0)] [])
-      `shouldBe` Right (Program [Func WInt (Ident "func" (0, 0)) [(WInt, Ident "x-1" (0, 0))] [] (Just 2) (0, 0)] [])
+      `shouldBe` Right (Program [Func WInt (Ident "func?int" (0, 0)) [(WInt, Ident "x-1" (0, 0))] [] (Just 2) (0, 0)] [])
 
   it "renames program body " $
     test initAux renameProg (Program [] [DecAssign WInt (Ident "x" (0, 0)) (RExpr (IntLiter 1 (0, 0))) (0, 0)])
@@ -35,19 +37,23 @@ spec = do
 
   it "renames function parameters" $
     test initAux renameFunc (Func WInt (Ident "func" (0, 0)) [(WInt, Ident "x" (0, 0)), (WInt, Ident "y" (0, 0))] [] Nothing (0, 0))
-      `shouldBe` Right (Func WInt (Ident "func" (0, 0)) [(WInt, Ident "x-1" (0, 0)), (WInt, Ident "y-1" (0, 0))] [] (Just 2) (0, 0))
+      `shouldBe` Right (Func WInt (Ident "func?int_int" (0, 0)) [(WInt, Ident "x-1" (0, 0)), (WInt, Ident "y-1" (0, 0))] [] (Just 2) (0, 0))
 
   it "renames function body" $
     test initAux renameFunc (Func WInt (Ident "func" (0, 0)) [(WInt, Ident "x" (0, 0))] [DecAssign WInt (Ident "x" (0, 0)) (RExpr (IdentExpr (Ident "x" (0, 0)) (0, 0))) (0, 0)] Nothing (0, 0))
-      `shouldBe` Right (Func WInt (Ident "func" (0, 0)) [(WInt, Ident "x-1" (0, 0))] [DecAssign WInt (Ident "x-2" (0, 0)) (RExpr (IdentExpr (Ident "x-1" (0, 0)) (0, 0))) (0, 0)] (Just 2) (0, 0))
+      `shouldBe` Right (Func WInt (Ident "func?int" (0, 0)) [(WInt, Ident "x-1" (0, 0))] [DecAssign WInt (Ident "x-2" (0, 0)) (RExpr (IdentExpr (Ident "x-1" (0, 0)) (0, 0))) (0, 0)] (Just 2) (0, 0))
+
+  it "renames overloaded functions" $
+    test initAux renameProg (Program [Func WInt (Ident "func" (0, 0)) [(WInt, (Ident "x" (0, 0)))] [] Nothing (0, 0), Func WInt (Ident "func" (0, 0)) [(WBool, (Ident "x" (0, 0)))] [] Nothing (0, 0)] [])
+      `shouldBe` Right (Program [Func WInt (Ident "func?int" (0, 0)) [(WInt,Ident "x-1" (0, 0))] [] (Just 2) (0, 0),Func WInt (Ident "func?bool" (0, 0)) [(WBool,Ident "x-3" (0, 0))] [] (Just 4) (0, 0)] [])
 
   it "can't rename already defined function" $
-    test funcAux renameProg (Program [Func WInt (Ident "func" (0, 0)) [] [] Nothing (0, 0)] [])
-      `shouldBe` Left [FunctionAlreadyDefined (Ident "func" (0, 0))]
+    test initAux renameProg (Program [Func WInt (Ident "func" (0, 0)) [] [] Nothing (0, 0), Func WInt (Ident "func" (0, 0)) [] [] Nothing (0, 0)] [])
+      `shouldBe` Left [FunctionAlreadyDefined (Ident "func" (0, 0)) []]
   
   it "renames functions that are mutually recursive" $
     test initAux renameProg (Program [Func WInt (Ident "func1" (0, 0)) [] [DecAssign WInt (Ident "x" (0, 0)) (Call (Ident "func2" (0, 0)) [] (0, 0)) (0, 0)] Nothing (0, 0), Func WInt (Ident "func2" (0,0)) [] [DecAssign WInt (Ident "x" (0,0)) (Call (Ident "func1" (0,0)) [] (0,0)) (0,0)] Nothing (0,0)] [])
-      `shouldBe` Right (Program [Func WInt (Ident "func1" (0,0)) [] [DecAssign WInt (Ident "x-2" (0,0)) (Call (Ident "func2" (0,0)) [] (0,0)) (0,0)] (Just 2) (0,0),Func WInt (Ident "func2" (0,0)) [] [DecAssign WInt (Ident "x-4" (0,0)) (Call (Ident "func1" (0,0)) [] (0,0)) (0,0)] (Just 4) (0,0)] [])
+      `shouldBe` Right (Program [Func WInt (Ident "func1?" (0,0)) [] [DecAssign WInt (Ident "x-2" (0,0)) (Call (Ident "func2" (0,0)) [] (0,0)) (0,0)] (Just 2) (0,0),Func WInt (Ident "func2?" (0,0)) [] [DecAssign WInt (Ident "x-4" (0,0)) (Call (Ident "func1" (0,0)) [] (0,0)) (0,0)] (Just 4) (0,0)] [])
 
   it "renames parameters" $
     test initAux renameParam (WInt, Ident "x" (0, 0))
@@ -149,10 +155,6 @@ spec = do
     test xFuncAux renameRVal (Call (Ident "func" (0, 0)) [IdentExpr (Ident "x" (0, 0)) (0, 0)] (0, 0))
       `shouldBe` Right (Call (Ident "func" (0, 0)) [IdentExpr (Ident "x-0" (0, 0)) (0, 0)] (0, 0))
 
-  it "can't rename function calls if function doesn't exist" $
-    test xAux renameRVal (Call (Ident "func" (0, 0)) [IdentExpr (Ident "x" (0, 0)) (0, 0)] (0, 0))
-      `shouldBe` Left [FunctionNotDefined (Ident "func" (0, 0))]
-                     
   it "renames identexprs" $
     test xAux renameExpr (IdentExpr (Ident "x" (0, 0)) (0, 0))
       `shouldBe` Right (IdentExpr (Ident "x-0" (0, 0)) (0, 0))
@@ -206,5 +208,5 @@ spec = do
       `shouldBe` Left [VariableNotDefined (Ident "x" (0, 0))]
 
   it "renames declared ident with closest possible parent scope" $
-    testWithStack [2, 1, 0] (initAux {scopeMap = fromList [(0, [Ident "x-0" (0, 0)]), (1, [Ident "x-1" (0, 0)])]}) renameDeclaredIdent  (Ident "x" (0, 0))
+    testWithStack [2, 1, 0] doubleXAux renameDeclaredIdent  (Ident "x" (0, 0))
       `shouldBe` Right (Ident "x-1" (0, 0))

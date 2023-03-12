@@ -42,9 +42,9 @@ type Actual = WType
 
 data SemanticError
   = VariableAlreadyDefined Ident
-  | FunctionAlreadyDefined Ident
+  | FunctionAlreadyDefined Ident [WType]
   | VariableNotDefined Ident
-  | FunctionNotDefined Ident
+  | FunctionNotDefined Ident [WType]
   | IncompatibleTypes Position Expectation Actual
   | WrongArguments Position Ident Int Int
   | IllegalReturn Position
@@ -87,9 +87,9 @@ printSemanticErrors errs contents fname = putStrLn $ concatMap printSemanticErro
 errorMessage :: SemanticError -> String
 errorMessage semErr = case semErr of
   VariableAlreadyDefined (Ident i _) -> "The variable " ++ bold (show i) ++ yellow ++ " is already defined" ++ "\n"
-  FunctionAlreadyDefined (Ident i _) -> "The function " ++ bold (show i) ++ yellow ++ " is already defined" ++ "\n"
+  FunctionAlreadyDefined (Ident i _) _ -> "The function " ++ bold (show i) ++ yellow ++ " is already defined" ++ "\n"
   VariableNotDefined (Ident i _) -> "The variable " ++ bold (show i) ++ yellow ++ " is not defined" ++ "\n"
-  FunctionNotDefined (Ident i _) -> "The function " ++ bold (show i) ++ yellow ++ " is not defined" ++ "\n"
+  FunctionNotDefined (Ident i _) _ -> "The function " ++ bold (show i) ++ yellow ++ " is not defined" ++ "\n"
   IncompatibleTypes _ expecteds actual -> "Incompatible types\n\tExpected: " ++ bold (intercalate " or " (map showWType expecteds)) ++ yellow ++ "\n\tActual:   " ++ bold (showWType actual) ++ "\n"
   WrongArguments _ (Ident i _) expected actual ->
     "The function "
@@ -117,9 +117,9 @@ showWType t = case t of
 
 getPosition :: SemanticError -> Position
 getPosition (VariableAlreadyDefined (Ident _ pos)) = pos
-getPosition (FunctionAlreadyDefined (Ident _ pos)) = pos
+getPosition (FunctionAlreadyDefined (Ident _ pos) _) = pos
 getPosition (VariableNotDefined (Ident _ pos)) = pos
-getPosition (FunctionNotDefined (Ident _ pos)) = pos
+getPosition (FunctionNotDefined (Ident _ pos) _) = pos
 getPosition (IncompatibleTypes pos _ _) = pos
 getPosition (WrongArguments pos _ _ _) = pos
 getPosition (IllegalReturn pos) = pos

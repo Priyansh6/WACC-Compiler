@@ -3,10 +3,11 @@ module Semantic.Type.CheckRLVals (checkRVal, checkLVal, getArrayBaseType, areTyp
 import Control.Monad.Except
 import Control.Monad.State
 import Control.Monad.Trans.Writer ()
-import Data.Map ((!))
+import qualified Data.Map as M
 
 import AST
 import Semantic.Errors
+import Semantic.Rename.Utils (addTypesToFuncIdent)
 import Semantic.Type.CheckExpressions
 import Semantic.Type.SymbolTable
 
@@ -28,16 +29,17 @@ checkRVal (NewPair e1 e2 _) = do
   return $ WPair wtype1' wtype2'
 checkRVal (RPair pairElem) = checkPairElemType pairElem
 checkRVal (Call ident exprs pos) = do
-  identType <- gets (! ident)
+  exprTypes <- mapM checkExprType exprs
+  identType <- gets (M.lookup (addTypesToFuncIdent ident exprTypes))
   case identType of
-    FuncType funcType paramIdents -> do
-      exprTypes <- mapM checkExprType exprs
+    Nothing -> throwError $ FunctionNotDefined ident exprTypes
+    Just (FuncType funcType paramIdents) -> do
       paramTypes <- mapM getIdentType paramIdents
       m <- mapM (\(a, b) -> areTypesCompatible a b pos) (zip exprTypes paramTypes)
       if length exprTypes == length paramTypes && and m
           then return funcType
           else compareParamsAndArguments ident paramTypes exprTypes pos
-    _ -> throwError $ FunctionNotDefined ident
+    _ -> error "Cannot call an ident that is not a function"
 
 checkLVal :: LVal -> ScopedSemanticAnalyser WType
 checkLVal (LIdent ident) = getIdentType ident
