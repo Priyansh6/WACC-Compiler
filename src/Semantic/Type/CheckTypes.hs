@@ -9,10 +9,12 @@ import qualified Data.Map as M
 
 import AST
 import Semantic.Type.CheckStatements 
+import Semantic.Type.RenameCalls
 import Semantic.Type.SymbolTable
 
-checkProg :: Program -> SemanticAnalyser ()
-checkProg (Program funcs stats) = addFuncsToSymbolTable funcs >> checkFuncs funcs >> runReaderT (checkStats stats) Nothing
+checkProg :: Program -> SemanticAnalyser Program
+checkProg p@(Program funcs stats) 
+  = addFuncsToSymbolTable funcs >> checkFuncs funcs >> runReaderT (checkStats stats) Nothing >> runReaderT (renameCallsProg p) Nothing
 
 checkFuncs :: [Func] -> SemanticAnalyser ()
 checkFuncs = mapM_ checkFunc

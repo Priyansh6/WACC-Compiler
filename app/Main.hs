@@ -35,9 +35,9 @@ main = do
       exitWith syntaxError
     Right ast -> case rename ast of
       Left errs -> printSemanticErrors errs contents fname >> exitWith semanticError
-      Right (scopeMap, renamedAST) -> case runExcept $ execStateT (checkProg renamedAST) M.empty of
+      Right (scopeMap, renamedAST) -> case runExcept $ runStateT (checkProg renamedAST) M.empty of
         Left err -> printSemanticErrors [err] contents fname >> exitWith semanticError
-        Right symbolTable -> do
-          let irProg = runReader (IR.transProg renamedAST) (symbolTable, scopeMap)
+        Right (renamedAST', symbolTable) -> do
+          let irProg = runReader (IR.transProg renamedAST') (symbolTable, scopeMap)
           let armProg = ARM.transProg irProg
           TIO.writeFile (takeBaseName fname ++ ".s") (showArm armProg) >> exitSuccess
