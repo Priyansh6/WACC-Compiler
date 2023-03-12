@@ -29,21 +29,25 @@ data CFG a
 data CFGNode a
   = CFGNode {
     instr :: Instr a,
+    isEntry :: Bool,
     dominators :: Set Id
   } deriving (Show, Eq)
 
 toCFG :: Instrs a -> CFG a
-toCFG instrs
+toCFG [] = CFG { nodes = M.empty, edges = Set.empty }
+toCFG (entryInstr:instrs)
   = CFG {
-    nodes = M.fromList labelledInstrs,
-    edges = findEdges labelledInstrs
+    nodes = M.fromList allLabelled,
+    edges = findEdges allLabelled
   }
   where
-    labelledInstrs = zipWith (\n instr -> (assignId instr n, mkCFGNode instr)) [0..] instrs 
+    allLabelled = labelledEntry : labelledInstrs
+    labelledInstrs = zipWith (\n instr -> (assignId instr n, mkCFGNode instr False)) [1..] instrs 
+    labelledEntry = (assignId entryInstr 0, mkCFGNode entryInstr True)
 
-mkCFGNode :: Instr a -> CFGNode a
-mkCFGNode instr 
-  = CFGNode { instr = instr, dominators = Set.empty }
+mkCFGNode :: Instr a -> Bool -> CFGNode a
+mkCFGNode instr isEntry
+  = CFGNode { instr = instr, isEntry = isEntry, dominators = Set.empty }
 
 findEdges :: [(Id, CFGNode a)] -> Set (Id, Id)
 findEdges ((i, CFGNode {instr = instr}):xs@((i', _):_)) 
@@ -87,13 +91,13 @@ getLabel (Jge l) = l
 getLabel _ = error "can't get the label of a non jump instruction"
 
 successors :: Id -> CFG a -> [CFGNode a]
-successors id cfg 
+successors i cfg 
   = map ((nodes cfg) !) succIds
   where
-    succIds = [dst | (src, dst) <- Set.toList (edges cfg), src == id]
+    succIds = [dst | (src, dst) <- Set.toList (edges cfg), src == i]
 
 predecessors :: Id -> CFG a -> [CFGNode a]
-predecessors id cfg 
+predecessors i cfg 
   = map ((nodes cfg) !) predIds
   where
-    predIds = [src | (src, dst) <- Set.toList (edges cfg), dst == id]
+    predIds = [src | (src, dst) <- Set.toList (edges cfg), dst == i]
