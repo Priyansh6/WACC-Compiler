@@ -56,7 +56,7 @@ addScopeToIdent scope (Ident i pos) =
   Ident (T.append (T.snoc i '-') (T.pack (show scope))) pos
 
 getOriginalIdent :: Ident -> Ident
-getOriginalIdent (Ident i pos) = Ident (T.takeWhile (/='-') i) pos
+getOriginalIdent (Ident i pos) = Ident (T.takeWhile (/= '-') i) pos
 
 addSemanticError :: SemanticError -> Renamer ()
 addSemanticError e = modify (\a@Aux {errors = es} -> a {errors = e : es})
@@ -88,13 +88,13 @@ getIdentFromScopeStack name = do
         else local tail $ getIdentFromScopeStack name
 
 addTypesToFuncIdent :: Ident -> [WType] -> Ident
-addTypesToFuncIdent (Ident i pos) paramTs = Ident (i <> "_" <> T.intercalate "_" (map showFuncWType (paramTs))) pos
+addTypesToFuncIdent (Ident i pos) paramTs = Ident (i <> "." <> T.intercalate "_" (map showFuncWType (paramTs))) pos
 
 addTypesToFunc :: Func -> Ident
 addTypesToFunc (Func _ name ps _ _ _) = addTypesToFuncIdent name (fst $ unzip ps)
 
 getOriginalFuncIdent :: Ident -> Ident
-getOriginalFuncIdent (Ident i pos) = Ident (T.takeWhile (/='_') i) pos
+getOriginalFuncIdent (Ident i pos) = Ident (T.takeWhile (/= '.') i) pos
 
 showFuncWType :: WType -> T.Text
 showFuncWType WUnit        = error "Cannot have a parameter with type WUnit"
