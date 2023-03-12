@@ -97,11 +97,10 @@ getOriginalFuncIdent :: Ident -> Ident
 getOriginalFuncIdent (Ident i pos) = Ident (T.takeWhile (/='?') i) pos
 
 showFuncWType :: WType -> T.Text
-showFuncWType WUnit               = error "Cannot have a parameter with type WUnit"
-showFuncWType WInt                = "int"
-showFuncWType WBool               = "bool"
-showFuncWType WChar               = "char"
-showFuncWType WStr                = "string"
-showFuncWType (WArr t dim)        = "arr" <> T.pack (show dim) <> showFuncWType t
-showFuncWType (WPair WUnit WUnit) = "pair"
-showFuncWType (WPair t1 t2)       = "pair" <> showFuncWType t1 <> showFuncWType t2
+showFuncWType WUnit        = error "Cannot have a parameter with type WUnit"
+showFuncWType WInt         = "int"
+showFuncWType WBool        = "bool"
+showFuncWType WChar        = "char"
+showFuncWType WStr         = "string"
+showFuncWType (WArr t dim) = "arr" <> T.pack (show dim) <> showFuncWType t
+showFuncWType (WPair _ _)  = "pair"
