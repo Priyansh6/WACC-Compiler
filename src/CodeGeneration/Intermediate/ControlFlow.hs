@@ -35,9 +35,7 @@ toCFG instrs
     labelledInstrs = zipWith (\n instr -> (assignId instr n, CFGNode{ instr })) [0..] instrs 
 
 findEdges :: [(Id, CFGNode a)] -> Set (Id, Id)
-findEdges [] = Set.empty 
-findEdges (x:[]) = Set.empty
-findEdges ((i, CFGNode {instr = instr}):xs@((i', x'):_)) 
+findEdges ((i, CFGNode {instr = instr}):xs@((i', _):_)) 
   = case jmpType instr of
       Nothing -> insertNextEdge (findEdges xs)
       Just LinearJmp -> insertBranchEdge (findEdges xs)
@@ -45,6 +43,7 @@ findEdges ((i, CFGNode {instr = instr}):xs@((i', x'):_))
     where
       insertNextEdge = Set.insert (i, i') 
       insertBranchEdge = Set.insert (i, Left $ getLabel instr)
+findEdges _ = Set.empty 
     
 assignId :: Instr a -> Int -> Id
 assignId (Define l) _ = Left l
