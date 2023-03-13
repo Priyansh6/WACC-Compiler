@@ -106,5 +106,6 @@ showFuncWType (WArr t dim) = "arr" <> T.pack (show dim) <> showFuncWType t
 showFuncWType (WPair _ _)  = "pair"
 
 showFuncReturnWType :: WType -> T.Text
+showFuncReturnWType (WPair WUnit WUnit) = "pair"
 showFuncReturnWType (WPair t1 t2) = "pair" <> showFuncWType t1 <> showFuncWType t2
 showFuncReturnWType t = showFuncWType t
