@@ -1,8 +1,9 @@
 module Semantic.Type.CheckRLVals (checkRVal, checkLVal, getArrayBaseType, areTypesCompatible) where 
 
 import Control.Monad.Except
+import Control.Monad.Reader
 import Control.Monad.State
-import Control.Monad.Trans.Writer ()
+
 import qualified Data.Map as M
 
 import AST
@@ -30,9 +31,9 @@ checkRVal (NewPair e1 e2 _) = do
 checkRVal (RPair pairElem) = checkPairElemType pairElem
 checkRVal (Call ident exprs pos) = do
   exprTypes <- mapM checkExprType exprs
-  identType <- gets (M.lookup (addTypesToFuncIdent ident exprTypes))
+  identType <- ask >>= (\(Just rT) -> gets (M.lookup (addTypesToFuncIdent ident rT exprTypes)))
   case identType of
-    Nothing -> throwError $ FunctionNotDefined ident exprTypes
+    Nothing -> ask >>= (\(Just rT) -> throwError $ FunctionNotDefined ident rT exprTypes)
     Just (FuncType funcType paramIdents) -> do
       paramTypes <- mapM getIdentType paramIdents
       m <- mapM (\(a, b) -> areTypesCompatible a b pos) (zip exprTypes paramTypes)

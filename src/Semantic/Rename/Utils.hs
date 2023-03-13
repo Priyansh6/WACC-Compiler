@@ -87,11 +87,11 @@ getIdentFromScopeStack name = do
         then return $ Just name'
         else local tail $ getIdentFromScopeStack name
 
-addTypesToFuncIdent :: Ident -> [WType] -> Ident
-addTypesToFuncIdent (Ident i pos) paramTs = Ident (i <> "." <> T.intercalate "_" (map showFuncWType (paramTs))) pos
+addTypesToFuncIdent :: Ident -> WType -> [WType] -> Ident
+addTypesToFuncIdent (Ident i pos) rt paramTs = Ident (i <> "." <> T.intercalate "_" (map showFuncWType (rt:paramTs))) pos
 
 addTypesToFunc :: Func -> Ident
-addTypesToFunc (Func _ name ps _ _ _) = addTypesToFuncIdent name (fst $ unzip ps)
+addTypesToFunc (Func rt name ps _ _ _) = addTypesToFuncIdent name rt (fst $ unzip ps)
 
 getOriginalFuncIdent :: Ident -> Ident
 getOriginalFuncIdent (Ident i pos) = Ident (T.takeWhile (/= '.') i) pos

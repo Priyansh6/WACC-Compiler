@@ -29,7 +29,7 @@ spec :: Spec
 spec = do
   it "renames program functions" $
     test initAux renameProg (Program [Func WInt (Ident "func" (0, 0)) [(WInt, Ident "x" (0, 0))] [] Nothing (0, 0)] [])
-      `shouldBe` Right (Program [Func WInt (Ident "func.int" (0, 0)) [(WInt, Ident "x-1" (0, 0))] [] (Just 2) (0, 0)] [])
+      `shouldBe` Right (Program [Func WInt (Ident "func.int_int" (0, 0)) [(WInt, Ident "x-1" (0, 0))] [] (Just 2) (0, 0)] [])
 
   it "renames program body " $
     test initAux renameProg (Program [] [DecAssign WInt (Ident "x" (0, 0)) (RExpr (IntLiter 1 (0, 0))) (0, 0)])
@@ -37,23 +37,23 @@ spec = do
 
   it "renames function parameters" $
     test initAux renameFunc (Func WInt (Ident "func" (0, 0)) [(WInt, Ident "x" (0, 0)), (WInt, Ident "y" (0, 0))] [] Nothing (0, 0))
-      `shouldBe` Right (Func WInt (Ident "func.int_int" (0, 0)) [(WInt, Ident "x-1" (0, 0)), (WInt, Ident "y-1" (0, 0))] [] (Just 2) (0, 0))
+      `shouldBe` Right (Func WInt (Ident "func.int_int_int" (0, 0)) [(WInt, Ident "x-1" (0, 0)), (WInt, Ident "y-1" (0, 0))] [] (Just 2) (0, 0))
 
   it "renames function body" $
     test initAux renameFunc (Func WInt (Ident "func" (0, 0)) [(WInt, Ident "x" (0, 0))] [DecAssign WInt (Ident "x" (0, 0)) (RExpr (IdentExpr (Ident "x" (0, 0)) (0, 0))) (0, 0)] Nothing (0, 0))
-      `shouldBe` Right (Func WInt (Ident "func.int" (0, 0)) [(WInt, Ident "x-1" (0, 0))] [DecAssign WInt (Ident "x-2" (0, 0)) (RExpr (IdentExpr (Ident "x-1" (0, 0)) (0, 0))) (0, 0)] (Just 2) (0, 0))
+      `shouldBe` Right (Func WInt (Ident "func.int_int" (0, 0)) [(WInt, Ident "x-1" (0, 0))] [DecAssign WInt (Ident "x-2" (0, 0)) (RExpr (IdentExpr (Ident "x-1" (0, 0)) (0, 0))) (0, 0)] (Just 2) (0, 0))
 
   it "renames overloaded functions" $
     test initAux renameProg (Program [Func WInt (Ident "func" (0, 0)) [(WInt, (Ident "x" (0, 0)))] [] Nothing (0, 0), Func WInt (Ident "func" (0, 0)) [(WBool, (Ident "x" (0, 0)))] [] Nothing (0, 0)] [])
-      `shouldBe` Right (Program [Func WInt (Ident "func.int" (0, 0)) [(WInt,Ident "x-1" (0, 0))] [] (Just 2) (0, 0),Func WInt (Ident "func.bool" (0, 0)) [(WBool,Ident "x-3" (0, 0))] [] (Just 4) (0, 0)] [])
+      `shouldBe` Right (Program [Func WInt (Ident "func.int_int" (0, 0)) [(WInt,Ident "x-1" (0, 0))] [] (Just 2) (0, 0),Func WInt (Ident "func.int_bool" (0, 0)) [(WBool,Ident "x-3" (0, 0))] [] (Just 4) (0, 0)] [])
 
   it "can't rename already defined function" $
     test initAux renameProg (Program [Func WInt (Ident "func" (0, 0)) [] [] Nothing (0, 0), Func WInt (Ident "func" (0, 0)) [] [] Nothing (0, 0)] [])
-      `shouldBe` Left [FunctionAlreadyDefined (Ident "func" (0, 0)) []]
+      `shouldBe` Left [FunctionAlreadyDefined (Ident "func" (0, 0)) WInt []]
   
   it "renames functions that are mutually recursive" $
     test initAux renameProg (Program [Func WInt (Ident "func1" (0, 0)) [] [DecAssign WInt (Ident "x" (0, 0)) (Call (Ident "func2" (0, 0)) [] (0, 0)) (0, 0)] Nothing (0, 0), Func WInt (Ident "func2" (0,0)) [] [DecAssign WInt (Ident "x" (0,0)) (Call (Ident "func1" (0,0)) [] (0,0)) (0,0)] Nothing (0,0)] [])
-      `shouldBe` Right (Program [Func WInt (Ident "func1." (0,0)) [] [DecAssign WInt (Ident "x-2" (0,0)) (Call (Ident "func2" (0,0)) [] (0,0)) (0,0)] (Just 2) (0,0),Func WInt (Ident "func2." (0,0)) [] [DecAssign WInt (Ident "x-4" (0,0)) (Call (Ident "func1" (0,0)) [] (0,0)) (0,0)] (Just 4) (0,0)] [])
+      `shouldBe` Right (Program [Func WInt (Ident "func1.int" (0,0)) [] [DecAssign WInt (Ident "x-2" (0,0)) (Call (Ident "func2" (0,0)) [] (0,0)) (0,0)] (Just 2) (0,0),Func WInt (Ident "func2.int" (0,0)) [] [DecAssign WInt (Ident "x-4" (0,0)) (Call (Ident "func1" (0,0)) [] (0,0)) (0,0)] (Just 4) (0,0)] [])
 
   it "renames parameters" $
     test initAux renameParam (WInt, Ident "x" (0, 0))

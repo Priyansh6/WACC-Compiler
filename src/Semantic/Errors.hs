@@ -42,9 +42,9 @@ type Actual = WType
 
 data SemanticError
   = VariableAlreadyDefined Ident
-  | FunctionAlreadyDefined Ident [WType]
+  | FunctionAlreadyDefined Ident WType [WType]
   | VariableNotDefined Ident
-  | FunctionNotDefined Ident [WType]
+  | FunctionNotDefined Ident WType [WType]
   | IncompatibleTypes Position Expectation Actual
   | IllegalReturn Position
   | IllegalPairExchange Position
@@ -86,9 +86,9 @@ printSemanticErrors errs contents fname = putStrLn $ concatMap printSemanticErro
 errorMessage :: SemanticError -> String
 errorMessage semErr = case semErr of
   VariableAlreadyDefined (Ident i _) -> "The variable " ++ bold (show i) ++ yellow ++ " is already defined" ++ "\n"
-  FunctionAlreadyDefined (Ident i _) ts -> "The function " ++ bold (show i) ++ yellow ++ " with parameter types " ++ (bold . show . intercalate ", " . map showWType) ts ++ yellow ++ " is already defined" ++ "\n"
+  FunctionAlreadyDefined (Ident i _) rt ts -> "The function " ++ bold (show i) ++ yellow ++ " with return type " ++ bold (showWType rt) ++ yellow ++ " and parameter types (" ++ (bold . show . intercalate ", " . map showWType) ts ++ yellow ++ ") is already defined" ++ "\n"
   VariableNotDefined (Ident i _) -> "The variable " ++ bold (show i) ++ yellow ++ " is not defined" ++ "\n"
-  FunctionNotDefined (Ident i _) ts -> "The function " ++ bold (show i) ++ yellow ++ " with parameter types " ++ (bold . show . intercalate ", " . map showWType) ts ++ yellow ++ " is not defined" ++ "\n"
+  FunctionNotDefined (Ident i _) rt ts -> "The function " ++ bold (show i) ++ yellow ++ " with return type " ++ bold (showWType rt) ++ yellow ++ " and parameter types (" ++ (bold . show . intercalate ", " . map showWType) ts ++ yellow ++ ") is not defined" ++ "\n"
   IncompatibleTypes _ expecteds actual -> "Incompatible types\n\tExpected: " ++ bold (intercalate " or " (map showWType expecteds)) ++ yellow ++ "\n\tActual:   " ++ bold (showWType actual) ++ "\n"
   IllegalReturn _ -> "Return statements outside of functions are not allowed\n" ++ reset
   IllegalPairExchange _ -> "Illegal exchange of values between pairs of unknown types\n" ++ reset
@@ -108,9 +108,9 @@ showWType t = case t of
 
 getPosition :: SemanticError -> Position
 getPosition (VariableAlreadyDefined (Ident _ pos)) = pos
-getPosition (FunctionAlreadyDefined (Ident _ pos) _) = pos
+getPosition (FunctionAlreadyDefined (Ident _ pos) _ _) = pos
 getPosition (VariableNotDefined (Ident _ pos)) = pos
-getPosition (FunctionNotDefined (Ident _ pos) _) = pos
+getPosition (FunctionNotDefined (Ident _ pos) _ _) = pos
 getPosition (IncompatibleTypes pos _ _) = pos
 getPosition (IllegalReturn pos) = pos
 getPosition (IllegalPairExchange pos) = pos

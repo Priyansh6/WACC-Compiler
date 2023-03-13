@@ -20,12 +20,12 @@ checkStats = mapM_ checkStat
 checkStat :: Stat -> ScopedSemanticAnalyser ()
 checkStat (DecAssign ltype ident rval pos) = do
   insertAssign ltype ident
-  rtype <- checkRVal rval
+  rtype <- local (const (Just ltype)) (checkRVal rval)
   _ <- areTypesCompatible ltype rtype pos
   return ()
 checkStat (Assign lval rval pos) = do
   ltype <- checkLVal lval
-  rtype <- checkRVal rval
+  rtype <- local (const (Just ltype)) (checkRVal rval)
   _ <- areTypesCompatible ltype rtype pos
   return ()
 checkStat (Read lval pos) = do
