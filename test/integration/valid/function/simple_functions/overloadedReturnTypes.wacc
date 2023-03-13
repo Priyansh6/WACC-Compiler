@@ -1,4 +1,4 @@
-# tests three functions which have the same name but have different return and parameter types and quantities
+# tests two functions which have the same name and parameters but have different return types
 
 # Output:
 # 4
