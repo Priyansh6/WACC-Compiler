@@ -1,0 +1,30 @@
+# tests two functions which have the same name but have different return and parameter types and quantities
+
+# Output:
+# 8
+# true
+# k
+#
+
+# Program:
+
+begin
+  int f(int u, int v) is
+    return v
+  end
+
+  bool f(int u, bool v) is
+    return v
+  end
+
+  char f(string s) is
+    return 'k'
+  end
+
+  int r_int = call f(4, 8) ;
+  bool r_bool = call f(5, true) ;
+  char r_char = call f("dfk") ;
+  println(r_int) ;
+  println(r_bool) ;
+  println(r_char)
+end
