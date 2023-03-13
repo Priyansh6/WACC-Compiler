@@ -1,6 +1,6 @@
 # view each test's stdout and/or stderr
-VIEW_STDOUT = 0
-VIEW_STDERR = 0
+VIEW_STDOUT = 1
+VIEW_STDERR = 1
 TIMEOUT_DURATION = 5 # seconds
 
 # specify any test paths to run any tests on

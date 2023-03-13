@@ -25,4 +25,8 @@ renameProg (Program funcs stats) =
 
 addFuncName :: Func -> Renamer ()
 addFuncName f@(Func rt name ps _ _ _) = 
-  funcExists f >>= bool (addFuncIdent f) (addSemanticError $ FunctionAlreadyDefined name rt (fst (unzip ps)))
+  funcExists f >>= bool (addFuncIdent f) (addSemanticError $ FunctionAlreadyDefined name rt ((map convertPairToErrorType . fst . unzip) ps))
+  where
+    convertPairToErrorType :: WType -> WType
+    convertPairToErrorType (WPair _ _) = pairErrorType
+    convertPairToErrorType t = t

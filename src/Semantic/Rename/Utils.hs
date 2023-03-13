@@ -88,7 +88,7 @@ getIdentFromScopeStack name = do
         else local tail $ getIdentFromScopeStack name
 
 addTypesToFuncIdent :: Ident -> WType -> [WType] -> Ident
-addTypesToFuncIdent (Ident i pos) rt paramTs = Ident (i <> "." <> T.intercalate "_" (map showFuncWType (rt:paramTs))) pos
+addTypesToFuncIdent (Ident i pos) rt paramTs = Ident (i <> "." <> showFuncReturnWType rt <> "." <> T.intercalate "_" (map showFuncWType (paramTs))) pos
 
 addTypesToFunc :: Func -> Ident
 addTypesToFunc (Func rt name ps _ _ _) = addTypesToFuncIdent name rt (fst $ unzip ps)
@@ -104,3 +104,7 @@ showFuncWType WChar        = "char"
 showFuncWType WStr         = "string"
 showFuncWType (WArr t dim) = "arr" <> T.pack (show dim) <> showFuncWType t
 showFuncWType (WPair _ _)  = "pair"
+
+showFuncReturnWType :: WType -> T.Text
+showFuncReturnWType (WPair t1 t2) = "pair" <> showFuncWType t1 <> showFuncWType t2
+showFuncReturnWType t = showFuncWType t
