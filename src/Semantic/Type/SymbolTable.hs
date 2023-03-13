@@ -1,4 +1,4 @@
-module Semantic.Type.SymbolTable where
+module Semantic.Type.SymbolTable (module Semantic.Type.SymbolTable) where
 
 import Control.Monad.Except
 import Control.Monad.Reader

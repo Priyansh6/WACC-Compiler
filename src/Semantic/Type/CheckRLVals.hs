@@ -36,10 +36,15 @@ checkRVal (Call ident exprs pos) = do
     Just (FuncType funcType paramIdents) -> do
       paramTypes <- mapM getIdentType paramIdents
       m <- mapM (\(a, b) -> areTypesCompatible a b pos) (zip exprTypes paramTypes)
-      if length exprTypes == length paramTypes && and m
-          then return funcType
-          else compareParamsAndArguments ident paramTypes exprTypes pos
+      if and m
+        then return funcType
+        else errorByCompareParamsAndArguments paramTypes exprTypes
     _ -> error "Cannot call an ident that is not a function"
+  where
+    errorByCompareParamsAndArguments :: [WType] -> [WType] -> ScopedSemanticAnalyser WType
+    errorByCompareParamsAndArguments ps as = throwError $ IncompatibleTypes pos [pT] aT
+      where
+        (pT, aT) = head (dropWhile (uncurry (==)) (zip ps as))
 
 checkLVal :: LVal -> ScopedSemanticAnalyser WType
 checkLVal (LIdent ident) = getIdentType ident
@@ -74,12 +79,7 @@ checkPairElemType (Snd (LArray arrayElem) pos) = do
     WPair _ t -> return t
     t -> throwError $ IncompatibleTypes pos [pairErrorType] t
 
-compareParamsAndArguments :: Ident -> [WType] -> [WType] -> Position -> ScopedSemanticAnalyser WType
-compareParamsAndArguments ident ps as pos
-  | length ps /= length as = throwError (WrongArguments pos ident (length ps) (length as))
-  | otherwise              = throwError $ IncompatibleTypes pos [pT] aT
-  where
-    (pT, aT) = head (dropWhile (uncurry (==)) (zip ps as))
+
 
 areTypesCompatible :: WType -> WType -> Position -> ScopedSemanticAnalyser Bool
 areTypesCompatible WUnit WUnit pos = throwError (IllegalPairExchange pos) >> return False

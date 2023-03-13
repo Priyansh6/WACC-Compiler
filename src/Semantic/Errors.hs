@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Semantic.Errors where
+module Semantic.Errors (SemanticError (..), pairErrorType, arrayErrorType, getArrayErrorType, printSemanticErrors, semanticError) where
 
 import Data.List (intercalate)
 import qualified Data.Text as T
@@ -46,7 +46,6 @@ data SemanticError
   | VariableNotDefined Ident
   | FunctionNotDefined Ident [WType]
   | IncompatibleTypes Position Expectation Actual
-  | WrongArguments Position Ident Int Int
   | IllegalReturn Position
   | IllegalPairExchange Position
   deriving (Show, Eq)
@@ -87,18 +86,10 @@ printSemanticErrors errs contents fname = putStrLn $ concatMap printSemanticErro
 errorMessage :: SemanticError -> String
 errorMessage semErr = case semErr of
   VariableAlreadyDefined (Ident i _) -> "The variable " ++ bold (show i) ++ yellow ++ " is already defined" ++ "\n"
-  FunctionAlreadyDefined (Ident i _) _ -> "The function " ++ bold (show i) ++ yellow ++ " is already defined" ++ "\n"
+  FunctionAlreadyDefined (Ident i _) ts -> "The function " ++ bold (show i) ++ yellow ++ " with parameter types " ++ (bold . show . intercalate ", " . map showWType) ts ++ yellow ++ " is already defined" ++ "\n"
   VariableNotDefined (Ident i _) -> "The variable " ++ bold (show i) ++ yellow ++ " is not defined" ++ "\n"
-  FunctionNotDefined (Ident i _) _ -> "The function " ++ bold (show i) ++ yellow ++ " is not defined" ++ "\n"
+  FunctionNotDefined (Ident i _) ts -> "The function " ++ bold (show i) ++ yellow ++ " with parameter types " ++ (bold . show . intercalate ", " . map showWType) ts ++ yellow ++ " is not defined" ++ "\n"
   IncompatibleTypes _ expecteds actual -> "Incompatible types\n\tExpected: " ++ bold (intercalate " or " (map showWType expecteds)) ++ yellow ++ "\n\tActual:   " ++ bold (showWType actual) ++ "\n"
-  WrongArguments _ (Ident i _) expected actual ->
-    "The function "
-      ++ func
-      ++ if actual < expected
-        then " is missing " ++ bold (show (expected - actual)) ++ yellow ++ " arguments\n"
-        else " takes " ++ bold (show expected) ++ yellow ++ " arguments but " ++ bold (show actual) ++ yellow ++ " were given\n"
-    where
-      func = bold (show i) ++ yellow
   IllegalReturn _ -> "Return statements outside of functions are not allowed\n" ++ reset
   IllegalPairExchange _ -> "Illegal exchange of values between pairs of unknown types\n" ++ reset
 
@@ -121,7 +112,6 @@ getPosition (FunctionAlreadyDefined (Ident _ pos) _) = pos
 getPosition (VariableNotDefined (Ident _ pos)) = pos
 getPosition (FunctionNotDefined (Ident _ pos) _) = pos
 getPosition (IncompatibleTypes pos _ _) = pos
-getPosition (WrongArguments pos _ _ _) = pos
 getPosition (IllegalReturn pos) = pos
 getPosition (IllegalPairExchange pos) = pos
 
