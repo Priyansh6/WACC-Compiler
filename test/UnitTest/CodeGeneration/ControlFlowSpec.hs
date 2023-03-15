@@ -5,6 +5,7 @@ module UnitTest.CodeGeneration.ControlFlowSpec (spec) where
 import CodeGeneration.Intermediate.ControlFlow 
 import CodeGeneration.Intermediate.IR
 import Data.Map ((!))
+import Data.List (sort)
 import Test.Hspec
 
 import qualified Data.Map as M
@@ -56,6 +57,9 @@ spec = do
                                        , (Right 6, Right 7)
                                        , (Right 7, Left "exit")]
 
+  it "correctly identifies the successors of unconditional jump nodes" $
+    successors (Right 2) cfg4 `shouldBe` [Left "equal"]
+
   let is5 = [ Mov (Reg (TmpReg 0)) (Imm 5) -- Right 0
             , Cmp (Reg (TmpReg 0)) (Imm 1) -- Right 1
             , Je "equal"                   -- Right 2
@@ -76,3 +80,10 @@ spec = do
                                        , (Right 4, Left "equal")
                                        , (Left "equal", Right 6)
                                        , (Right 6, Left "exit")]
+
+  it "correctly identifies the successors of non jump nodes" $
+    successors (Right 0) cfg5 `shouldBe` [Right 1]
+
+  it "correctly identifies the successors of conditional jump nodes" $
+    successors (Right 2) cfg5 `shouldBe` sort [Left "equal", Right 3]
+
