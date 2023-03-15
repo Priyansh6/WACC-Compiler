@@ -174,11 +174,9 @@ transArrayElem (ArrayElem (AST.Ident i _) exprs _) dst = do
     transArrExpr arrPtr (e : es) arrDst = do
       eInstrs <- transExp e (IRParam 1)
       indexArrayInstrs <- transArrExpr arrDst es arrDst
-      return $
-        eInstrs
-          ++ [ Mov (Reg (IRParam 0)) (Reg arrPtr) ]
-          ++ eInstrs
-          ++ [ Jsr $ showHelperLabel ArrLoad,
-               Mov (Reg arrDst) (Reg IRRet)
-             ]
-          ++ indexArrayInstrs
+      return $ [ Mov (Reg (IRParam 0)) (Reg arrPtr) ]
+            ++ eInstrs
+            ++ [ Jsr $ showHelperLabel ArrLoad,
+                 Mov (Reg arrDst) (Reg IRRet)
+               ]
+            ++ indexArrayInstrs
