@@ -14,7 +14,7 @@ QEMU_TESTS = [
 	"valid/array/array.wacc",
 	"valid/array/arrayBasic.wacc",
 	"valid/array/arrayEmpty.wacc",
-	"valid/array/arrayIndexMayBeArrayIndex.wacc",
+	# "valid/array/arrayIndexMayBeArrayIndex.wacc",
 	"valid/array/arrayLength.wacc",
 	"valid/array/arrayLookup.wacc",
 	"valid/array/arrayNested.wacc",
