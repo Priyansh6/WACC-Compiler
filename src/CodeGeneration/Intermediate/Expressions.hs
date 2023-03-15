@@ -14,8 +14,6 @@ import CodeGeneration.Utils
     getVarReg,
     getWType,
     heapTypeSize,
-    makeRegAvailable,
-    nextFreeReg,
     nextLabel,
     (<++),
   )
@@ -29,11 +27,7 @@ type NumInstrCons a = Operand a -> Operand a -> Operand a -> Instr a
 type BranchInstrCons a = Label -> Instr a
 
 transExp :: Expr -> IRReg -> IRStatementGenerator IRInstrs
-transExp (IntLiter x _) dst =
-  return
-    [ Load (Reg IRScratch1) (Abs $ T.pack $ show x),
-      Mov (Reg dst) (Reg IRScratch1)
-    ]
+transExp (IntLiter x _) dst = return [Load (Reg dst) (Abs $ T.pack $ show x)]
 transExp (BoolLiter True _) dst =
   return [Mov (Reg dst) true]
   where
@@ -50,9 +44,9 @@ transExp (PairLiter _) dst =
     nullptr = Imm 0
 transExp (IdentExpr (AST.Ident i _) _) dst = getVarReg (Ident i) >>= (\r -> return [Mov (Reg dst) (Reg r)])
 transExp (ArrayExpr (ArrayElem _ [] _) _) _ = error "accessing array at no indices is semantically incorrect"
-transExp (ArrayExpr l@(ArrayElem (AST.Ident i _) es@(e : _) _) _) dst = do
+transExp (ArrayExpr l@(ArrayElem (AST.Ident i _) es _) _) dst = do
   lInstrs <- transArrayElem l (IRParam 0)
-  eInstrs <- transExp e (IRParam 1)
+  eInstrs <- transExp (last es) (IRParam 1)
   wType <- getWType (Ident i)
   let (WArr t dim) = wType
       accType = if dim == length es then t else WArr t (dim - length es)
@@ -178,15 +172,13 @@ transArrayElem (ArrayElem (AST.Ident i _) exprs _) dst = do
     transArrExpr _ [] _ = error "semantically incorrect"
     transArrExpr arrPtr [_] arrDst = return [Mov (Reg arrDst) (Reg arrPtr)]
     transArrExpr arrPtr (e : es) arrDst = do
-      eDst <- nextFreeReg
-      eInstrs <- transExp e eDst
+      eInstrs <- transExp e (IRParam 1)
       indexArrayInstrs <- transArrExpr arrDst es arrDst
-      _ <- makeRegAvailable eDst
       return $
         eInstrs
-          ++ [ Mov (Reg $ IRParam 0) (Reg arrPtr),
-               Mov (Reg $ IRParam 1) (Reg eDst),
-               Jsr $ showHelperLabel ArrLoad,
+          ++ [ Mov (Reg (IRParam 0)) (Reg arrPtr) ]
+          ++ eInstrs
+          ++ [ Jsr $ showHelperLabel ArrLoad,
                Mov (Reg arrDst) (Reg IRRet)
              ]
           ++ indexArrayInstrs
