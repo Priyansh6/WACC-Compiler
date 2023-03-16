@@ -88,7 +88,7 @@ getIdentFromScopeStack name = do
         else local tail $ getIdentFromScopeStack name
 
 addTypesToFuncIdent :: Ident -> WType -> [WType] -> Ident
-addTypesToFuncIdent (Ident i pos) rt paramTs = Ident (i <> "." <> T.concat (map showFuncWType (rT:paramTs))) pos
+addTypesToFuncIdent (Ident i pos) rt paramTs = Ident (i <> "." <> T.concat (map showFuncWType (rt:paramTs))) pos
 
 addTypesToFunc :: Func -> Ident
 addTypesToFunc (Func rt name ps _ _ _) = addTypesToFuncIdent name rt (fst $ unzip ps)
