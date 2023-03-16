@@ -1,0 +1,24 @@
+# tests two functions which have the same name and parameters but have different return types
+
+# Output:
+# 4
+# true
+#
+
+# Program:
+
+begin
+  int f() is
+    return 4
+  end
+
+  bool f() is
+    return true
+  end
+
+  int r_int = call f() ;
+  bool r_bool = false ;
+  r_bool = call f() ;
+  println(r_int) ;
+  println(r_bool)
+end

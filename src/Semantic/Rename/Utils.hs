@@ -87,20 +87,20 @@ getIdentFromScopeStack name = do
         then return $ Just name'
         else local tail $ getIdentFromScopeStack name
 
-addTypesToFuncIdent :: Ident -> [WType] -> Ident
-addTypesToFuncIdent (Ident i pos) paramTs = Ident (i <> "." <> T.intercalate "_" (map showFuncWType (paramTs))) pos
+addTypesToFuncIdent :: Ident -> WType -> [WType] -> Ident
+addTypesToFuncIdent (Ident i pos) rt paramTs = Ident (i <> "." <> T.concat (map showFuncWType (rt:paramTs))) pos
 
 addTypesToFunc :: Func -> Ident
-addTypesToFunc (Func _ name ps _ _ _) = addTypesToFuncIdent name (fst $ unzip ps)
+addTypesToFunc (Func rt name ps _ _ _) = addTypesToFuncIdent name rt (fst $ unzip ps)
 
 getOriginalFuncIdent :: Ident -> Ident
 getOriginalFuncIdent (Ident i pos) = Ident (T.takeWhile (/= '.') i) pos
 
 showFuncWType :: WType -> T.Text
 showFuncWType WUnit        = error "Cannot have a parameter with type WUnit"
-showFuncWType WInt         = "int"
-showFuncWType WBool        = "bool"
-showFuncWType WChar        = "char"
-showFuncWType WStr         = "string"
-showFuncWType (WArr t dim) = "arr" <> T.pack (show dim) <> showFuncWType t
-showFuncWType (WPair _ _)  = "pair"
+showFuncWType WInt         = "i"
+showFuncWType WBool        = "b"
+showFuncWType WChar        = "c"
+showFuncWType WStr         = "s"
+showFuncWType (WArr t dim) = "a" <> T.pack (show dim) <> showFuncWType t
+showFuncWType (WPair _ _)  = "p"

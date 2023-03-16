@@ -76,22 +76,23 @@ transSection :: Section IRReg -> ArmTranslator (Section ArmReg)
 transSection (Section d (Body label global instrs)) = do
   section <- concat <$> mapM transAndAddMemoryInstrs instrs
   fpOff <- gets nextFPOffset
+  availRegs <- gets regsAvailable
+  let usedRegs = generalRegs S.\\ availRegs
+      (pushInstr, popInstr) = if S.null usedRegs then ([], []) else ([Push (Regs (S.toList usedRegs))], [Pop (Regs (S.toList usedRegs))])
   return $
     Section
       d
       ( Body
           label
           global
-          ( [ Push (Regs [FP, LR]),
-              Push (Regs (S.toList generalRegs)),
-              Mov (Reg FP) (Reg SP),
-              Add (Reg SP) (Reg SP) (Imm (fpOff + 4))
-            ]
-              ++ section
-              ++ [ Sub (Reg SP) (Reg SP) (Imm (fpOff + 4)),
-                   Pop (Regs (S.toList generalRegs)),
-                   Pop (Regs [FP, PC])
-                 ]
+          ( [ Push (Regs [FP, LR]) ]
+            ++ pushInstr
+            ++ [ Mov (Reg FP) (Reg SP),
+              Add (Reg SP) (Reg SP) (Imm (fpOff + 4)) ]
+            ++ section
+            ++ [ Sub (Reg SP) (Reg SP) (Imm (fpOff + 4)) ]
+            ++ popInstr
+            ++ [ Pop (Regs [FP, PC]) ]
           )
       )
 

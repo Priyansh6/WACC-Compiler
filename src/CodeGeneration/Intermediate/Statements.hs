@@ -26,11 +26,9 @@ transStat :: Stat -> IRStatementGenerator IRInstrs
 transStat Skip = return []
 transStat (DecAssign _ (AST.Ident i _) r _) = do
   varReg <- nextFreeReg
-  rReg <- nextFreeReg
-  rInstrs <- transRVal r rReg
-  makeRegAvailable rReg
+  rInstrs <- transRVal r varReg
   insertVarReg (Ident i) varReg
-  return $ rInstrs ++ [Mov (Reg varReg) (Reg rReg)]
+  return rInstrs
 transStat (Assign (LIdent (AST.Ident i _)) r _) = do
   varReg <- getVarReg (Ident i)
   withReg (\rReg -> transRVal r rReg <++ [Mov (Reg varReg) (Reg rReg)])
@@ -103,31 +101,13 @@ transStat (Exit e _) = do
   return $ eis ++ [Mov (Reg $ IRParam 0) (Reg dst), Jsr "exit"]
 transStat (Print e) = do
   helperFuncType <- HPrint . fromWType <$> exprType e
-  eInstrs <-
-    withReg
-      ( \r ->
-          transExp e r
-            <++ [ Mov (Reg (IRParam 0)) (Reg r),
-                  Jsr (showHelperLabel helperFuncType),
-                  Comment "end of print"
-                ]
-      )
   addHelperFunc helperFuncType
-  return eInstrs
+  transExp e (IRParam 0) <++ [Jsr (showHelperLabel helperFuncType)]
 transStat (Println e) = do
   helperFuncType <- HPrint . fromWType <$> exprType e
-  eInstrs <-
-    withReg
-      ( \r ->
-          transExp e r
-            <++ [ Mov (Reg (IRParam 0)) (Reg r),
-                  Jsr (showHelperLabel helperFuncType),
-                  Jsr (showHelperLabel HPrintln)
-                ]
-      )
   addHelperFunc helperFuncType
   addHelperFunc HPrintln
-  return eInstrs
+  transExp e (IRParam 0) <++ [Jsr (showHelperLabel helperFuncType), Jsr (showHelperLabel HPrintln)]
 transStat (If e ss _ ss' _ _) = do
   eReg <- nextFreeReg
   eInstrs <- transExp e eReg
@@ -165,10 +145,8 @@ transRVal (ArrayLiter elems@(e : _) _) dst = do
   where
     transArrLiterElem :: HelperFunc -> Expr -> Int -> IRStatementGenerator IRInstrs
     transArrLiterElem hf e' idx = do
-      eReg <- nextFreeReg
-      exprInstrs <- transExp e' eReg
-      makeRegAvailable eReg
-      return $ exprInstrs ++ [Mov (Reg (IRParam 0)) (Reg dst), Mov (Reg (IRParam 1)) (Imm idx), Mov (Reg (IRParam 2)) (Reg eReg), Jsr (showHelperLabel hf)]
+      eInstrs <- transExp e' (IRParam 2)
+      return $ [Mov (Reg (IRParam 0)) (Reg dst), Mov (Reg (IRParam 1)) (Imm idx)] ++ eInstrs ++ [Jsr (showHelperLabel hf)]
 transRVal (NewPair e e' _) dst = do
   eReg <- nextFreeReg
   ePtrReg <- nextFreeReg
