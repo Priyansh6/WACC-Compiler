@@ -31,7 +31,9 @@ type BranchInstrCons a = Label -> Instr a
 transExp :: Expr -> IRReg -> IRStatementGenerator IRInstrs
 transExp (IntLiter x _) dst =
   return
-    [ Load (Reg IRScratch1) (Abs $ T.pack $ show x),
+    [ (if (x >= 0 && x <= 256) 
+      then (Mov (Reg IRScratch1) (Imm (fromIntegral x))) 
+      else Load (Reg IRScratch1) (Abs $ T.pack $ show x)),
       Mov (Reg dst) (Reg IRScratch1)
     ]
 transExp (BoolLiter True _) dst =
@@ -100,8 +102,8 @@ transExp ((:&&:) e e' _) dst = do
   eInstrs <- transExp e dst
   eInstrs' <- transExp e' dst
   let successCase =
-        [ Pop (Reg IRScratch2),
-          Pop (Reg IRScratch1),
+        [ Pop (Regs [IRScratch2]),
+          Pop (Regs [IRScratch1]),
           Cmp (Reg IRScratch1) (Imm 1),
           Jne failLabel,
           Cmp (Reg IRScratch2) (Imm 1),
@@ -111,15 +113,15 @@ transExp ((:&&:) e e' _) dst = do
         ]
       failCase = [Define failLabel, Mov (Reg dst) (Imm 0)]
       end = [Define endLabel]
-  return $ eInstrs ++ [Push (Reg dst)] ++ eInstrs' ++ [Push (Reg dst)] ++ successCase ++ failCase ++ end
+  return $ eInstrs ++ [Push (Regs [dst])] ++ eInstrs' ++ [Push (Regs [dst])] ++ successCase ++ failCase ++ end
 transExp ((:||:) e e' _) dst = do
   successLabel <- nextLabel
   endLabel <- nextLabel
   eInstrs <- transExp e dst
   eInstrs' <- transExp e' dst
   let failCase =
-        [ Pop (Reg IRScratch2),
-          Pop (Reg IRScratch1),
+        [ Pop (Regs [IRScratch2]),
+          Pop (Regs [IRScratch1]),
           Cmp (Reg IRScratch1) (Imm 1),
           Je successLabel,
           Cmp (Reg IRScratch2) (Imm 1),
@@ -129,7 +131,7 @@ transExp ((:||:) e e' _) dst = do
         ]
       successCase = [Define successLabel, Mov (Reg dst) (Imm 1)]
       end = [Define endLabel]
-  return $ eInstrs ++ [Push (Reg dst)] ++ eInstrs' ++ [Push (Reg dst)] ++ failCase ++ successCase ++ end
+  return $ eInstrs ++ [Push (Regs [dst])] ++ eInstrs' ++ [Push (Regs [dst])] ++ failCase ++ successCase ++ end
 
 transNumOp :: NumInstrCons IRReg -> Expr -> Expr -> IRReg -> IRStatementGenerator IRInstrs
 transNumOp cons e e' dst = do
@@ -137,11 +139,11 @@ transNumOp cons e e' dst = do
   eInstrs' <- transExp e' dst
   return $
     eInstrs
-      ++ [Push (Reg dst)]
+      ++ [Push (Regs [dst])]
       ++ eInstrs'
-      ++ [ Push (Reg dst),
-           Pop (Reg IRScratch2),
-           Pop (Reg IRScratch1),
+      ++ [ Push (Regs [dst]),
+           Pop (Regs [IRScratch2]),
+           Pop (Regs [IRScratch1]),
            cons (Reg dst) (Reg IRScratch1) (Reg IRScratch2)
          ]
 
@@ -156,11 +158,11 @@ transCmpOp cons e e' dst = do
   eInstrs' <- transExp e' dst
   return $
     eInstrs
-      ++ [Push (Reg dst)]
+      ++ [Push (Regs [dst])]
       ++ eInstrs'
-      ++ [ Push (Reg dst),
-           Pop (Reg IRScratch2),
-           Pop (Reg IRScratch1),
+      ++ [ Push (Regs [dst]),
+           Pop (Regs [IRScratch2]),
+           Pop (Regs [IRScratch1]),
            Cmp (Reg IRScratch1) (Reg IRScratch2),
            cons greaterLabel
          ]

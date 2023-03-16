@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module CodeGeneration.ARM.Registers (ArmInstr, ArmInstrs, ArmReg (..), transProg, overflowReg) where
+module CodeGeneration.ARM.Registers (isParamOperand, isGeneralOperand, isScratchOperand, ArmInstr, ArmInstrs, ArmReg (..), transProg, overflowReg) where
 -- Convert IR to ARM / Allocate ARM registers from an intermediate respresentation --
 
 import AST (WType (WInt))
@@ -49,6 +49,18 @@ allRegs = S.fromList [R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, FP, R12, SP, 
 generalRegs = S.fromList [R4, R5, R6, R7]
 paramRegs = S.fromList [R0, R1, R2, R3]
 scratchRegs = S.fromList [R8, R10, R12]
+
+isScratchOperand :: Operand ArmReg -> Bool
+isScratchOperand (Reg reg) = S.member reg scratchRegs
+isScratchOperand _ = False
+
+isGeneralOperand :: Operand ArmReg -> Bool 
+isGeneralOperand (Reg reg) = S.member reg generalRegs
+isGeneralOperand _ = False
+
+isParamOperand :: Operand ArmReg -> Bool
+isParamOperand (Reg reg) = S.member reg paramRegs
+isParamOperand _ = False
 
 retReg, overflowReg :: ArmReg
 retReg = R0

@@ -202,7 +202,7 @@ transRVal (Call (AST.Ident i _) exps _) dst = do
     prepareParams (e : es) paramNum stackOff = do
       paramInstrs <- transExp e IRScratch1
       (remainingInstrs, finalStackOff) <- prepareParams es (paramNum - 1) stackOff'
-      return (paramInstrs ++ [Push (Reg IRScratch1)] ++ remainingInstrs ++ popInstrs, finalStackOff)
+      return (paramInstrs ++ [Push (Regs [IRScratch1])] ++ remainingInstrs ++ popInstrs, finalStackOff)
       where
         popInstrs = [Pop (Regs [IRParam paramNum]) | paramNum < numParamRegs]
         stackOff' = if paramNum >= numParamRegs then stackOff + 4 else stackOff
