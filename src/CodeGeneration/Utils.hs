@@ -21,7 +21,6 @@ module CodeGeneration.Utils
     nextLabel,
     stackTypeSize,
     heapTypeSize,
-    wrapScope,
     (<++>),
     (++>),
     (<++),
@@ -167,12 +166,3 @@ exprType ((:==:) {}) = return WBool
 exprType ((:!=:) {}) = return WBool
 exprType ((:&&:) {}) = return WBool
 exprType ((:||:) {}) = return WBool
-
-wrapScope :: Int -> IRInstrs -> IRSectionGenerator IRInstrs
-wrapScope scopeId instrs = do
-  (_, sm) <- ask
-  case M.lookup scopeId sm of
-    Nothing -> return instrs
-    Just ids -> do
-      let stackSize = 4 * length ids
-      return $ [Sub (Reg IRSP) (Reg IRSP) (Imm stackSize)] ++ instrs ++ [Add (Reg IRSP) (Reg IRSP) (Imm stackSize)]

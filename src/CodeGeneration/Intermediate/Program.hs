@@ -47,7 +47,7 @@ transMain ss = do
     _ -> return (Section dataSection (Body name True (bodyInstrs ++ [Mov (Reg IRRet) (Imm 0)])), helperFuncs aux)
 
 transFunc :: AST.Func -> IRSectionGenerator (Section IRReg, HelperFuncs)
-transFunc (AST.Func _ (AST.Ident name _) params ss scopeId _) = do
+transFunc (AST.Func _ (AST.Ident name _) params ss _ _) = do
   let (dataSection, lt) = generateDataSection ss name
       numParams = length params
       registerParamMoves = take numParams $ zipWith Mov (map (Reg . TmpReg) [0 .. numParamRegs - 1]) (map (Reg . IRParam) [0 .. numParamRegs - 1])
