@@ -41,7 +41,9 @@ data CFGNode a
     isEntry :: Bool,
     isExit :: Bool,
     dominators :: Set Id,
-    revDominators :: Set Id
+    revDominators :: Set Id,
+    liveIns :: Set a,
+    liveOuts :: Set a
   } deriving (Show, Eq)
 
 toCFG :: Instrs a -> CFG a
@@ -64,7 +66,9 @@ mkCFGNode i instr isEntry
             , isEntry = isEntry
             , isExit = isExit' instr
             , dominators = Set.empty
-            , revDominators = Set.empty }
+            , revDominators = Set.empty
+            , liveIns = Set.empty
+            , liveOuts = Set.empty }
   where
     isExit' :: Instr a -> Bool
     isExit' (Jsr "exit") = True

@@ -22,6 +22,9 @@ module CodeGeneration.Utils
     stackTypeSize,
     heapTypeSize,
     wrapScope,
+    temps, 
+    used, 
+    defs,
     (<++>),
     (++>),
     (<++),
@@ -35,8 +38,10 @@ import CodeGeneration.Intermediate.IR
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.Functor ((<&>))
+import Data.Set (Set)
 import qualified Data.List as L
 import qualified Data.Map as M
+import qualified Data.Set as Set
 import qualified Data.Text as T
 import Semantic.Rename.Scope ( ScopeMap )
 import Semantic.Type.SymbolTable (IdentType, SymbolTable, fromIdentType)
@@ -176,3 +181,63 @@ wrapScope scopeId instrs = do
     Just ids -> do
       let stackSize = 4 * length ids
       return $ [Sub (Reg IRSP) (Reg IRSP) (Imm stackSize)] ++ instrs ++ [Add (Reg IRSP) (Reg IRSP) (Imm stackSize)]
+
+tmpOperands :: Operand IRReg -> Set IRReg
+tmpOperands (Reg r) = tmpReg r
+tmpOperands (Regs rs) = foldr ((<>) . tmpReg) Set.empty rs
+tmpOperands (Ind r) = tmpReg r
+tmpOperands (ImmOffset r _) = tmpReg r
+tmpOperands (ASR r _) = tmpReg r
+tmpOperands _ = Set.empty
+
+tmpReg :: IRReg -> Set IRReg
+tmpReg t@(TmpReg _) = Set.singleton t
+tmpReg _ = Set.empty
+
+-- Returns the tmpregs defined by an instr
+defs :: Instr IRReg -> Set IRReg
+defs (Load o _) = tmpOperands o
+defs (LoadB o _) = tmpOperands o
+defs (Store _ o) = tmpOperands o
+defs (StoreB _ o) = tmpOperands o
+defs (Mov o _) = tmpOperands o
+defs (Add o _ _) = tmpOperands o
+defs (Sub o _ _) = tmpOperands o
+defs (Mul o _ _) = tmpOperands o
+defs (Div o _ _) = tmpOperands o
+defs (Mod o _ _) = tmpOperands o
+defs (Pop o) = tmpOperands o
+defs _ = Set.empty
+
+-- Returns the tmpregs used by an instr
+used :: Instr IRReg -> Set IRReg
+used (Load _ o) = tmpOperands o
+used (LoadB _ o) = tmpOperands o
+used (Store o _) = tmpOperands o
+used (StoreB o _) = tmpOperands o
+used (Mov _ o) = tmpOperands o
+used (Add _ o1 o2) = tmpOperands o1 <> tmpOperands o2
+used (Sub _ o1 o2) = tmpOperands o1 <> tmpOperands o2
+used (Mul _ o1 o2) = tmpOperands o1 <> tmpOperands o2
+used (Div _ o1 o2) = tmpOperands o1 <> tmpOperands o2
+used (Mod _ o1 o2) = tmpOperands o1 <> tmpOperands o2
+used (Cmp o1 o2) = tmpOperands o1 <> tmpOperands o2
+used (Push o) = tmpOperands o
+used _ = Set.empty
+
+-- Returns all tmpRegs an instruction interacts with
+temps :: Instr IRReg -> Set IRReg
+temps (Load o1 o2) = tmpOperands o1 <> tmpOperands o2
+temps (LoadB o1 o2) = tmpOperands o1 <> tmpOperands o2
+temps (Store o1 o2) = tmpOperands o1 <> tmpOperands o2
+temps (StoreB o1 o2) = tmpOperands o1 <> tmpOperands o2
+temps (Mov o1 o2) = tmpOperands o1 <> tmpOperands o2
+temps (Add o1 o2 o3) = tmpOperands o1 <> tmpOperands o2 <> tmpOperands o3
+temps (Sub o1 o2 o3) = tmpOperands o1 <> tmpOperands o2 <> tmpOperands o3
+temps (Mul o1 o2 o3) = tmpOperands o1 <> tmpOperands o2 <> tmpOperands o3
+temps (Div o1 o2 o3) = tmpOperands o1 <> tmpOperands o2 <> tmpOperands o3
+temps (Mod o1 o2 o3) = tmpOperands o1 <> tmpOperands o2 <> tmpOperands o3
+temps (Cmp o1 o2) = tmpOperands o1 <> tmpOperands o2
+temps (Push o1) = tmpOperands o1
+temps (Pop o1) = tmpOperands o1
+temps _ = Set.empty

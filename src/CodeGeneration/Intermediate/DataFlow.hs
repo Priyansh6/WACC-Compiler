@@ -1,10 +1,15 @@
-module CodeGeneration.Intermediate.DataFlow (solveDominatorDFE, solveRevDominatorDFE) where
+module CodeGeneration.Intermediate.DataFlow 
+  ( solveDominatorDFE
+  , solveRevDominatorDFE
+  , solveLiveRangesDFE
+) where
 
 import CodeGeneration.Intermediate.ControlFlow 
 import CodeGeneration.Intermediate.IR
+import CodeGeneration.Utils (used, defs)
 import Data.List (foldl', foldl1')
 import Data.Map ((!))
-import Data.Set (Set)
+import Data.Set (Set, (\\))
 import Prelude hiding (id)
 
 import qualified Data.Map as M
@@ -13,7 +18,7 @@ import qualified Data.Set as Set
 type DFE a = CFG a -> Id -> CFG a
 type DFEInitialiser a = CFG a -> CFG a
 type DFEIterator a = CFG a -> Id -> CFG a
-type Diff a = CFG a -> [Set Id]
+type Diff a b = CFG a -> b
 
 iterateDFE :: DFEIterator a -> CFG a -> CFG a
 iterateDFE dfe cfg
@@ -21,7 +26,7 @@ iterateDFE dfe cfg
   where
     nodeIds = M.keys $ nodes cfg
 
-solveDFE :: DFEInitialiser a -> DFE a -> Diff a -> CFG a -> CFG a
+solveDFE :: Eq b => DFEInitialiser a -> DFE a -> Diff a b -> CFG a -> CFG a
 solveDFE initialiser dfe diff cfg
   = solveDFE' start
   where
@@ -70,6 +75,26 @@ solveRevDominatorDFE
         n' = if null succDominators 
               then n {revDominators = Set.singleton i} 
               else n {revDominators = Set.singleton i <> foldl1' Set.intersection succDominators} 
-        n = nodes cfg ! i
+        n = nm ! i
         succDominators = map (\i' -> revDominators (nm ! i')) (successors i cfg)
     diff = map revDominators . M.elems . nodes
+
+solveLiveRangesDFE :: CFG IRReg -> CFG IRReg
+solveLiveRangesDFE
+  = solveDFE initialise dfe diff
+  where
+    initialise cfg@CFG {nodes = nm}
+      = cfg {nodes = M.map initialiseNode nm}
+      where
+        initialiseNode cfgn = cfgn {liveIns = Set.empty, liveOuts = Set.empty}
+
+    dfe cfg@CFG {nodes = nm} i
+      = cfg {nodes = M.insert i n' nm }
+      where
+        n' = n {liveIns = lis', liveOuts = los'}
+        n@CFGNode{instr = inst, liveOuts = los} = nm ! i
+        lis' = used inst <> (los \\ defs inst)
+        los' = mconcat [liveOuts (nm ! i')| i' <- successors i cfg]
+
+    diff cfg = [(liveIns n, liveOuts n) | n <- M.elems $ nodes cfg]
+  
