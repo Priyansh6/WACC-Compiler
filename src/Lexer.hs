@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances, GADTs, OverloadedStrings, TypeSynonymInstances#-}
 
-module Lexer (ident, number, char, brackets, parens, fully) where
+module Lexer (ident, number, char, brackets, parens, fully, keywords) where
 
 import Data.Maybe
 import Data.String
