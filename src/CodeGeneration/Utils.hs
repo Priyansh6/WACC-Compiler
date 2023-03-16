@@ -25,6 +25,7 @@ module CodeGeneration.Utils
     temps, 
     used, 
     defs,
+    mapBodies,
     (<++>),
     (++>),
     (<++),
@@ -45,6 +46,8 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import Semantic.Rename.Scope ( ScopeMap )
 import Semantic.Type.SymbolTable (IdentType, SymbolTable, fromIdentType)
+
+import qualified CodeGeneration.Intermediate.IR as IR (Program)
 
 type IRStatementGenerator a = StateT Aux (Reader (SymbolTable, ScopeMap)) a
 
@@ -241,3 +244,7 @@ temps (Cmp o1 o2) = tmpOperands o1 <> tmpOperands o2
 temps (Push o1) = tmpOperands o1
 temps (Pop o1) = tmpOperands o1
 temps _ = Set.empty
+
+mapBodies :: ([Instr a] -> [Instr a]) -> IR.Program a -> IR.Program a
+mapBodies f
+  = map (\(Section d (Body l g is)) -> Section d (Body l g (f is))) 

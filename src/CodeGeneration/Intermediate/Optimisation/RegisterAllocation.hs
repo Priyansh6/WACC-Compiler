@@ -11,6 +11,8 @@ import Data.Set (Set)
 import qualified Data.Map as M
 import qualified Data.Set as Set
 
+import Debug.Trace
+
 -- Type a denotes the source register type, type b denotes the target register type
 type RIG a b = Map a (Set (Either a b))
 
@@ -39,7 +41,7 @@ colour cfg rig
     startingAmount = 2
     colour' :: Int -> Colouring IRReg IRReg
     colour' i 
-      = case findColouring cfg rig (map TmpReg [1..i]) of
+      = case findColouring cfg rig (map TmpReg [0..i]) of
           Just colouring -> colouring
           _ -> colour' (i + 1)
 
@@ -54,7 +56,6 @@ findColouring cfg rig regs = colourings
       | otherwise = Just $ head cs
       where
         cs = catMaybes [M.insert t r <$> findColouring' ts (M.adjust (Set.insert (Right r)) t rig') | (_, r) <- validMappings]
-        validMappings :: [(IRReg, IRReg)]
         validMappings = [(t, r) | (_, r) <- [(t, r) | r <- regs, not $ interferes t r rig']]
 
 interferes :: IRReg -> IRReg -> RIG IRReg IRReg -> Bool
@@ -85,11 +86,11 @@ replace c (Push op1) = Push (replaceOp c op1)
 replace c (Pop op1) = Pop (replaceOp c op1)
 replace _ i = i
 
-replaceOp :: Ord a => Colouring a b -> Operand a -> Operand b
-replaceOp c (Reg r) = Reg (c ! r)
-replaceOp c (Regs rs) = Regs (map (c !) rs)
-replaceOp c (Ind r) = Ind (c ! r)
-replaceOp c (ImmOffset r i) = ImmOffset (c ! r) i
-replaceOp c (ASR r i) = ASR (c ! r) i
+replaceOp :: Colouring IRReg IRReg -> Operand IRReg -> Operand IRReg
+replaceOp c (Reg r) = Reg (M.findWithDefault r r c)
+replaceOp c (Regs rs) = Regs (map (\r -> M.findWithDefault r r c) rs)
+replaceOp c (Ind r) = Ind (M.findWithDefault r r c)
+replaceOp c (ImmOffset r i) = ImmOffset (M.findWithDefault r r c) i
+replaceOp c (ASR r i) = ASR (M.findWithDefault r r c) i
 replaceOp _ (Imm x) = Imm x
 replaceOp _ (Abs x) = Abs x

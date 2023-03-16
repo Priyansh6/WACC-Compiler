@@ -24,6 +24,8 @@ import qualified Data.Map as M
 import qualified Data.Set as Set
 import qualified Data.Text as T
 
+import Debug.Trace
+
 type Id = Either Label Int
 
 data JmpType = CondJmp | LinearJmp 
@@ -38,9 +40,7 @@ data CFGNode a
   = CFGNode {
     id :: Id,
     instr :: Instr a,
-    isEntry :: Bool,
     isExit :: Bool,
-    dominators :: Set Id,
     revDominators :: Set Id,
     liveIns :: Set a,
     liveOuts :: Set a
@@ -48,24 +48,20 @@ data CFGNode a
 
 toCFG :: Instrs a -> CFG a
 toCFG [] = CFG { nodes = M.empty, edges = Set.empty }
-toCFG (entryInstr:instrs)
+toCFG instrs
   = CFG {
-    nodes = M.fromList allLabelled,
-    edges = findEdges allLabelled
+    nodes = M.fromList labelledInstrs,
+    edges = findEdges labelledInstrs allLabels
   }
   where
-    allLabelled = labelledEntry : labelledInstrs
-    labelledInstrs = zipWith (\n instr -> (assignId instr n, mkCFGNode (assignId instr n) instr False)) [1..] instrs 
-    labelledEntry = (i0, mkCFGNode i0 entryInstr True)
-    i0 = assignId entryInstr 0
+    labelledInstrs = zipWith (\n instr -> (assignId instr n, mkCFGNode (assignId instr n) instr)) [0..] instrs 
+    allLabels = Set.fromList [l | (Define l) <- instrs]
 
-mkCFGNode :: Id -> Instr a -> Bool -> CFGNode a
-mkCFGNode i instr isEntry 
+mkCFGNode :: Id -> Instr a -> CFGNode a
+mkCFGNode i instr 
   = CFGNode { id = i
             , instr = instr
-            , isEntry = isEntry
             , isExit = isExit' instr
-            , dominators = Set.empty
             , revDominators = Set.empty
             , liveIns = Set.empty
             , liveOuts = Set.empty }
@@ -79,16 +75,18 @@ mkCFGNode i instr isEntry
 fromCFG :: CFG a -> Instrs a
 fromCFG = undefined
 
-findEdges :: [(Id, CFGNode a)] -> Set (Id, Id)
-findEdges ((i, CFGNode {instr = instr}):xs@((i', _):_)) 
+findEdges :: [(Id, CFGNode a)] -> Set Label -> Set (Id, Id)
+findEdges ((i, CFGNode {instr = instr}):xs@((i', _):_)) allLabels
   = case jmpType instr of
-      Nothing -> insertNextEdge (findEdges xs)
-      Just LinearJmp -> insertBranchEdge (findEdges xs)
-      Just CondJmp -> (insertNextEdge . insertBranchEdge) $ findEdges xs
+      Nothing -> insertNextEdge (findEdges xs allLabels)
+      Just LinearJmp -> insertBranchEdge (findEdges xs allLabels)
+      Just CondJmp -> (insertNextEdge . insertBranchEdge) $ findEdges xs allLabels
     where
       insertNextEdge = Set.insert (i, i') 
-      insertBranchEdge = Set.insert (i, Left $ getLabel instr)
-findEdges _ = Set.empty 
+      insertBranchEdge = if Set.member (getLabel instr) allLabels
+                            then Set.insert (i, Left $ getLabel instr)
+                            else Set.insert (i, i')
+findEdges _ _ = Set.empty 
     
 assignId :: Instr a -> Int -> Id
 assignId (Define l) _ = Left l

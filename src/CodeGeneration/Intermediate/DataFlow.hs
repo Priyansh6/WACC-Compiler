@@ -1,6 +1,5 @@
 module CodeGeneration.Intermediate.DataFlow 
-  ( solveDominatorDFE
-  , solveRevDominatorDFE
+  ( solveRevDominatorDFE
   , solveLiveRangesDFE
 ) where
 
@@ -8,7 +7,7 @@ import CodeGeneration.Intermediate.ControlFlow
 import CodeGeneration.Intermediate.IR
 import CodeGeneration.Utils (used, defs)
 import Data.List (foldl', foldl1')
-import Data.Map ((!))
+import Data.Map (Map, (!))
 import Data.Set (Set, (\\))
 import Prelude hiding (id)
 
@@ -36,28 +35,6 @@ solveDFE initialiser dfe diff cfg
       | otherwise = solveDFE' g'
       where
         g' = iterateDFE dfe g
-
-solveDominatorDFE :: CFG a -> CFG a
-solveDominatorDFE
-  = solveDFE initialise dfe diff
-  where
-    initialise cfg@CFG {nodes = nm}
-      = cfg {nodes = M.map initialiseNode nm}
-      where
-        initialiseNode cfgn@CFGNode{id = i}
-          | isEntry cfgn = cfgn {dominators = Set.singleton i}
-          | otherwise = cfgn {dominators = Set.fromList (M.keys nm)}
-
-    dfe cfg@CFG {nodes = nm} i
-      = cfg {nodes = M.insert i n' nm }
-      where
-        n' = if null predDominators 
-              then n {dominators = Set.singleton i} 
-              else n {dominators = Set.singleton i <> foldl1' Set.intersection predDominators} 
-        n = nodes cfg ! i
-        predDominators = map (\i' -> dominators (nm ! i')) (predecessors i cfg)
-
-    diff = map dominators . M.elems . nodes
 
 solveRevDominatorDFE :: CFG a -> CFG a 
 solveRevDominatorDFE
@@ -94,7 +71,12 @@ solveLiveRangesDFE
         n' = n {liveIns = lis', liveOuts = los'}
         n@CFGNode{instr = inst, liveOuts = los} = nm ! i
         lis' = used inst <> (los \\ defs inst)
-        los' = mconcat [liveOuts (nm ! i')| i' <- successors i cfg]
+        los' = mconcat (map (liveOuts' nm) (successors i cfg)) --[liveOuts (nm ! i') | i' <- trace (show (successors i cfg)) successors i cfg]
+      
+    liveOuts' :: Map Id (CFGNode IRReg) -> Id -> Set IRReg
+    liveOuts' nm i
+      | M.member i nm = liveOuts (nm ! i)
+      | otherwise = Set.empty
 
     diff cfg = [(liveIns n, liveOuts n) | n <- M.elems $ nodes cfg]
   
