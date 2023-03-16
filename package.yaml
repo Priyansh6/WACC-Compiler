@@ -17,6 +17,7 @@ dependencies:
 - transformers
 - mtl
 - filepath
+- haskeline
 
 ghc-options:
 - -Wall
