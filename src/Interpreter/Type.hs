@@ -30,6 +30,9 @@ toWType p@(IPair _) = do
     _ -> error "invalid address dereference for pair"
 toWType IUnit = return $ WPair WUnit WUnit
 
+erasePairType :: WType -> WType
+erasePairType (WPair _ _) = WUnit
+erasePairType t = t
 
 checkType :: AST.Position -> [AST.WType] -> AST.WType -> Interpreter ()
 checkType pos [WUnit] WUnit = throwError (IllegalPairExchange pos)
