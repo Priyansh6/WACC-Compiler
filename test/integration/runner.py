@@ -145,7 +145,7 @@ def integrationTests():
 						if expectedExit != 0:
 							continue
 					else:
-						testSummary += addTestResult(FAILED_EXIT, waccFilename, f"{LIGHT_RED}qemu exit code: {expectedExit}{END}", f"{LIGHT_RED}qemu exit code: {actualExit}{END}")
+						testSummary += addTestResult(FAILED_EXIT, waccFilename, f"{LIGHT_RED}interpreter exit code: {expectedExit}{END}", f"{LIGHT_RED}interpreter exit code: {actualExit}{END}")
 				except subprocess.TimeoutExpired:
 					testSummary += addTestResult(FAILED_TIMEOUT, waccFilename, expectedOutput, f"{LIGHT_RED}Timed out after {TIMEOUT_DURATION} seconds{END}")
 				continue
@@ -282,7 +282,7 @@ def getActualOutput(basename, waccInput):
 			print(e)
 		return str(e), 0
 
-def getActualOutputIntepreted(waccFilename, waccInput):
+def getActualOutputInterpreted(waccFilename, waccInput):
 	try:
 		if waccInput:
 			waccInput = '\n'.join(waccInput.split(' '))

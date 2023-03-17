@@ -1,7 +1,7 @@
 module Interpreter.LVal (module Interpreter.LVal) where
 
 import AST hiding (Ident, Scope)
-import Control.Monad.Except (MonadIO (liftIO), throwError)
+import Control.Monad.Except (throwError)
 import Interpreter.Expression (evalExpr, getArrayElem)
 import Interpreter.Identifiers
 import Interpreter.Type (checkType, iPairFst, iPairSnd, toWType)
@@ -9,12 +9,12 @@ import Interpreter.Utils
 import Semantic.Errors (RuntimeError (..), SemanticError (..), arrayErrorType, pairErrorType)
 
 assignLVal :: Scope -> LVal -> Value -> Interpreter ()
-assignLVal scope (LIdent ident) value = addOrUpdateIdent ident scope value
+assignLVal _ (LIdent ident) value = updateIdent ident value
 assignLVal _ (LArray (ArrayElem ident indexExprs pos)) value = do
   origArrVal <- getVarOrParam ident
   checkType pos [arrayErrorType] <$> toWType origArrVal
   indices <- mapM evalExpr indexExprs
-  _ <- replaceInArray (address origArrVal) indices
+  replaceInArray (address origArrVal) indices
   return ()
   where
     replaceInArray :: Address -> [Value] -> Interpreter Address
@@ -40,41 +40,32 @@ assignLVal _ (LArray (ArrayElem ident indexExprs pos)) value = do
               return addr
         _ -> throwError $ Runtime IndexOutOfBounds pos
     replaceInArray _ (i : _) = toWType i >>= throwError . IncompatibleTypes pos [WInt]
-assignLVal scope (LPair (Fst lval pos)) value = do
+
+assignLVal _ (LPair (Fst lval pos)) rValue = do
   lValue <- evalLVal lval
-  wtRVal <- toWType value
-  case lValue of
-    IPair _ -> do
-      pair <- lookupHeap lValue
-      case pair of
-        (HPair left _) -> do
-          wtLeft <- toWType left
-          liftIO $ print lval
-          liftIO $ print wtLeft
-          liftIO $ print wtRVal
-          checkType pos [wtLeft] wtRVal
-        _ -> error "invalid pair" -- never reaches
-    IUnit -> checkType pos [WUnit] wtRVal
+  wtRVal <- toWType rValue
+  sndOfLval <- case lValue of
+    IPair addr -> do
+      (left, right) <- lookupHeapPair addr
+      wtLeft <- toWType left
+      checkType pos [wtLeft] wtRVal
+      return right
+    IUnit -> throwError $ Runtime NullDereference pos
     v -> toWType v >>= throwError . IncompatibleTypes pos [pairErrorType]
-  sndOfLval <- iPairSnd pos lValue
-  addHeapValue (HPair value sndOfLval) -- ??????
-    >>= assignLVal scope lval
-assignLVal scope (LPair (Snd lval pos)) value = do
+  modifyHeapPair (address lValue) (HPair rValue sndOfLval)
+
+assignLVal _ (LPair (Snd lval pos)) rValue = do
   lValue <- evalLVal lval
-  wtRVal <- toWType value
-  case lValue of
-    IPair _ -> do
-      pair <- lookupHeap lValue
-      case pair of
-        (HPair _ right) -> do
-          wtRight <- toWType right
-          checkType pos [wtRight] wtRVal
-        _ -> error "invalid pair" -- never reaches
-    IUnit -> checkType pos [WUnit] wtRVal
+  wtRVal <- toWType rValue
+  fstOfLval <- case lValue of
+    IPair addr -> do
+      (left, right) <- lookupHeapPair addr
+      wtRight <- toWType right
+      checkType pos [wtRight] wtRVal
+      return left
+    IUnit -> throwError $ Runtime NullDereference pos
     v -> toWType v >>= throwError . IncompatibleTypes pos [pairErrorType]
-  iPairFst pos lValue
-    >>= addHeapValue . flip HPair value
-    >>= assignLVal scope lval
+  modifyHeapPair (address lValue) (HPair fstOfLval rValue)
 
 evalLVal :: LVal -> Interpreter Value
 evalLVal (LIdent ident) = getVarOrParam ident

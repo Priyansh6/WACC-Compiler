@@ -4,15 +4,35 @@ module Interpreter.Identifiers (module Interpreter.Identifiers) where
 
 import qualified AST
 import Control.Monad.Except (throwError)
-import Control.Monad.State (gets, modify)
+import Control.Monad.State (gets, modify, when)
 import qualified Data.Map as M
 import Interpreter.Utils (Aux (..), Interpreter, ReturnValue, Scope (..), Value)
 import Semantic.Errors (SemanticError (..))
+import Data.Bifunctor (second)
+
+setReturnValue :: ReturnValue -> Interpreter ()
+setReturnValue val = modify (\aux -> aux {returnValue = val})
+
+varExists :: AST.Ident -> Aux -> Bool
+varExists ident aux = M.member ident (vars aux)
+
+-- get highest scoped value for that ident
+lookupVar :: AST.Ident -> Aux -> Maybe (Scope, Value)
+lookupVar ident aux =
+  case M.lookup ident (vars aux) of
+    Nothing -> Nothing
+    Just scopeMap ->
+      if M.null scopeMap
+        then Nothing
+        else Just (M.findMax scopeMap)
 
 lookupVarOrParam :: AST.Ident -> Aux -> Maybe Value
-lookupVarOrParam ident aux = case M.lookup ident (vars aux) of
-  Nothing -> M.lookup ident (params aux)
-  Just (_, value) -> Just value
+lookupVarOrParam ident aux =
+  case M.lookup ident (vars aux) of
+    Nothing -> M.lookup ident (params aux)
+    Just scopeMap -> if M.null scopeMap
+      then Nothing
+      else Just (snd $ M.findMax scopeMap)
 
 getVarOrParam :: AST.Ident -> Interpreter Value
 getVarOrParam ident =
@@ -29,10 +49,13 @@ addFunction func@(AST.Func wtReturn ident ps _ _ _) = do
 
 addVariable :: AST.Ident -> Scope -> Value -> Interpreter ()
 addVariable ident sc v = do
-  prev <- gets (M.lookup ident . vars)
-  case prev of
+  mScopeValue <- gets (lookupVar ident)
+  case mScopeValue of
     Nothing -> addVariable' sc ident v
-    _ -> throwError $ VariableAlreadyDefined ident
+    Just (origSc, _) ->
+      if origSc == sc
+        then throwError $ VariableAlreadyDefined ident
+        else addVariable' sc ident v
 
 addParam :: AST.Ident -> Value -> Interpreter ()
 addParam ident v = do
@@ -45,56 +68,58 @@ addFunction' :: AST.Func -> Interpreter ()
 addFunction' func@(AST.Func _ ident _ _ _ _) = modify (\aux@Aux {funcs = fs} -> aux {funcs = M.insert ident func fs})
 
 addVariable' :: Scope -> AST.Ident -> Value -> Interpreter ()
-addVariable' sc ident v = modify (\aux@Aux {vars = vs} -> aux {vars = M.insert ident (sc, v) vs})
+addVariable' sc ident v = do
+  mScopeMap <- gets (M.lookup ident . vars)
+  case mScopeMap of
+    Nothing -> modify (\aux@Aux {vars = vs} -> aux {vars = M.insert ident (M.singleton sc v) vs})
+    Just scopeMap -> modify (\aux@Aux {vars = vs} -> aux {vars = M.insert ident (M.insert sc v scopeMap) vs})
 
 addParameter' :: AST.Ident -> Value -> Interpreter ()
 addParameter' ident v = modify (\aux@Aux {params = ps} -> aux {params = M.insert ident v ps})
 
-setReturnValue :: ReturnValue -> Interpreter ()
-setReturnValue val = modify (\aux -> aux {returnValue = val})
-
 -- modify an existing ident, error if not defined
 updateIdent :: AST.Ident -> Value -> Interpreter ()
 updateIdent ident value = do
-  var <- gets (M.lookup ident . vars)
-  case var of
-    -- if defined, change value, but keep same scope
-    Just (scope, _) -> addVariable' scope ident value
-    -- if not a variable, check if param otherwise undefined error
-    _ -> do
-      param <- gets (M.lookup ident . params)
-      case param of
-        Just _ -> addParameter' ident value
-        _ -> throwError $ VariableNotDefined ident
+  prevVar <- gets (lookupVar ident)
+  case prevVar of
+    -- if defined and same scope, change its value in scope map
+    -- if defined and diff scope, add to scope map
+    (Just (origSc, origV)) -> when (origV /= value) $ addVariable' origSc ident value
+    Nothing -> do
+      prevParam <- gets (M.lookup ident . params)
+      case prevParam of
+        Just _ -> addParameter' ident value -- not variable, is param
+        -- if not defined, throw error
+        Nothing -> throwError $ VariableNotDefined ident
 
 -- add new ident & value OR modify existing ident
 addOrUpdateIdent :: AST.Ident -> Scope -> Value -> Interpreter ()
 addOrUpdateIdent ident sc v = do
-  prev <- gets (lookupVarOrParam ident)
-  case prev of
-    -- if defined, change its value but keep same scope
-    (Just _) -> do
-      isVariable <- gets (M.member ident . vars)
-      if isVariable
-        then do
-          origSc <- gets (fst . (M.! ident) . vars)
-          addVariable' origSc ident v
-        else addParameter' ident v
-
-    -- if not defined, add to variables
-    Nothing -> addVariable' sc ident v
+  prevVar <- gets (lookupVar ident)
+  case prevVar of
+    -- if defined and same scope, change its value in scope map
+    -- if defined and diff scope, add to scope map
+    (Just (origSc, origV)) -> when (origV /= v) $ addVariable' (max sc origSc) ident v
+    Nothing -> do
+      prevParam <- gets (M.lookup ident . params)
+      case prevParam of
+        Just _ -> addParameter' ident v -- not variable, is param
+        -- if not defined, add to variables
+        Nothing -> addVariable' sc ident v
 
 removeIdent :: AST.Ident -> Interpreter ()
 removeIdent ident = do
-  isVariable <- gets (M.member ident . vars)
-  isParam <- gets (M.member ident . params)
-  if isVariable
-    then modify (\aux@Aux {vars = vs} -> aux {vars = M.delete ident vs})
-    else
+  mScopeMap <- gets (M.lookup ident . vars)
+  case mScopeMap of
+    Nothing -> do
+      isParam <- gets (M.member ident . params)
       if isParam
         then modify (\aux@Aux {params = ps} -> aux {params = M.delete ident ps})
-        else error "Segmentation fault"
+        else throwError $ VariableNotDefined ident
+    Just scopeMap -> modify (\aux@Aux {vars = vs} -> aux {vars = M.insert ident (M.deleteMax scopeMap) vs})
 
 filterVarsByScope :: Scope -> Interpreter ()
-filterVarsByScope scope =
-  modify (\aux@Aux {vars = vs} -> aux {vars = M.filter ((<= scope) . fst) vs})
+filterVarsByScope scope = do
+  vs <- gets (M.toList . vars)
+  let vs' = map (second (M.filterWithKey (\ sc _ -> sc <= scope))) vs
+  modify (\aux -> aux {vars = M.fromList vs'})

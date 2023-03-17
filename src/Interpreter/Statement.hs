@@ -6,7 +6,7 @@ module Interpreter.Statement (module Interpreter.Statement) where
 import AST hiding (Scope)
 import Control.Monad.Except (MonadError (throwError))
 import Control.Monad.Reader
-import Control.Monad.State (gets)
+import Control.Monad.State (gets, modify)
 import qualified Data.Map as M
 import Data.Maybe (isNothing)
 import qualified Data.Text.IO as TIO
@@ -134,19 +134,22 @@ evalRVal _ (Call ident exprs pos) = do
   wtParams <- mapM toWType evalParams
   gets (M.lookup ident . funcs)
     >>= \case
-      (Just func@(Func expectedReturn _ ps _ _ _)) -> do
+      (Just func@(Func expectedReturn _ ps _ _ _)) ->
         if length ps /= length exprs
           then do
             -- TODO: replace expectedReturn with the type lVal accepts
             throwError $ FunctionNotDefined ident expectedReturn wtParams
           else do
             functions <- gets funcs
-            result <- runInterpreter (execFunction func evalParams) $ defaultAux {funcs = functions}
+            h <- gets heap
+            fAddrs <- gets freeAddresses
+            result <- runInterpreter (execFunction func evalParams) $ defaultAux {funcs = functions, heap = h, freeAddresses = fAddrs}
             case result of
               Left semanticErr -> throwError semanticErr
-              Right aux -> case returnValue aux of
+              Right funcAux -> case returnValue funcAux of
                 Nothing -> error "Function did not return a value"
                 Just output -> do
+                  modify (\aux -> aux {heap = heap funcAux, freeAddresses = freeAddresses funcAux})
                   wt <- toWType output
                   checkType pos [expectedReturn] wt
                   return output

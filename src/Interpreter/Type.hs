@@ -1,7 +1,7 @@
 module Interpreter.Type (module Interpreter.Type) where
 
 import AST
-import Control.Monad.Except (throwError, when)
+import Control.Monad.Except (throwError, unless, when)
 import Interpreter.Utils
 import Semantic.Errors (RuntimeError (..), SemanticError (..), arrayErrorType, pairErrorType)
 
@@ -41,8 +41,9 @@ checkType _ _ WUnit = return ()
 checkType _ [WPair WUnit WUnit] (WPair _ _) = return ()
 checkType _ [WPair _ _] (WPair WUnit WUnit) = return ()
 checkType pos [WPair pt1 pt2] (WPair pt1' pt2') = do
-  checkType pos [pt1] pt1'
-  checkType pos [pt2] pt2'
+  unless
+    (pt1 == pt1' && pt2 == pt2')
+    (checkType pos [pt1] pt1' >> checkType pos [pt2] pt2')
 checkType pos [ex@(WPair _ _)] ac = throwError (IncompatibleTypes pos [ex] ac)
 checkType _ [WStr] (WArr WChar _) = return ()
 checkType _ [WArr _ _] (WArr WUnit _) = return ()

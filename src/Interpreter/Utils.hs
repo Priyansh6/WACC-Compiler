@@ -29,7 +29,7 @@ data Aux = Aux
 -- data ReplError = Runtime RuntimeError | Semantic SemanticError
 type IsMain = Bool
 
-data Scope = Scope IsMain Int deriving (Eq)
+data Scope = Scope IsMain Int deriving (Eq, Show)
 
 instance Ord Scope where
   compare (Scope False _) (Scope True _) = GT
@@ -44,7 +44,7 @@ instance Num Scope where
   signum (Scope main n) = Scope main (signum n)
   fromInteger n = Scope True (fromInteger n)
 
-type Variables = M.Map AST.Ident (Scope, Value)
+type Variables = M.Map AST.Ident (M.Map Scope Value)
 
 type Parameters = M.Map AST.Ident Value
 
@@ -83,6 +83,7 @@ instance Show Value where
 data HeapValue
   = HArr [Value]
   | HPair Value Value
+  deriving (Show)
 
 showValue :: Value -> Interpreter T.Text
 showValue arr'@(IArr addr) = do
@@ -116,6 +117,9 @@ addHeapValue' v = do
 addHeapValue :: HeapValue -> Interpreter Value
 addHeapValue v@(HArr _) = addHeapValue' v <&> IArr
 addHeapValue v@(HPair _ _) = addHeapValue' v <&> IPair
+
+modifyHeapPair :: Address -> HeapValue -> Interpreter ()
+modifyHeapPair addr hval = modify (\aux@Aux {heap = h} -> aux {heap = M.insert addr hval h})
 
 freeHeapValue :: Address -> AST.Position -> Interpreter ()
 freeHeapValue addr pos = do
@@ -152,7 +156,7 @@ lookupHeap (IArr addr) =
             val@(HArr _) -> return val
             _ -> error "invalid address dereference for arrays"
         )
-lookupHeap _ = throwError $ Runtime NullDereference (1, 1)
+lookupHeap _ = throwError $ Runtime NullDereference (2, 1)
 
 lookupHeapArray :: Address -> Interpreter [Value]
 lookupHeapArray addr = do
@@ -161,4 +165,9 @@ lookupHeapArray addr = do
     (HPair _ _) -> error "invalid array" -- never reaches
     (HArr values) -> return values
 
--- lookupHeapPair :: Address -> Interpreter ??????
+lookupHeapPair :: Address -> Interpreter (Value, Value)
+lookupHeapPair addr = do
+  arr <- lookupHeap (IPair addr)
+  case arr of
+    (HPair l r) -> return (l, r)
+    (HArr _) -> error "invalid pair" -- never reaches
