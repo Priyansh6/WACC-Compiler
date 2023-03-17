@@ -4,7 +4,9 @@ module Main (main) where
 
 import qualified Lexer as L
 import CodeGeneration.ARM.PrettyPrint (showArm)
+import CodeGeneration.Utils (mapBodies)
 import qualified CodeGeneration.ARM.Registers as ARM (transProg)
+import qualified CodeGeneration.Intermediate.Optimisation.RegisterAllocation as Optim (allocRegisters)
 import qualified CodeGeneration.Intermediate.Program as IR
 import Syntax.Program (program)
 import Semantic.Errors (printSemanticErrors)
@@ -39,5 +41,6 @@ main = do
         Left err -> printSemanticErrors [err] contents fname >> exitWith semanticError
         Right (renamedAST', symbolTable) -> do
           let irProg = runReader (IR.transProg renamedAST') (symbolTable, scopeMap)
+          let irProg = mapBodies Optim.allocRegisters (runReader (IR.transProg renamedAST) (symbolTable, scopeMap))
           let armProg = ARM.transProg irProg
           TIO.writeFile (takeBaseName fname ++ ".s") (showArm armProg) >> exitSuccess
