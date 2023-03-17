@@ -9,10 +9,10 @@ import Control.Monad.Trans.Writer ()
 import qualified Data.Map as M
 
 import AST
+import Error.Semantic (SemanticError (..), arrayErrorType, pairErrorType)
 import Semantic.Type.CheckExpressions
 import Semantic.Type.CheckRLVals
 import Semantic.Type.SymbolTable
-import Semantic.Errors
 
 checkStats :: Stats -> ScopedSemanticAnalyser ()
 checkStats = mapM_ checkStat

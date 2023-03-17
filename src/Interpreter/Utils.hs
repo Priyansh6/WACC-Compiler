@@ -8,12 +8,14 @@ import Control.Monad.State (MonadIO, StateT, execStateT, gets, modify)
 import Data.Functor ((<&>))
 import qualified Data.Map as M
 import qualified Data.Text as T
+import Error.PrettyPrint (WaccError (..))
+import Error.Runtime (RuntimeError (..))
+import Error.Semantic (ParameterTypes, ReturnType, SemanticError (..), arrayErrorType, pairErrorType)
 import Numeric (showHex)
-import Semantic.Errors (RuntimeError (..), SemanticError (..), pairErrorType, arrayErrorType)
 
-type Interpreter = StateT Aux (ExceptT SemanticError IO)
+type Interpreter = StateT Aux (ExceptT WaccError IO)
 
-runInterpreter :: MonadIO m => Interpreter a -> Aux -> m (Either SemanticError Aux)
+runInterpreter :: MonadIO m => Interpreter a -> Aux -> m (Either WaccError Aux)
 runInterpreter executor initialState = liftIO $ runExceptT $ execStateT executor initialState
 
 data Aux = Aux
@@ -47,17 +49,13 @@ type Variables = M.Map AST.Ident (M.Map Scope Value)
 
 type Parameters = M.Map AST.Ident Value
 
-type Functions = M.Map (AST.Ident, ReturnType, ParamsType) AST.Func
+type Functions = M.Map (AST.Ident, ReturnType, ParameterTypes) AST.Func
 
 type Heap = M.Map Address HeapValue
 
 type ReturnValue = Maybe Value
 
 type Address = Int
-
-type ReturnType = AST.WType
-
-type ParamsType = [AST.WType]
 
 address :: Value -> Address
 address (IArr addr) = addr
@@ -126,32 +124,32 @@ freeHeapValue addr pos = do
   isInHeap <- gets (M.member addr . heap)
   if isInHeap
     then modify (\aux@Aux {heap = h, freeAddresses = addrs} -> aux {heap = M.delete addr h, freeAddresses = addr : addrs})
-    else throwError $ Runtime NullDereference pos
+    else throwError $ Runtime $ NullDereference pos
 
 updateValueInHeap :: Address -> HeapValue -> AST.Position -> Interpreter ()
 updateValueInHeap addr newHeapVal pos = do
   isInHeap <- gets (M.member addr . heap)
   if isInHeap
     then modify (\aux@Aux {heap = h} -> aux {heap = M.insert addr newHeapVal h})
-    else throwError $ Runtime NullDereference pos
+    else throwError $ Runtime $ NullDereference pos
 
 lookupHeap :: Address -> AST.Position -> Interpreter HeapValue
 lookupHeap addr pos = do
   mVal <- gets (M.lookup addr . heap)
   case mVal of
     Just val -> return val
-    Nothing -> throwError $ Runtime NullDereference pos
+    Nothing -> throwError $ Runtime $ NullDereference pos
 
 lookupHeapArray :: Address -> AST.Position ->  Interpreter [Value]
 lookupHeapArray addr pos = do
   arr <- lookupHeap addr pos
   case arr of
     (HArr values) -> return values
-    (HPair _ _) -> throwError $ IncompatibleTypes pos [arrayErrorType] pairErrorType
+    (HPair _ _) -> throwError $ Semantic $ IncompatibleTypes pos [arrayErrorType] pairErrorType
 
 lookupHeapPair :: Address -> AST.Position ->  Interpreter (Value, Value)
 lookupHeapPair addr pos = do
   arr <- lookupHeap addr pos
   case arr of
     (HPair l r) -> return (l, r)
-    (HArr _) -> throwError $ IncompatibleTypes pos [pairErrorType] arrayErrorType
+    (HArr _) -> throwError $ Semantic $ IncompatibleTypes pos [pairErrorType] arrayErrorType

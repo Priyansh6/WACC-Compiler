@@ -7,10 +7,10 @@ import Control.Monad.State
 import qualified Data.Map as M
 
 import AST
-import Semantic.Errors
+import Error.Semantic (SemanticError (..), getArrayErrorType, pairErrorType)
 import Semantic.Rename.Utils (addTypesToFuncIdent)
 import Semantic.Type.CheckExpressions
-import Semantic.Type.SymbolTable
+import Semantic.Type.SymbolTable (IdentType (FuncType), ScopedSemanticAnalyser, getIdentType)
 
 checkRVal :: RVal -> ScopedSemanticAnalyser WType
 checkRVal (RExpr expr) = checkExprType expr

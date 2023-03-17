@@ -6,10 +6,10 @@ import qualified Lexer as L
 import CodeGeneration.ARM.PrettyPrint (showArm)
 import qualified CodeGeneration.ARM.Registers as ARM (transProg)
 import qualified CodeGeneration.Intermediate.Program as IR
+import Error.PrettyPrint (printSemanticErrors, semanticExit, syntaxExit)
 import REPL.Handler (runRepl)
 import Interpreter.Program (interpretFile)
 import Syntax.Program (program)
-import Semantic.Errors (printSemanticErrors)
 import Semantic.Rename.Program (rename)
 import Semantic.Type.CheckTypes (checkProg)
 
@@ -23,10 +23,6 @@ import System.FilePath ( takeBaseName )
 import Text.Megaparsec
 import qualified Data.Map as M
 
-syntaxError, semanticError :: ExitCode
-syntaxError = ExitFailure 100
-semanticError = ExitFailure 200
-
 main :: IO ()
 main = do 
   getArgs >>= \case
@@ -37,11 +33,11 @@ main = do
       case runParser (L.fully program) fname contents of
         Left err -> do
           putStrLn (errorBundlePretty err)
-          exitWith syntaxError
+          exitWith syntaxExit
         Right ast -> case rename ast of
-          Left errs -> printSemanticErrors errs contents fname >> exitWith semanticError
+          Left errs -> printSemanticErrors errs contents fname >> exitWith semanticExit
           Right (scopeMap, renamedAST) -> case runExcept $ runStateT (checkProg renamedAST) M.empty of
-            Left err -> printSemanticErrors [err] contents fname >> exitWith semanticError
+            Left err -> printSemanticErrors [err] contents fname >> exitWith semanticExit
             Right (renamedAST', symbolTable) -> do
               let irProg = runReader (IR.transProg renamedAST') (symbolTable, scopeMap)
               let armProg = ARM.transProg irProg

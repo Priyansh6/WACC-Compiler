@@ -3,7 +3,7 @@ module Semantic.Rename.RLValExpr (module Semantic.Rename.RLValExpr) where
 import Data.Bool
 
 import AST
-import Semantic.Errors
+import Error.Semantic (SemanticError (..))
 import Semantic.Rename.Utils
 
 renameLVal :: LVal -> Renamer LVal

@@ -3,11 +3,11 @@ module Interpreter.Program (module Interpreter.Program) where
 import qualified AST
 import Control.Monad.Except (liftIO)
 import qualified Data.Text.IO as TIO
+import Error.PrettyPrint (printErrors, WaccError (..))
 import Interpreter.Identifiers (addFunction)
 import Interpreter.Statement (evalStatements)
 import Interpreter.Utils (Interpreter, Scope (..), defaultAux, runInterpreter)
 import qualified Lexer as L
-import Semantic.Errors (SemanticError (..), printSemanticErrors)
 import Syntax.Program (program)
 import System.Exit (ExitCode (ExitFailure), exitSuccess, exitWith)
 import Text.Megaparsec (errorBundlePretty, runParser)
@@ -37,9 +37,9 @@ interpretFile fname = do
     Right ast -> do
       output <- runInterpreter (evalProgram ast) defaultAux
       case output of
-        Left semanticErr -> do
-          liftIO $ printSemanticErrors [semanticErr] contents fname
-          case semanticErr of
-            Runtime _ _ -> exitWith runtimeError
-            _ -> exitWith semanticError
+        Left err -> do
+          liftIO $ printErrors [err] contents fname
+          case err of
+            Runtime _ -> exitWith runtimeError
+            Semantic _ -> exitWith semanticError
         Right _ -> exitSuccess

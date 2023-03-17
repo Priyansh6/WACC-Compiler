@@ -1,12 +1,13 @@
 module Interpreter.LVal (module Interpreter.LVal) where
 
 import AST hiding (Ident, Scope)
-import Control.Monad.Except (throwError)
+import Error.PrettyPrint (runtimeError, semanticError)
+import Error.Runtime (RuntimeError (..))
+import Error.Semantic (SemanticError (..), arrayErrorType, pairErrorType)
 import Interpreter.Expression (evalExpr, getArrayElem)
 import Interpreter.Identifiers
 import Interpreter.Type (checkType, iPairFst, iPairSnd, toWType)
 import Interpreter.Utils
-import Semantic.Errors (RuntimeError (..), SemanticError (..), arrayErrorType, pairErrorType)
 
 assignLVal :: Scope -> LVal -> Value -> Interpreter ()
 assignLVal _ (LIdent ident) value = updateIdent ident value
@@ -38,8 +39,8 @@ assignLVal _ (LArray (ArrayElem ident indexExprs pos)) value = do
               -- Base element
               updateValueInHeap addr (HArr (before ++ (value : after))) pos
               return addr
-        _ -> throwError $ Runtime IndexOutOfBounds pos
-    replaceInArray _ (i : _) = toWType i >>= throwError . IncompatibleTypes pos [WInt]
+        _ -> runtimeError $ IndexOutOfBounds pos
+    replaceInArray _ (i : _) = toWType i >>= semanticError . IncompatibleTypes pos [WInt]
 
 assignLVal _ (LPair (Fst lval pos)) rValue = do
   lValue <- evalLVal lval
@@ -50,8 +51,8 @@ assignLVal _ (LPair (Fst lval pos)) rValue = do
       wtLeft <- toWType left
       checkType pos [wtLeft] wtRVal
       return right
-    IUnit -> throwError $ Runtime NullDereference pos
-    v -> toWType v >>= throwError . IncompatibleTypes pos [pairErrorType]
+    IUnit -> runtimeError $ NullDereference pos
+    v -> toWType v >>= semanticError . IncompatibleTypes pos [pairErrorType]
   modifyHeapPair (address lValue) (HPair rValue sndOfLval)
 
 assignLVal _ (LPair (Snd lval pos)) rValue = do
@@ -63,8 +64,8 @@ assignLVal _ (LPair (Snd lval pos)) rValue = do
       wtRight <- toWType right
       checkType pos [wtRight] wtRVal
       return left
-    IUnit -> throwError $ Runtime NullDereference pos
-    v -> toWType v >>= throwError . IncompatibleTypes pos [pairErrorType]
+    IUnit -> runtimeError $ NullDereference pos
+    v -> toWType v >>= semanticError . IncompatibleTypes pos [pairErrorType]
   modifyHeapPair (address lValue) (HPair fstOfLval rValue)
 
 evalLVal :: LVal -> Interpreter Value

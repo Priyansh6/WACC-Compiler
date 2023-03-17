@@ -6,8 +6,8 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import Data.Void (Void)
+import Error.Colour
 import qualified Lexer as L
-import Semantic.Errors (bold)
 import Syntax.Repl (ReplInput, repl)
 import System.Console.Haskeline (InputT, getInputLine)
 import Text.Megaparsec (ErrorItem (Label), ParseError (TrivialError), ParseErrorBundle (bundleErrors), runParser)

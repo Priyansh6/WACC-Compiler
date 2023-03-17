@@ -4,16 +4,18 @@
 module REPL.Print (module REPL.Print) where
 
 import qualified AST
-import Control.Monad.Except (liftIO, throwError)
+import Control.Monad.Except (liftIO)
 import Control.Monad.State (gets)
 import qualified Data.Map as M
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import Interpreter.Identifiers (lookupVarOrParam)
 import Interpreter.Utils (Aux (..), Interpreter, Value (..), lookupHeapArray, lookupHeapPair)
-import Semantic.Errors (SemanticError (VariableNotDefined), cyan, printSemanticErrors, reset)
 import System.Console.Haskeline (InputT)
 import Interpreter.Type (toWType)
+import Error.PrettyPrint (WaccError, printErrors, semanticError)
+import Error.Colour
+import Error.Semantic ( SemanticError(..) )
 
 banner :: T.Text
 banner =
@@ -29,10 +31,10 @@ banner =
       ]
     <> T.pack reset
 
-print :: T.Text -> Either SemanticError b -> InputT IO ()
+print :: T.Text -> Either WaccError b -> InputT IO ()
 print input result = case result of
   Left semanticErr -> do
-    liftIO $ printSemanticErrors [semanticErr] input "REPL"
+    liftIO $ printErrors [semanticErr] input "REPL"
   Right _ -> return ()
 
 getFuncs :: AST.Ident -> Aux -> [AST.Func]
@@ -40,13 +42,13 @@ getFuncs ident = M.elems . M.filterWithKey (\(i, _, _) _ -> i == ident) . funcs
 
 printIdent :: AST.Ident -> Interpreter ()
 printIdent ident = do
-  funcs <- gets (getFuncs ident)
-  ( if null funcs
+  fs <- gets (getFuncs ident)
+  ( if null fs
       then do
         gets (lookupVarOrParam ident) >>= \case
           (Just val) -> showReplValue val
           _ -> printDefaultFunction ident
-      else return $ printFunctions funcs
+      else return $ printFunctions fs
     )
     >>= liftIO . TIO.putStrLn . (\t -> T.pack cyan <> t <> T.pack reset)
 
@@ -80,7 +82,7 @@ printDefaultFunction :: AST.Ident -> Interpreter T.Text
 printDefaultFunction ident@(AST.Ident name _) = do
   case M.lookup name defaultFuncTypes of
     Just helperText -> return helperText
-    Nothing -> throwError $ VariableNotDefined ident
+    Nothing -> semanticError $ VariableNotDefined ident
 
 showReplValue :: Value -> Interpreter T.Text
 showReplValue (IArr addr) = do
@@ -110,5 +112,5 @@ printIdentType ident =
         gets (lookupVarOrParam ident) >>= \case
           (Just val) -> showType <$> toWType val
           _ -> printDefaultFunction ident
-      funcs -> return $ printFunctions funcs
+      fs -> return $ printFunctions fs
     >>= liftIO . TIO.putStrLn . (\t -> T.pack cyan <> t <> T.pack reset)

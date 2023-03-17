@@ -10,7 +10,8 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 
 import AST
-import Semantic.Errors
+import Data.Functor ((<&>))
+import Error.Semantic (SemanticError)
 
 type ScopeStack = [Int]
 type ScopeMap = M.Map Int (S.Set Ident)
@@ -37,8 +38,8 @@ initAux = Aux
     }
 
 nextFreeScope :: Renamer Int
-nextFreeScope = (+1) <$> gets scopeCounter
-    
+nextFreeScope = gets ((+1) . scopeCounter)
+
 prepareNewScope :: Renamer a -> Renamer a
 prepareNewScope renamer = do
   nextS <- nextFreeScope
@@ -49,7 +50,7 @@ getCurrentScope :: Renamer Int
 getCurrentScope = asks head
 
 getScopedVars :: Int -> Renamer (S.Set Ident)
-getScopedVars s = gets scopeMap >>= return . M.findWithDefault (S.empty) s 
+getScopedVars s = gets scopeMap <&> M.findWithDefault S.empty s
 
 addScopeToIdent :: Int -> Ident -> Ident
 addScopeToIdent scope (Ident i pos) =
@@ -65,7 +66,7 @@ addFuncIdent :: Func -> Renamer ()
 addFuncIdent f = modify (\a@Aux {funcSet = fs} -> a {funcSet = S.insert (addTypesToFunc f) fs})
 
 funcExists :: Func -> Renamer Bool
-funcExists f = gets funcSet >>= return . S.member (addTypesToFunc f)
+funcExists f = gets funcSet <&> S.member (addTypesToFunc f)
 
 insertIdentInScope :: Int -> Ident -> Renamer ()
 insertIdentInScope s name = do
@@ -73,7 +74,7 @@ insertIdentInScope s name = do
   modify (\a@Aux {scopeMap = sMap} -> a {scopeMap = M.insert s (S.insert name sVars) sMap})
 
 identInScope :: Int -> Ident -> Renamer Bool
-identInScope s name = getScopedVars s >>= return . S.member name
+identInScope s name = getScopedVars s <&> S.member name
 
 getIdentFromScopeStack :: Ident -> Renamer (Maybe Ident)
 getIdentFromScopeStack name = do
@@ -82,8 +83,8 @@ getIdentFromScopeStack name = do
     [] -> return Nothing
     (s:_) -> do
       let name' = addScopeToIdent s name
-      declared <- identInScope s name' 
-      if declared 
+      declared <- identInScope s name'
+      if declared
         then return $ Just name'
         else local tail $ getIdentFromScopeStack name
 
@@ -91,7 +92,7 @@ addTypesToFuncIdent :: Ident -> WType -> [WType] -> Ident
 addTypesToFuncIdent (Ident i pos) rt paramTs = Ident (i <> "." <> T.concat (map showFuncWType (rt:paramTs))) pos
 
 addTypesToFunc :: Func -> Ident
-addTypesToFunc (Func rt name ps _ _ _) = addTypesToFuncIdent name rt (fst $ unzip ps)
+addTypesToFunc (Func rt name ps _ _ _) = addTypesToFuncIdent name rt (map fst ps)
 
 getOriginalFuncIdent :: Ident -> Ident
 getOriginalFuncIdent (Ident i pos) = Ident (T.takeWhile (/= '.') i) pos

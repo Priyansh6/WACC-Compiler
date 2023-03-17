@@ -12,11 +12,12 @@ import Interpreter.Utils (Aux (..), defaultAux, runInterpreter)
 import REPL.Autocomplete
 import REPL.Print (banner, print, printIdent, printIdentType)
 import REPL.Read (isMultiLine, read, readMultiLine)
-import Semantic.Errors (SemanticError, bold)
 import Syntax.Repl (ReplInput (..))
 import System.Console.Haskeline
-import Text.Megaparsec
+import Text.Megaparsec ( errorBundlePretty )
 import Prelude hiding (print, read)
+import Error.PrettyPrint (WaccError)
+import Error.Colour ( bold )
 
 runRepl :: IO ()
 runRepl = do
@@ -49,7 +50,7 @@ readEvalPrintLoop st input =
       print (T.pack input) result
       loop result st
 
-eval :: ReplInput -> Aux -> InputT IO (Either SemanticError Aux)
+eval :: ReplInput -> Aux -> InputT IO (Either WaccError Aux)
 eval ast =
   runInterpreter
     ( case ast of

@@ -10,12 +10,14 @@ import Control.Monad.State (gets, modify)
 import qualified Data.Map as M
 import Data.Maybe (isNothing)
 import qualified Data.Text.IO as TIO
+import Error.PrettyPrint (runtimeError, semanticError)
+import Error.Runtime (RuntimeError (..))
+import Error.Semantic (SemanticError (..), arrayErrorType, pairErrorType)
 import Interpreter.Expression (evalExpr, position)
 import Interpreter.Identifiers
 import Interpreter.LVal (assignLVal, evalLVal)
 import Interpreter.Type (checkType, iPairFst, iPairSnd, toWType)
 import Interpreter.Utils
-import Semantic.Errors (RuntimeError (..), SemanticError (..), arrayErrorType, pairErrorType)
 import System.Exit
 import System.IO (hFlush, stdout)
 import Text.Read (readMaybe)
@@ -27,7 +29,7 @@ evalStatements sc@(Scope isMain _) (stat : stats) = do
   returnVal <- gets returnValue
   case returnVal of
     Nothing -> evalStatements sc stats
-    (Just _) | isMain -> throwError $ IllegalReturn (statPosition stat)
+    (Just _) | isMain -> semanticError $ IllegalReturn (statPosition stat)
     _ -> return returnVal
 
 evalFuncStatements :: [Stat] -> Interpreter ReturnValue
@@ -50,7 +52,7 @@ evalStatement scope (Assign lval rval pos) = do
 evalStatement scope (Read lval pos) = do
   lValue <- evalLVal lval
   case lValue of
-    IUnit -> throwError $ Runtime NullDereference pos
+    IUnit -> runtimeError $ NullDereference pos
     _ -> return ()
   liftIO $ hFlush stdout
   input <- liftIO getLine
@@ -65,24 +67,24 @@ evalStatement scope (Read lval pos) = do
                 [] -> return c
               _ -> do
                 wt <- toWType lValue
-                throwError $ IncompatibleTypes pos [WInt, WChar] wt
+                semanticError $ IncompatibleTypes pos [WInt, WChar] wt
           )
   assignLVal scope lval newValue
-evalStatement _ (Free (PairLiter pos) _) = throwError $ Runtime NullDereference pos
+evalStatement _ (Free (PairLiter pos) _) = runtimeError $ NullDereference pos
 evalStatement _ (Free (IdentExpr i pos) _) = do
   mVal <- gets (lookupVarOrParam i)
   case mVal of
     Just (IArr addr) -> removeIdent i >> freeHeapValue addr pos
     Just (IPair addr) -> removeIdent i >> freeHeapValue addr pos
-    Just IUnit -> throwError $ Runtime NullDereference pos
+    Just IUnit -> runtimeError $ NullDereference pos
     Just val -> do
       wt <- toWType val
-      throwError $ IncompatibleTypes pos [pairErrorType, arrayErrorType] wt
-    Nothing -> throwError $ VariableNotDefined i
+      semanticError $ IncompatibleTypes pos [pairErrorType, arrayErrorType] wt
+    Nothing -> semanticError $ VariableNotDefined i
 evalStatement _ (Free e pos) = do
   expr <- evalExpr e
   wt <- toWType expr
-  throwError $ IncompatibleTypes pos [pairErrorType, arrayErrorType] wt
+  semanticError $ IncompatibleTypes pos [pairErrorType, arrayErrorType] wt
 evalStatement _ (Return expr _) = evalExpr expr >>= setReturnValue . Just
 evalStatement _ (Exit expr _) =
   evalExpr expr
@@ -90,7 +92,7 @@ evalStatement _ (Exit expr _) =
       (IInt i) -> liftIO $ exitWith (if i `mod` 256 == 0 then ExitSuccess else ExitFailure (fromInteger i `mod` 256))
       v -> do
         wt <- toWType v
-        throwError $ IncompatibleTypes (position expr) [WInt] wt
+        semanticError $ IncompatibleTypes (position expr) [WInt] wt
 evalStatement _ (Print expr) = evalExpr expr >>= showValue >>= liftIO . TIO.putStr >> liftIO (hFlush stdout)
 evalStatement _ (Println expr) = evalExpr expr >>= showValue >>= liftIO . TIO.putStrLn >> liftIO (hFlush stdout)
 evalStatement scope (If expr ss1 _ ss2 _ _) =
@@ -101,7 +103,7 @@ evalStatement scope (If expr ss1 _ ss2 _ _) =
           >> filterVarsByScope scope
       v -> do
         wt <- toWType v
-        throwError $ IncompatibleTypes (position expr) [WBool] wt
+        semanticError $ IncompatibleTypes (position expr) [WBool] wt
 evalStatement scope w@(While expr ss _ _) =
   evalExpr expr
     >>= \case
@@ -112,7 +114,7 @@ evalStatement scope w@(While expr ss _ _) =
       (IBool False) -> return ()
       v -> do
         wt <- toWType v
-        throwError $ IncompatibleTypes (position expr) [WBool] wt
+        semanticError $ IncompatibleTypes (position expr) [WBool] wt
 evalStatement scope (Begin ss _) = do
   returnVal <- evalStatements (scope + 1) ss
   when (isNothing returnVal) $ filterVarsByScope scope
@@ -126,7 +128,7 @@ evalRVal _ _ (ArrayLiter exprs pos) = do
   wtypes <- mapM toWType elems
   if all (== head wtypes) wtypes
     then addHeapValue $ HArr elems
-    else throwError $ IncompatibleTypes pos [head wtypes] (head (dropWhile (== head wtypes) wtypes))
+    else semanticError $ IncompatibleTypes pos [head wtypes] (head (dropWhile (== head wtypes) wtypes))
 evalRVal _ _ (NewPair exp1 exp2 _) = HPair <$> evalExpr exp1 <*> evalExpr exp2 >>= addHeapValue
 evalRVal _ _ (RPair (Fst lval pos)) = evalLVal lval >>= iPairFst pos
 evalRVal _ _ (RPair (Snd lval pos)) = evalLVal lval >>= iPairSnd pos
@@ -137,14 +139,14 @@ evalRVal _ lvalType (Call ident exprs pos) = do
     >>= \case
       (Just func@(Func expectedReturn _ ps _ _ _)) ->
         if length ps /= length exprs
-          then throwError $ FunctionNotDefined ident lvalType wtParams
+          then semanticError $ FunctionNotDefined ident lvalType wtParams
           else do
             functions <- gets funcs
             h <- gets heap
             fAddrs <- gets freeAddresses
             result <- runInterpreter (execFunction func evalParams) $ defaultAux {funcs = functions, heap = h, freeAddresses = fAddrs}
             case result of
-              Left semanticErr -> throwError semanticErr
+              Left err -> throwError err
               Right funcAux -> case returnValue funcAux of
                 Nothing -> error "Function did not return a value"
                 Just output -> do
@@ -152,7 +154,7 @@ evalRVal _ lvalType (Call ident exprs pos) = do
                   wt <- toWType output
                   checkType pos [expectedReturn] wt
                   return output
-      _ -> throwError $ FunctionNotDefined ident lvalType wtParams
+      _ -> semanticError $ FunctionNotDefined ident lvalType wtParams
 
 execFunction :: Func -> [Value] -> Interpreter ()
 execFunction (Func _ _ ps ss _ pos) values = do
@@ -166,7 +168,7 @@ execFunction (Func _ _ ps ss _ pos) values = do
       checkType pos [expectedWt] wt
       isDuplicateIdent <- gets (M.member p . params)
       if isDuplicateIdent
-        then throwError (VariableAlreadyDefined p)
+        then semanticError $ VariableAlreadyDefined p
         else addParam p val
 
 statPosition :: Stat -> Position

@@ -3,12 +3,12 @@
 module Interpreter.Identifiers (module Interpreter.Identifiers) where
 
 import qualified AST
-import Control.Monad.Except (throwError)
 import Control.Monad.State (gets, modify, when)
-import qualified Data.Map as M
-import Interpreter.Utils (Aux (..), Interpreter, ReturnValue, Scope (..), Value)
-import Semantic.Errors (SemanticError (..))
 import Data.Bifunctor (second)
+import qualified Data.Map as M
+import Error.PrettyPrint (semanticError)
+import Error.Semantic (SemanticError (..))
+import Interpreter.Utils (Aux (..), Interpreter, ReturnValue, Scope (..), Value)
 
 setReturnValue :: ReturnValue -> Interpreter ()
 setReturnValue val = modify (\aux -> aux {returnValue = val})
@@ -38,7 +38,7 @@ getVarOrParam :: AST.Ident -> Interpreter Value
 getVarOrParam ident =
   gets (lookupVarOrParam ident) >>= \case
     (Just val) -> return val
-    _ -> throwError $ VariableNotDefined ident
+    _ -> semanticError $ VariableNotDefined ident
 
 addFunction :: AST.Func -> Interpreter ()
 addFunction func@(AST.Func wtReturn ident ps _ _ _) = do
@@ -46,7 +46,7 @@ addFunction func@(AST.Func wtReturn ident ps _ _ _) = do
   prev <- gets (M.lookup funcKey . funcs)
   case prev of
     Nothing -> modify (\aux@Aux {funcs = fs} -> aux {funcs = M.insert funcKey func fs})
-    _ -> throwError $ FunctionAlreadyDefined ident wtReturn (map fst ps)
+    _ -> semanticError $ FunctionAlreadyDefined ident wtReturn (map fst ps)
 
 addVariable :: AST.Ident -> Scope -> Value -> Interpreter ()
 addVariable ident sc v = do
@@ -55,7 +55,7 @@ addVariable ident sc v = do
     Nothing -> addVariable' ident sc v
     Just (origSc, _) ->
       if origSc == sc
-        then throwError $ VariableAlreadyDefined ident
+        then semanticError $ VariableAlreadyDefined ident
         else addVariable' ident sc v
 
 addParam :: AST.Ident -> Value -> Interpreter ()
@@ -63,7 +63,7 @@ addParam ident v = do
   prev <- gets (M.lookup ident . params)
   case prev of
     Nothing -> addParameter' ident v
-    _ -> throwError $ VariableAlreadyDefined ident
+    _ -> semanticError $ VariableAlreadyDefined ident
 
 addVariable' :: AST.Ident -> Scope -> Value -> Interpreter ()
 addVariable' ident sc v = do
@@ -88,7 +88,7 @@ updateIdent ident value = do
       case prevParam of
         Just _ -> addParameter' ident value -- not variable, is param
         -- if not defined, throw error
-        Nothing -> throwError $ VariableNotDefined ident
+        Nothing -> semanticError $ VariableNotDefined ident
 
 -- add new ident & value OR modify existing ident
 addOrUpdateIdent :: AST.Ident -> Scope -> Value -> Interpreter ()
@@ -112,7 +112,7 @@ removeIdent ident = do
       isParam <- gets (M.member ident . params)
       if isParam
         then modify (\aux@Aux {params = ps} -> aux {params = M.delete ident ps})
-        else throwError $ VariableNotDefined ident
+        else semanticError $ VariableNotDefined ident
     Just scopeMap -> modify (\aux@Aux {vars = vs} -> aux {vars = M.insert ident (M.deleteMax scopeMap) vs})
 
 filterVarsByScope :: Scope -> Interpreter ()

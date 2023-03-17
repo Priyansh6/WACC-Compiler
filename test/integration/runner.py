@@ -86,7 +86,7 @@ from itertools import chain
 import re
 from sys import argv
 
-IS_INTERPRETED = len(argv) > 0 and argv[1] == "-i"
+IS_INTERPRETED = len(argv) > 1 and argv[1] == "-i"
 
 global QEMU_NOT_FOUND
 QEMU_NOT_FOUND = False
