@@ -10,7 +10,7 @@ import Interpreter.Program (evalProgram)
 import Interpreter.Statement
 import Interpreter.Utils (Aux (..), defaultAux, runInterpreter)
 import REPL.Autocomplete
-import REPL.Print (banner, print, printIdent)
+import REPL.Print (banner, print, printIdent, printIdentType)
 import REPL.Read (isMultiLine, read, readMultiLine)
 import Semantic.Errors (SemanticError, bold)
 import Syntax.Repl (ReplInput (..))
@@ -24,13 +24,14 @@ runRepl = do
   runInputT replSettings $ withInterrupt $ promptInput defaultAux
 
 promptInput :: Aux -> InputT IO ()
-promptInput st = handleInterrupt (outputStrLn "Interrupt (To exit press Ctrl+D)" >> promptInput st) $ do
+promptInput st = handleInterrupt (outputStrLn "Interrupt (Ctrl+D or \"exit\" to exit)" >> promptInput st) $ do
   minput <- getInputLine (bold "wacc> ")
   case minput of
     Nothing -> return ()
     Just "" -> promptInput st
+    Just ";" -> promptInput st
     Just "help" -> outputStrLn (T.unpack banner) >> promptInput st
-    Just "quit" -> return ()
+    Just "exit" -> return ()
     Just input -> readEvalPrintLoop st input
 
 readEvalPrintLoop :: Aux -> String -> InputT IO ()
@@ -52,10 +53,11 @@ eval :: ReplInput -> Aux -> InputT IO (Either SemanticError Aux)
 eval ast =
   runInterpreter
     ( case ast of
-        (ReplFunc func) -> addFunction func
-        (ReplStat stat) -> evalStatement 0 stat
-        (ReplIdent ident) -> printIdent ident
         (ReplProgram prog) -> evalProgram prog
+        (ReplStat stat) -> evalStatement 0 stat
+        (ReplFunc func) -> addFunction func
+        (ReplIdent ident) -> printIdent ident
+        (ReplWType ident) -> printIdentType ident
     )
 
 loop :: Either a Aux -> Aux -> InputT IO ()

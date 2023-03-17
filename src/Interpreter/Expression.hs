@@ -10,18 +10,19 @@ import Interpreter.Identifiers
 import Interpreter.Type (checkType, toWType)
 import Interpreter.Utils
 import Semantic.Errors
+import Data.Functor ((<&>))
 
 evalExpr :: Expr -> Interpreter Value
 evalExpr (IntLiter i _) = return $ IInt (fromInteger i)
 evalExpr (BoolLiter bool _) = return $ IBool bool
 evalExpr (CharLiter char _) = return $ IChar char
 evalExpr (StrLiter str _) = return $ IStr str
-evalExpr (PairLiter _) = return IUnit -- ?IPair IUnit IUnit?
-evalExpr (IdentExpr ident _) = getVarOrParam ident -- check in scope?
+evalExpr (PairLiter _) = return IUnit
+evalExpr (IdentExpr ident _) = getVarOrParam ident
 evalExpr (ArrayExpr arrElem _) = getArrayElem arrElem
 evalExpr (Not expr pos) = evalUnOp (\(IBool bool) -> return $ IBool (not bool)) expr pos WBool
 evalExpr (Neg expr pos) = evalUnOp (\(IInt i) -> return $ IInt (-i)) expr pos WInt
-evalExpr (Len expr pos) = evalUnOp lengthOfIArr expr pos arrayErrorType
+evalExpr (Len expr pos) = evalUnOp (len pos) expr pos arrayErrorType
 evalExpr (Ord expr pos) = evalUnOp (\(IChar c) -> return $ IInt (toInteger (ord c))) expr pos WChar
 evalExpr (Chr expr pos) = evalUnOp (\(IInt i) -> return $ IChar (chr (fromInteger i))) expr pos WInt
 evalExpr ((:*:) exp1 exp2 pos) = evalNumericBinOp (*) exp1 exp2 pos
@@ -38,13 +39,9 @@ evalExpr ((:!=:) exp1 exp2 pos) = evalEqBinOp (/=) exp1 exp2 pos
 evalExpr ((:&&:) exp1 exp2 pos) = evalBoolBinOp (&&) exp1 exp2 pos
 evalExpr ((:||:) exp1 exp2 pos) = evalBoolBinOp (||) exp1 exp2 pos
 
-lengthOfIArr :: Value -> Interpreter Value
-lengthOfIArr a@(IArr _) = do
-  arr <- lookupHeap a
-  case arr of
-    (HPair _ _) -> error "pair is not a valid array" -- never reaches
-    (HArr vs) -> return $ IInt (toInteger (length vs))
-lengthOfIArr v = toWType v >>= throwError . IncompatibleTypes (1, 1) [arrayErrorType]
+len :: Position -> Value -> Interpreter Value
+len pos (IArr addr) = lookupHeapArray addr pos <&> (IInt . toInteger . length)
+len pos v = toWType v >>= throwError . IncompatibleTypes pos [arrayErrorType]
 
 smallestWaccInt, biggestWaccInt :: Integer
 biggestWaccInt = 2 ^ (31 :: Integer) - 1
@@ -128,7 +125,7 @@ getArrayElem (ArrayElem ident indices pos) =
     getArrElem :: Value -> [Value] -> Interpreter Value
     getArrElem val [] = return val
     getArrElem (IArr addr') ((IInt i) : is) = do
-      arr <- lookupHeapArray addr'
+      arr <- lookupHeapArray addr' pos
       if null arr
         then throwError $ Runtime IndexOutOfBounds pos
         else

@@ -97,9 +97,9 @@ printSemanticErrors errs contents fname = do
 errorMessage :: SemanticError -> String
 errorMessage semErr = case semErr of
   VariableAlreadyDefined (Ident i _) -> "The variable " ++ bold (show i) ++ yellow ++ " is already defined" ++ "\n"
-  FunctionAlreadyDefined (Ident i _) rt ts -> "The function " ++ bold (show i) ++ yellow ++ " with return type " ++ bold (showWType rt) ++ yellow ++ " and parameter types (" ++ (bold . show . intercalate ", " . map showWType) ts ++ yellow ++ ") is already defined" ++ "\n"
+  FunctionAlreadyDefined (Ident i _) rt ts -> "The function " ++ bold (show i) ++ yellow ++ " with return type " ++ bold (showWType rt) ++ yellow ++ " and parameter types (" ++ (bold . intercalate ", " . map showWType) ts ++ yellow ++ ") is already defined" ++ "\n"
   VariableNotDefined (Ident i _) -> "The variable " ++ bold (show i) ++ yellow ++ " is not defined" ++ "\n"
-  FunctionNotDefined (Ident i _) rt ts -> "The function " ++ bold (show i) ++ yellow ++ " with return type " ++ bold (showWType rt) ++ yellow ++ " and parameter types (" ++ (bold . show . intercalate ", " . map showWType) ts ++ yellow ++ ") is not defined" ++ "\n"
+  FunctionNotDefined (Ident i _) rt ts -> "The function " ++ bold (show i) ++ yellow ++ " with return type " ++ bold (showWType rt) ++ yellow ++ " and parameter types (" ++ (bold . intercalate ", " . map showWType) ts ++ yellow ++ ") is not defined" ++ "\n"
   IncompatibleTypes _ expecteds actual -> "Incompatible types\n\tExpected: " ++ bold (intercalate " or " (map showWType expecteds)) ++ yellow ++ "\n\tActual:   " ++ bold (showWType actual) ++ "\n"
   NonSubscriptable _ -> "The expression is not subscriptable\n"
   IllegalReturn _ -> "Return statements outside of functions are not allowed\n" ++ reset

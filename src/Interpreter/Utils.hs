@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Interpreter.Utils (module Interpreter.Utils) where
@@ -10,7 +9,7 @@ import Data.Functor ((<&>))
 import qualified Data.Map as M
 import qualified Data.Text as T
 import Numeric (showHex)
-import Semantic.Errors (RuntimeError (..), SemanticError (..))
+import Semantic.Errors (RuntimeError (..), SemanticError (..), pairErrorType, arrayErrorType)
 
 type Interpreter = StateT Aux (ExceptT SemanticError IO)
 
@@ -48,13 +47,17 @@ type Variables = M.Map AST.Ident (M.Map Scope Value)
 
 type Parameters = M.Map AST.Ident Value
 
-type Functions = M.Map AST.Ident AST.Func
-
-type ReturnValue = Maybe Value
+type Functions = M.Map (AST.Ident, ReturnType, ParamsType) AST.Func
 
 type Heap = M.Map Address HeapValue
 
+type ReturnValue = Maybe Value
+
 type Address = Int
+
+type ReturnType = AST.WType
+
+type ParamsType = [AST.WType]
 
 address :: Value -> Address
 address (IArr addr) = addr
@@ -86,14 +89,11 @@ data HeapValue
   deriving (Show)
 
 showValue :: Value -> Interpreter T.Text
-showValue arr'@(IArr addr) = do
-  hArr <- lookupHeap arr'
+showValue (IArr addr) = do
+  hArr <- lookupHeapArray addr (1,1)
   case hArr of
-    (HPair _ _) -> error "pair not valid array" -- never reaches
-    (HArr chars@(IChar _ : _)) -> do
-      strArr <- mapM showValue chars
-      return $ T.concat strArr
-    (HArr _) -> return (T.pack $ "0x" <> showHex addr "")
+    chars@(IChar _ : _) -> mapM showValue chars <&> T.concat
+    _ -> return (T.pack $ "0x" <> showHex addr "")
 showValue (IPair addr) = return (T.pack $ "0x" <> showHex addr "")
 showValue v = return (T.pack $ show v)
 
@@ -128,46 +128,30 @@ freeHeapValue addr pos = do
     then modify (\aux@Aux {heap = h, freeAddresses = addrs} -> aux {heap = M.delete addr h, freeAddresses = addr : addrs})
     else throwError $ Runtime NullDereference pos
 
-updateValueInHeap :: AST.Position -> Address -> HeapValue -> Interpreter ()
-updateValueInHeap pos addr newHeapVal = do
+updateValueInHeap :: Address -> HeapValue -> AST.Position -> Interpreter ()
+updateValueInHeap addr newHeapVal pos = do
   isInHeap <- gets (M.member addr . heap)
   if isInHeap
     then modify (\aux@Aux {heap = h} -> aux {heap = M.insert addr newHeapVal h})
     else throwError $ Runtime NullDereference pos
 
-lookupHeap' :: Address -> Interpreter HeapValue
-lookupHeap' addr =
-  gets (M.lookup addr . heap)
-    >>= ( \case
-            Just val -> return val
-            Nothing -> throwError $ Runtime NullDereference (1, 1)
-        )
+lookupHeap :: Address -> AST.Position -> Interpreter HeapValue
+lookupHeap addr pos = do
+  mVal <- gets (M.lookup addr . heap)
+  case mVal of
+    Just val -> return val
+    Nothing -> throwError $ Runtime NullDereference pos
 
-lookupHeap :: Value -> Interpreter HeapValue
-lookupHeap (IPair addr) =
-  lookupHeap' addr
-    >>= ( \case
-            val@(HPair _ _) -> return val
-            _ -> error "invalid address dereference for pairs"
-        )
-lookupHeap (IArr addr) =
-  lookupHeap' addr
-    >>= ( \case
-            val@(HArr _) -> return val
-            _ -> error "invalid address dereference for arrays"
-        )
-lookupHeap _ = throwError $ Runtime NullDereference (2, 1)
-
-lookupHeapArray :: Address -> Interpreter [Value]
-lookupHeapArray addr = do
-  arr <- lookupHeap (IArr addr)
+lookupHeapArray :: Address -> AST.Position ->  Interpreter [Value]
+lookupHeapArray addr pos = do
+  arr <- lookupHeap addr pos
   case arr of
-    (HPair _ _) -> error "invalid array" -- never reaches
     (HArr values) -> return values
+    (HPair _ _) -> throwError $ IncompatibleTypes pos [arrayErrorType] pairErrorType
 
-lookupHeapPair :: Address -> Interpreter (Value, Value)
-lookupHeapPair addr = do
-  arr <- lookupHeap (IPair addr)
+lookupHeapPair :: Address -> AST.Position ->  Interpreter (Value, Value)
+lookupHeapPair addr pos = do
+  arr <- lookupHeap addr pos
   case arr of
     (HPair l r) -> return (l, r)
-    (HArr _) -> error "invalid pair" -- never reaches
+    (HArr _) -> throwError $ IncompatibleTypes pos [pairErrorType] arrayErrorType

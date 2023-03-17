@@ -6,6 +6,7 @@ module Syntax.Repl
     mkReplFunc,
     mkReplIdent,
     mkReplStat,
+    mkReplWType
   )
 where
 
@@ -18,19 +19,25 @@ import Syntax.Expressions (ident)
 import Syntax.Parser (Parser)
 import Syntax.Program (func, program)
 import Syntax.Statements (stat)
-import Text.Megaparsec ((<?>))
+import Text.Megaparsec ((<?>), notFollowedBy)
 import Text.Megaparsec.Char (string)
 
-data ReplInput = ReplIdent AST.Ident | ReplStat AST.Stat | ReplFunc AST.Func | ReplProgram AST.Program
+data ReplInput
+  = ReplProgram AST.Program
+  | ReplStat AST.Stat
+  | ReplFunc AST.Func
+  | ReplIdent AST.Ident
+  | ReplWType AST.Ident
 
 pDefaultIdents :: Parser AST.Ident
 pDefaultIdents = choice $ map (mkIdent . string . T.pack) keywords
 
-mkReplStat, mkReplFunc, mkReplIdent, mkReplProgram :: Parser ReplInput
+mkReplStat, mkReplFunc, mkReplIdent, mkReplProgram, mkReplWType :: Parser ReplInput
 mkReplProgram = ReplProgram <$> program
 mkReplStat = ReplStat <$> stat <* ";" <?> "statement"
 mkReplFunc = ReplFunc <$> func <?> "function"
-mkReplIdent = ReplIdent <$> (":" *> choice [ident, pDefaultIdents]) <?> "identifier"
+mkReplIdent = ReplIdent <$> (":" *> notFollowedBy ":" *> choice [ident, pDefaultIdents]) <?> "identifier"
+mkReplWType = ReplWType <$> ("::" *> choice [ident, pDefaultIdents]) <?> "identifier"
 
 repl :: Parser ReplInput
-repl = mkReplProgram <|> mkReplFunc <|> mkReplStat <|> mkReplIdent
+repl = mkReplProgram <|> mkReplFunc <|> mkReplStat <|> mkReplWType <|> mkReplIdent

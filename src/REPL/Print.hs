@@ -10,9 +10,10 @@ import qualified Data.Map as M
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import Interpreter.Identifiers (lookupVarOrParam)
-import Interpreter.Utils (Aux (..), HeapValue (..), Interpreter, Value (..), lookupHeap)
+import Interpreter.Utils (Aux (..), Interpreter, Value (..), lookupHeapArray, lookupHeapPair)
 import Semantic.Errors (SemanticError (VariableNotDefined), cyan, printSemanticErrors, reset)
 import System.Console.Haskeline (InputT)
+import Interpreter.Type (toWType)
 
 banner :: T.Text
 banner =
@@ -20,10 +21,10 @@ banner =
     <> T.unlines
       [ "Welcome to WACC 40's REPL",
         "\tCtrl+C\tinterrupt",
-        "\tquit\texit",
         "\tCtrl+D\texit",
         "\ttab\tautocomplete wacc keywords",
-        "\t:\tpreview value of any identifier, eg :print",
+        "\t: \tpreview value of any identifier, eg :print",
+        "\t::\tpreview type of any identifier, eg ::myInt",
         "\thelp\tDisplay this message"
       ]
     <> T.pack reset
@@ -34,25 +35,31 @@ print input result = case result of
     liftIO $ printSemanticErrors [semanticErr] input "REPL"
   Right _ -> return ()
 
+getFuncs :: AST.Ident -> Aux -> [AST.Func]
+getFuncs ident = M.elems . M.filterWithKey (\(i, _, _) _ -> i == ident) . funcs
+
 printIdent :: AST.Ident -> Interpreter ()
-printIdent ident =
-  gets (M.lookup ident . funcs)
-    >>= ( \case
-            Just f@(AST.Func {}) -> return $ printFunction f
-            Nothing -> do
-              gets (lookupVarOrParam ident) >>= \case
-                (Just val) -> showReplValue val
-                _ -> printDefaultFunction ident
-        )
+printIdent ident = do
+  funcs <- gets (getFuncs ident)
+  ( if null funcs
+      then do
+        gets (lookupVarOrParam ident) >>= \case
+          (Just val) -> showReplValue val
+          _ -> printDefaultFunction ident
+      else return $ printFunctions funcs
+    )
     >>= liftIO . TIO.putStrLn . (\t -> T.pack cyan <> t <> T.pack reset)
+
+printFunctions :: [AST.Func] -> T.Text
+printFunctions = T.unlines . map printFunction
 
 printFunction :: AST.Func -> T.Text
 printFunction (AST.Func wt (AST.Ident name _) ps _ _ _) =
-  printWType wt
+  showType wt
     <> " "
     <> name
     <> "("
-    <> T.intercalate ", " (map (\(wt', AST.Ident name' _) -> printWType wt' <> " " <> name') ps)
+    <> T.intercalate ", " (map (\(wt', AST.Ident name' _) -> showType wt' <> " " <> name') ps)
     <> ")"
 
 defaultFuncTypes :: M.Map T.Text T.Text
@@ -76,28 +83,32 @@ printDefaultFunction ident@(AST.Ident name _) = do
     Nothing -> throwError $ VariableNotDefined ident
 
 showReplValue :: Value -> Interpreter T.Text
-showReplValue arr'@(IArr _) = do
-  hArr <- lookupHeap arr'
-  case hArr of
-    (HPair _ _) -> error "pair not valid array" -- never reaches
-    (HArr arr) -> do
-      elems <- mapM showReplValue arr
-      return $ "[" <> T.intercalate ", " elems <> "]"
-showReplValue pair'@(IPair _) = do
-  hPair <- lookupHeap pair'
-  case hPair of
-    (HArr _) -> error "array is not valid pair" -- never reaches
-    (HPair v1 v2) -> do
-      left <- showReplValue v1
-      right <- showReplValue v2
-      return $ "(" <> left <> ", " <> right <> ")"
+showReplValue (IArr addr) = do
+  arr <- lookupHeapArray addr (1,1)
+  elems <- mapM showReplValue arr
+  return $ "[" <> T.intercalate ", " elems <> "]"
+showReplValue (IPair addr) = do
+  (v1, v2) <- lookupHeapPair addr (1,1)
+  left <- showReplValue v1
+  right <- showReplValue v2
+  return $ "(" <> left <> ", " <> right <> ")"
 showReplValue v = return $ T.pack $ show v
 
-printWType :: AST.WType -> T.Text
-printWType AST.WUnit = "pair"
-printWType AST.WInt = "int"
-printWType AST.WChar = "char"
-printWType AST.WBool = "bool"
-printWType AST.WStr = "str"
-printWType (AST.WArr base _) = printWType base <> "[]"
-printWType (AST.WPair f s) = "pair(" <> printWType f <> ", " <> printWType s <> ")"
+showType :: AST.WType -> T.Text
+showType AST.WUnit = "pair"
+showType AST.WInt = "int"
+showType AST.WChar = "char"
+showType AST.WBool = "bool"
+showType AST.WStr = "str"
+showType (AST.WArr base _) = showType base <> "[]"
+showType (AST.WPair f s) = "pair(" <> showType f <> ", " <> showType s <> ")"
+
+printIdentType :: AST.Ident -> Interpreter ()
+printIdentType ident =
+  gets (getFuncs ident) >>= \case
+      [] ->
+        gets (lookupVarOrParam ident) >>= \case
+          (Just val) -> showType <$> toWType val
+          _ -> printDefaultFunction ident
+      funcs -> return $ printFunctions funcs
+    >>= liftIO . TIO.putStrLn . (\t -> T.pack cyan <> t <> T.pack reset)

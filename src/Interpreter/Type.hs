@@ -2,32 +2,29 @@ module Interpreter.Type (module Interpreter.Type) where
 
 import AST
 import Control.Monad.Except (throwError, unless, when)
+import Data.Functor ((<&>))
 import Interpreter.Utils
-import Semantic.Errors (RuntimeError (..), SemanticError (..), arrayErrorType, pairErrorType)
+import Semantic.Errors (RuntimeError (..), SemanticError (..), pairErrorType)
 
 toWType :: Value -> Interpreter WType
 toWType (IInt _) = return WInt
 toWType (IBool _) = return WBool
 toWType (IChar _) = return WChar
 toWType (IStr _) = return WStr
-toWType arr@(IArr _) = do
-  arr' <- lookupHeap arr
-  case arr' of
-    HArr [] -> return $ WArr WUnit 1 -- ???
-    HArr (e : _) -> do
+toWType (IArr addr) = do
+  arr <- lookupHeapArray addr (1, 1)
+  case arr of
+    [] -> return $ WArr WUnit 1 -- ???
+    (e : _) -> do
       base' <- toWType e
       case base' of
         (WArr b d) -> return $ WArr b (1 + d)
         _ -> return $ WArr base' 1
-    _ -> error "invalid address dereference for array"
-toWType p@(IPair _) = do
-  pair <- lookupHeap p
-  case pair of
-    HPair v1 v2 -> do
-      wt1 <- toWType v1
-      wt2 <- toWType v2
-      return $ WPair (erasePairType wt1) (erasePairType wt2)
-    _ -> error "invalid address dereference for pair"
+toWType (IPair addr) = do
+  (left, right) <- lookupHeapPair addr (1, 1)
+  wt1 <- erasePairType <$> toWType left
+  wt2 <- erasePairType <$> toWType right
+  return $ WPair wt1 wt2
 toWType IUnit = return $ WPair WUnit WUnit
 
 erasePairType :: WType -> WType
@@ -55,20 +52,11 @@ checkType pos expecteds actual =
   when (actual `notElem` expecteds) $ throwError (IncompatibleTypes pos expecteds actual)
 
 iPairFst, iPairSnd :: AST.Position -> Value -> Interpreter Value
-iPairFst pos pair@(IPair _) = do
-  pair' <- lookupHeap pair
-  case pair' of
-    (HArr _) -> throwError $ IncompatibleTypes pos [pairErrorType] arrayErrorType
-    (HPair v _) -> return v
+iPairFst pos (IPair addr) = lookupHeapPair addr pos <&> fst
 iPairFst pos IUnit = throwError $ Runtime NullDereference pos
-iPairFst p v = do
-  wt <- toWType v
-  throwError $ IncompatibleTypes p [pairErrorType] wt
-iPairSnd pos pair@(IPair _) = do
-  pair' <- lookupHeap pair
-  case pair' of
-    HArr _ -> throwError $ IncompatibleTypes pos [pairErrorType] arrayErrorType
-    HPair _ v -> return v
+iPairFst p v = toWType v >>= throwError . IncompatibleTypes p [pairErrorType]
+
+iPairSnd pos (IPair addr) = lookupHeapPair addr pos <&> snd
 iPairSnd pos IUnit = throwError $ Runtime NullDereference pos
 iPairSnd p v = iPairFst p v
 

@@ -36,14 +36,14 @@ evalFuncStatements = evalStatements (Scope False 0)
 evalStatement :: Scope -> Stat -> Interpreter ()
 evalStatement _ Skip = return ()
 evalStatement scope (DecAssign wt ident rval pos) = do
-  value <- evalRVal scope rval
+  value <- evalRVal scope wt rval
   actual <- toWType value
   checkType pos [wt] actual
   addVariable ident scope value
 evalStatement scope (Assign lval rval pos) = do
   lValue <- evalLVal lval
-  rValue <- evalRVal scope rval
   lValueType <- toWType lValue
+  rValue <- evalRVal scope lValueType rval
   rValueType <- toWType rValue
   checkType pos [lValueType] rValueType
   assignLVal scope lval rValue
@@ -117,28 +117,27 @@ evalStatement scope (Begin ss _) = do
   returnVal <- evalStatements (scope + 1) ss
   when (isNothing returnVal) $ filterVarsByScope scope
 
-evalRVal :: Scope -> RVal -> Interpreter Value
-evalRVal _ (RExpr expr) = evalExpr expr
-evalRVal _ (ArrayLiter [] _) = addHeapValue $ HArr []
-evalRVal _ (ArrayLiter exprs pos) = do
+
+evalRVal :: Scope -> WType -> RVal -> Interpreter Value
+evalRVal _ _ (RExpr expr) = evalExpr expr
+evalRVal _ _ (ArrayLiter [] _) = addHeapValue $ HArr []
+evalRVal _ _ (ArrayLiter exprs pos) = do
   elems <- mapM evalExpr exprs
   wtypes <- mapM toWType elems
   if all (== head wtypes) wtypes
     then addHeapValue $ HArr elems
     else throwError $ IncompatibleTypes pos [head wtypes] (head (dropWhile (== head wtypes) wtypes))
-evalRVal _ (NewPair exp1 exp2 _) = HPair <$> evalExpr exp1 <*> evalExpr exp2 >>= addHeapValue
-evalRVal _ (RPair (Fst lval pos)) = evalLVal lval >>= iPairFst pos
-evalRVal _ (RPair (Snd lval pos)) = evalLVal lval >>= iPairSnd pos
-evalRVal _ (Call ident exprs pos) = do
+evalRVal _ _ (NewPair exp1 exp2 _) = HPair <$> evalExpr exp1 <*> evalExpr exp2 >>= addHeapValue
+evalRVal _ _ (RPair (Fst lval pos)) = evalLVal lval >>= iPairFst pos
+evalRVal _ _ (RPair (Snd lval pos)) = evalLVal lval >>= iPairSnd pos
+evalRVal _ lvalType (Call ident exprs pos) = do
   evalParams <- mapM evalExpr exprs
   wtParams <- mapM toWType evalParams
-  gets (M.lookup ident . funcs)
+  gets (M.lookup (ident, lvalType, wtParams) . funcs)
     >>= \case
       (Just func@(Func expectedReturn _ ps _ _ _)) ->
         if length ps /= length exprs
-          then do
-            -- TODO: replace expectedReturn with the type lVal accepts
-            throwError $ FunctionNotDefined ident expectedReturn wtParams
+          then throwError $ FunctionNotDefined ident lvalType wtParams
           else do
             functions <- gets funcs
             h <- gets heap
@@ -153,8 +152,7 @@ evalRVal _ (Call ident exprs pos) = do
                   wt <- toWType output
                   checkType pos [expectedReturn] wt
                   return output
-      -- TODO: replace WUnit with the type lVal accepts
-      _ -> throwError $ FunctionNotDefined ident WUnit wtParams
+      _ -> throwError $ FunctionNotDefined ident lvalType wtParams
 
 execFunction :: Func -> [Value] -> Interpreter ()
 execFunction (Func _ _ ps ss _ pos) values = do

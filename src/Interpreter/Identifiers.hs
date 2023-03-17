@@ -42,20 +42,21 @@ getVarOrParam ident =
 
 addFunction :: AST.Func -> Interpreter ()
 addFunction func@(AST.Func wtReturn ident ps _ _ _) = do
-  prev <- gets (M.lookup ident . funcs)
+  let funcKey = (ident, wtReturn, map fst ps)
+  prev <- gets (M.lookup funcKey . funcs)
   case prev of
-    Nothing -> addFunction' func
+    Nothing -> modify (\aux@Aux {funcs = fs} -> aux {funcs = M.insert funcKey func fs})
     _ -> throwError $ FunctionAlreadyDefined ident wtReturn (map fst ps)
 
 addVariable :: AST.Ident -> Scope -> Value -> Interpreter ()
 addVariable ident sc v = do
   mScopeValue <- gets (lookupVar ident)
   case mScopeValue of
-    Nothing -> addVariable' sc ident v
+    Nothing -> addVariable' ident sc v
     Just (origSc, _) ->
       if origSc == sc
         then throwError $ VariableAlreadyDefined ident
-        else addVariable' sc ident v
+        else addVariable' ident sc v
 
 addParam :: AST.Ident -> Value -> Interpreter ()
 addParam ident v = do
@@ -64,11 +65,8 @@ addParam ident v = do
     Nothing -> addParameter' ident v
     _ -> throwError $ VariableAlreadyDefined ident
 
-addFunction' :: AST.Func -> Interpreter ()
-addFunction' func@(AST.Func _ ident _ _ _ _) = modify (\aux@Aux {funcs = fs} -> aux {funcs = M.insert ident func fs})
-
-addVariable' :: Scope -> AST.Ident -> Value -> Interpreter ()
-addVariable' sc ident v = do
+addVariable' :: AST.Ident -> Scope -> Value -> Interpreter ()
+addVariable' ident sc v = do
   mScopeMap <- gets (M.lookup ident . vars)
   case mScopeMap of
     Nothing -> modify (\aux@Aux {vars = vs} -> aux {vars = M.insert ident (M.singleton sc v) vs})
@@ -84,7 +82,7 @@ updateIdent ident value = do
   case prevVar of
     -- if defined and same scope, change its value in scope map
     -- if defined and diff scope, add to scope map
-    (Just (origSc, origV)) -> when (origV /= value) $ addVariable' origSc ident value
+    (Just (origSc, origV)) -> when (origV /= value) $ addVariable' ident origSc value
     Nothing -> do
       prevParam <- gets (M.lookup ident . params)
       case prevParam of
@@ -97,15 +95,14 @@ addOrUpdateIdent :: AST.Ident -> Scope -> Value -> Interpreter ()
 addOrUpdateIdent ident sc v = do
   prevVar <- gets (lookupVar ident)
   case prevVar of
-    -- if defined and same scope, change its value in scope map
-    -- if defined and diff scope, add to scope map
-    (Just (origSc, origV)) -> when (origV /= v) $ addVariable' (max sc origSc) ident v
+    -- if value is diff, then change in aux with whichever scope is greater
+    (Just (origSc, origV)) -> when (origV /= v) $ addVariable' ident (max sc origSc) v
     Nothing -> do
       prevParam <- gets (M.lookup ident . params)
       case prevParam of
         Just _ -> addParameter' ident v -- not variable, is param
         -- if not defined, add to variables
-        Nothing -> addVariable' sc ident v
+        Nothing -> addVariable' ident sc v
 
 removeIdent :: AST.Ident -> Interpreter ()
 removeIdent ident = do

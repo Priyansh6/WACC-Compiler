@@ -21,10 +21,10 @@ assignLVal _ (LArray (ArrayElem ident indexExprs pos)) value = do
     replaceInArray _ [] = do
       -- wants to replace in array but no more indices, which means value is NOT BASE ELEM (so must be array)
       checkType pos [arrayErrorType] <$> toWType value
-      lookupHeapArray (address value)
+      lookupHeapArray (address value) pos
       return (address value)
     replaceInArray addr ((IInt i) : is) = do
-      arrValues <- lookupHeapArray addr
+      arrValues <- lookupHeapArray addr pos
       case splitAt (fromInteger i) arrValues of
         (before, prev : after) ->
           case prev of
@@ -32,11 +32,11 @@ assignLVal _ (LArray (ArrayElem ident indexExprs pos)) value = do
               -- nested array element
               newAddr <- replaceInArray prevAddr is
               if null is
-                then updateValueInHeap pos addr (HArr (before ++ (IArr newAddr : after))) >> return addr
+                then updateValueInHeap addr (HArr (before ++ (IArr newAddr : after))) pos >> return addr
                 else return addr
             _ -> do
               -- Base element
-              updateValueInHeap pos addr (HArr (before ++ (value : after)))
+              updateValueInHeap addr (HArr (before ++ (value : after))) pos
               return addr
         _ -> throwError $ Runtime IndexOutOfBounds pos
     replaceInArray _ (i : _) = toWType i >>= throwError . IncompatibleTypes pos [WInt]
@@ -46,7 +46,7 @@ assignLVal _ (LPair (Fst lval pos)) rValue = do
   wtRVal <- toWType rValue
   sndOfLval <- case lValue of
     IPair addr -> do
-      (left, right) <- lookupHeapPair addr
+      (left, right) <- lookupHeapPair addr pos
       wtLeft <- toWType left
       checkType pos [wtLeft] wtRVal
       return right
@@ -59,7 +59,7 @@ assignLVal _ (LPair (Snd lval pos)) rValue = do
   wtRVal <- toWType rValue
   fstOfLval <- case lValue of
     IPair addr -> do
-      (left, right) <- lookupHeapPair addr
+      (left, right) <- lookupHeapPair addr pos
       wtRight <- toWType right
       checkType pos [wtRight] wtRVal
       return left
