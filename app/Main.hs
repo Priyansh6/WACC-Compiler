@@ -41,6 +41,6 @@ main = do
         Left err -> printSemanticErrors [err] contents fname >> exitWith semanticError
         Right (renamedAST', symbolTable) -> do
           let irProg = runReader (IR.transProg renamedAST') (symbolTable, scopeMap)
-          let irProg = mapBodies Optim.allocRegisters (runReader (IR.transProg renamedAST) (symbolTable, scopeMap))
+          --let irProg = mapBodies Optim.allocRegisters (runReader (IR.transProg renamedAST) (symbolTable, scopeMap))
           let armProg = ARM.transProg irProg
           TIO.writeFile (takeBaseName fname ++ ".s") (showArm armProg) >> exitSuccess
