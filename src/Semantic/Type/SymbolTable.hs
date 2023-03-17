@@ -7,7 +7,7 @@ import Control.Monad.Trans.Writer ()
 import qualified Data.Map as M
 
 import AST
-import Semantic.Errors
+import Error.Semantic (SemanticError)
 
 type Env = Maybe WType
 

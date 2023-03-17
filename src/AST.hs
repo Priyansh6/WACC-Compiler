@@ -37,7 +37,7 @@ data WType
   | WStr
   | WArr WType Int
   | WPair WType WType
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 data LVal
   = LIdent Ident

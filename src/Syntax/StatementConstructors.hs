@@ -63,10 +63,10 @@ mkPrintln :: Parser AST.Expr -> Parser AST.Stat
 mkPrintln e = label "statement" $ AST.Println <$> e
 
 mkIf :: Parser AST.Expr -> Parser AST.Stats -> Parser AST.Stats -> Parser AST.Stat
-mkIf c b1 b2 = label "statement" $ liftPosScopeIf AST.If (c <?> "condition") (b1 <?> "branch") (b2 <?> "branch")
+mkIf c b1 b2 = label "if statement" $ liftPosScopeIf AST.If (c <?> "condition") (b1 <?> "branch") (b2 <?> "branch")
 
 mkWhile :: Parser AST.Expr -> Parser AST.Stats -> Parser AST.Stat
-mkWhile c b = label "statement" $ liftPosScopeWhile AST.While (c <?> "condition") (b <?> "body")
+mkWhile c b = label "while statement" $ liftPosScopeWhile AST.While (c <?> "condition") (b <?> "body")
 
 mkBegin :: Parser AST.Stats -> Parser AST.Stat
-mkBegin = label "statement" . liftScopeBegin AST.Begin
+mkBegin = label "begin statement" . liftScopeBegin AST.Begin

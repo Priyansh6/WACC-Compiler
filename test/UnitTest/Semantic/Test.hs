@@ -3,7 +3,7 @@ module UnitTest.Semantic.Test (test, testWithStack) where
 import Control.Monad.Reader
 import Control.Monad.State
 
-import Semantic.Errors
+import Error.Semantic
 import Semantic.Rename.Utils
 
 test :: Aux -> (a -> Renamer a) -> a -> Either [SemanticError] a

@@ -4,7 +4,7 @@ import Control.Monad.Except
 import Control.Monad.Trans.Writer ()
 
 import AST
-import Semantic.Errors
+import Error.Semantic (SemanticError (..), arrayErrorType, getArrayErrorType, incompatibleType)
 import Semantic.Type.SymbolTable
 
 checkExprType :: Expr -> ScopedSemanticAnalyser WType
@@ -49,16 +49,16 @@ checkBinOpType p out expr1 expr2 = do
 
 isValidNumericOperator :: Position -> WType -> WType -> ScopedSemanticAnalyser Bool
 isValidNumericOperator _ WInt WInt = return True
-isValidNumericOperator pos t1 t2 = throwError (semanticError pos [WInt] t1 t2) >> return False
+isValidNumericOperator pos t1 t2 = throwError (incompatibleType pos [WInt] t1 t2) >> return False
 
 isValidComparisonOperator :: Position -> WType -> WType -> ScopedSemanticAnalyser Bool
 isValidComparisonOperator _ WChar WChar = return True
 isValidComparisonOperator _ WInt WInt = return True
-isValidComparisonOperator pos t1 t2 = throwError (semanticError pos [WInt, WChar] t1 t2) >> return False
+isValidComparisonOperator pos t1 t2 = throwError (incompatibleType pos [WInt, WChar] t1 t2) >> return False
 
 isValidBooleanOperator :: Position -> WType -> WType -> ScopedSemanticAnalyser Bool
 isValidBooleanOperator _ WBool WBool = return True
-isValidBooleanOperator pos t1 t2 = throwError (semanticError pos [WBool] t1 t2) >> return False
+isValidBooleanOperator pos t1 t2 = throwError (incompatibleType pos [WBool] t1 t2) >> return False
 
 isValidEquality :: Position -> WType -> WType -> ScopedSemanticAnalyser Bool
 isValidEquality _ (WPair _ _) (WPair _ _) = return True

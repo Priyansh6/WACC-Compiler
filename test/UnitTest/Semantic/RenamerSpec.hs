@@ -8,7 +8,7 @@ import qualified Data.Set as S
 import Test.Hspec
 
 import AST
-import Semantic.Errors
+import Error.Semantic
 import Semantic.Rename.Utils
 import Semantic.Rename.Function
 import Semantic.Rename.Program
