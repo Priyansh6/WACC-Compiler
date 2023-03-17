@@ -16,17 +16,23 @@ import Semantic.Type.CheckTypes (checkProg)
 import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.Trans.State
+import qualified Data.Map as M
 import qualified Data.Text.IO as TIO
+import qualified Data.Text as T
 import System.Environment
 import System.Exit
 import System.FilePath ( takeBaseName )
 import Text.Megaparsec
-import qualified Data.Map as M
 
 main :: IO ()
 main = do 
   getArgs >>= \case
     [] -> runRepl
+    ["-h"] -> TIO.putStrLn $ T.unlines [
+      "./compile\t\t\tUse the WACC REPL",
+      "./compile -h\t\t\tUsage guide",
+      "./compile -i [filename.wacc]\tExecute a WACC using an interpreter",
+      "./compile [filename.wacc]\tCompile a WACC file into assembly" ]
     ("-i":fname:_) -> interpretFile fname
     (fname:_) -> do
       contents <- TIO.readFile fname

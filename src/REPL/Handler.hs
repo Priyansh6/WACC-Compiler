@@ -10,7 +10,7 @@ import Interpreter.Program (evalProgram)
 import Interpreter.Statement
 import Interpreter.Utils (Aux (..), defaultAux, runInterpreter)
 import REPL.Autocomplete
-import REPL.Print (banner, print, printIdent, printIdentType)
+import REPL.Print (printBanner, print, printIdent, printIdentType)
 import REPL.Read (isMultiLine, read, readMultiLine)
 import Syntax.Repl (ReplInput (..))
 import System.Console.Haskeline
@@ -21,7 +21,7 @@ import Error.Colour ( bold )
 
 runRepl :: IO ()
 runRepl = do
-  TIO.putStrLn banner
+  printBanner
   runInputT replSettings $ withInterrupt $ promptInput defaultAux
 
 promptInput :: Aux -> InputT IO ()
@@ -29,10 +29,10 @@ promptInput st = handleInterrupt (outputStrLn "Interrupt (Ctrl+D or \"exit\" to 
   minput <- getInputLine (bold "wacc> ")
   case minput of
     Nothing -> return ()
+    Just "exit" -> return ()
     Just "" -> promptInput st
     Just ";" -> promptInput st
-    Just "help" -> outputStrLn (T.unpack banner) >> promptInput st
-    Just "exit" -> return ()
+    Just "help" -> liftIO printBanner >> promptInput st
     Just input -> readEvalPrintLoop st input
 
 readEvalPrintLoop :: Aux -> String -> InputT IO ()

@@ -17,10 +17,10 @@ import Error.PrettyPrint (WaccError, printErrors, semanticError)
 import Error.Colour
 import Error.Semantic ( SemanticError(..) )
 
-banner :: T.Text
-banner =
-  T.pack cyan
-    <> T.unlines
+printBanner :: IO ()
+printBanner =
+  replOutput $
+    T.unlines
       [ "Welcome to WACC 40's REPL",
         "\tCtrl+C\tinterrupt",
         "\tCtrl+D\texit",
@@ -29,7 +29,9 @@ banner =
         "\t::\tpreview type of any identifier, eg ::myInt",
         "\thelp\tDisplay this message"
       ]
-    <> T.pack reset
+
+replOutput :: T.Text -> IO ()
+replOutput = TIO.putStrLn . (\t -> T.pack cyan <> t <> T.pack reset)
 
 print :: T.Text -> Either WaccError b -> InputT IO ()
 print input result = case result of
@@ -50,7 +52,7 @@ printIdent ident = do
           _ -> printDefaultFunction ident
       else return $ printFunctions fs
     )
-    >>= liftIO . TIO.putStrLn . (\t -> T.pack cyan <> t <> T.pack reset)
+    >>= liftIO . replOutput
 
 printFunctions :: [AST.Func] -> T.Text
 printFunctions = T.unlines . map printFunction
@@ -113,4 +115,4 @@ printIdentType ident =
           (Just val) -> showType <$> toWType val
           _ -> printDefaultFunction ident
       fs -> return $ printFunctions fs
-    >>= liftIO . TIO.putStrLn . (\t -> T.pack cyan <> t <> T.pack reset)
+    >>= liftIO . replOutput
