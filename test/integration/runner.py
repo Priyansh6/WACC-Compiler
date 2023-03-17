@@ -84,6 +84,9 @@ from pathlib import Path
 import subprocess
 from itertools import chain
 import re
+from sys import argv
+
+IS_INTERPRETED = len(argv) > 0 and argv[1] == "-i"
 
 global QEMU_NOT_FOUND
 QEMU_NOT_FOUND = False
@@ -110,6 +113,8 @@ TEST_PATHS = [Path("test/integration/" + path) for path in TESTS]
 def shouldTestOutput(testPath):
 	return any(runPath in testPath.parents or runPath == testPath for runPath in QEMU_TEST_PATHS)
 
+wacc40exe = str(next(Path("./.stack-work/dist").rglob("build/WACC40-exe/WACC40-exe"), ""))
+
 def integrationTests():
 	print(PASSED, "passed")
 	print(FAILED_COMPILE, "failed compilation")
@@ -120,7 +125,6 @@ def integrationTests():
 	testSummary = ""
 	skippedTests = totalTests = 0
 	
-	wacc40exe = str(next(Path("./.stack-work/dist").rglob("build/WACC40-exe/WACC40-exe"), ""))
 	if not wacc40exe:
 		print(RED + "\nWACC40-exe not found - did you", BOLD + "stack build" + END + RED + "?", END)
 		exit(1)
@@ -131,6 +135,21 @@ def integrationTests():
 			if not any(runPath in waccFilename.parents or runPath == waccFilename for runPath in TEST_PATHS):
 				continue
 			totalTests += 1
+			if IS_INTERPRETED:
+				expectedInput, expectedOutput, expectedExit = getWaccFileIO(waccFilename)
+				basename = os_path.splitext(os_path.basename(waccFilename))[0]
+				try:
+					actualOutput, actualExit = getActualOutputInterpreted(waccFilename, expectedInput)
+					if actualExit == expectedExit:
+						testSummary += addTestResult(PASSED if "#runtime_error#" in expectedOutput or checkOutput(expectedOutput, actualOutput) else FAILED_OUTPUT, waccFilename, expectedOutput, actualOutput)
+						if expectedExit != 0:
+							continue
+					else:
+						testSummary += addTestResult(FAILED_EXIT, waccFilename, f"{LIGHT_RED}interpreter exit code: {expectedExit}{END}", f"{LIGHT_RED}interpreter exit code: {actualExit}{END}")
+				except subprocess.TimeoutExpired:
+					testSummary += addTestResult(FAILED_TIMEOUT, waccFilename, expectedOutput, f"{LIGHT_RED}Timed out after {TIMEOUT_DURATION} seconds{END}")
+				continue
+			# not interpreted
 			result = subprocess.run(
 				[wacc40exe, waccFilename],
 				stdout=None if VIEW_STDOUT else subprocess.DEVNULL,
@@ -203,7 +222,11 @@ def integrationTests():
 
 
 def checkOutput(expectedOutput, actualOutput):
-	return expectedOutput == re.sub(r"0x[\da-fA-F]+", "#addrs#", actualOutput)
+	return any(x in expectedOutput for x in [
+		"#syntax_error#",
+		"#semantic_error#",
+		"#runtime_error#"
+	]) or expectedOutput == re.sub(r"0x[\da-fA-F]+", "#addrs#", actualOutput)
 
 def extract(text, startText, endText=None):
 	start = text.find(startText)
@@ -246,6 +269,35 @@ def getActualOutput(basename, waccInput):
 			timeout=TIMEOUT_DURATION,
 			universal_newlines=True
 		)
+		return result2.stdout, result2.returncode
+	except FileNotFoundError as e:
+		if e.filename == "arm-linux-gnueabi-gcc":
+			global QEMU_NOT_FOUND
+			QEMU_NOT_FOUND = True
+			return runRefEmulator(basename + ".s", waccInput)
+		else:
+			raise e
+	except UnicodeDecodeError as e:
+		if VIEW_STDERR:
+			print(e)
+		return str(e), 0
+
+def getActualOutputInterpreted(waccFilename, waccInput):
+	try:
+		if waccInput:
+			waccInput = '\n'.join(waccInput.split(' '))
+		result2 = subprocess.run(
+			[wacc40exe, "-i", waccFilename],
+			input=(waccInput or '\n'),
+			capture_output=True,
+			text=True,
+			timeout=TIMEOUT_DURATION,
+			universal_newlines=True,
+		)
+		if VIEW_STDOUT:
+			print(result2.stdout)
+		if VIEW_STDERR:
+			print(result2.stderr)
 		return result2.stdout, result2.returncode
 	except FileNotFoundError as e:
 		if e.filename == "arm-linux-gnueabi-gcc":

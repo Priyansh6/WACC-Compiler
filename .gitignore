@@ -3,3 +3,4 @@
 .DS_Store
 *.cabal
 *.s
+.wacc_history

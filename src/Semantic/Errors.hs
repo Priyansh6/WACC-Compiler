@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Semantic.Errors (SemanticError (..), pairErrorType, arrayErrorType, getArrayErrorType, printSemanticErrors, semanticError) where
+module Semantic.Errors (module Semantic.Errors) where
 
 import Data.List (intercalate)
 import qualified Data.Text as T
@@ -46,12 +46,23 @@ data SemanticError
   | VariableNotDefined Ident
   | FunctionNotDefined Ident WType [WType]
   | IncompatibleTypes Position Expectation Actual
+  | NonSubscriptable Position
   | IllegalReturn Position
   | IllegalPairExchange Position
+  | Runtime RuntimeError Position
+  deriving (Show, Eq)
+
+data RuntimeError
+  = IndexOutOfBounds
+  | DivideByZero
+  | NullDereference
+  | IntegerOverflow
+  | IntegerUnderflow
   deriving (Show, Eq)
 
 printSemanticErrors :: [SemanticError] -> T.Text -> String -> IO ()
-printSemanticErrors errs contents fname = putStrLn $ concatMap printSemanticError errs
+printSemanticErrors errs contents fname = do
+  putStrLn $ concatMap printSemanticError errs
   where
     file = T.lines contents
 
@@ -81,17 +92,23 @@ printSemanticErrors errs contents fname = putStrLn $ concatMap printSemanticErro
         line = show row
         border = cyan ++ replicate (length line) ' ' ++ " | " ++ reset
         getRow :: Int -> String
-        getRow r = T.unpack (file !! (r - 1)) ++ "\n"
+        getRow r = T.unpack (file !! min (length file - 1) (r - 1)) ++ "\n"
 
 errorMessage :: SemanticError -> String
 errorMessage semErr = case semErr of
   VariableAlreadyDefined (Ident i _) -> "The variable " ++ bold (show i) ++ yellow ++ " is already defined" ++ "\n"
-  FunctionAlreadyDefined (Ident i _) rt ts -> "The function " ++ bold (show i) ++ yellow ++ " with return type " ++ bold (showWType rt) ++ yellow ++ " and parameter types (" ++ (bold . show . intercalate ", " . map showWType) ts ++ yellow ++ ") is already defined" ++ "\n"
+  FunctionAlreadyDefined (Ident i _) rt ts -> "The function " ++ bold (show i) ++ yellow ++ " with return type " ++ bold (showWType rt) ++ yellow ++ " and parameter types (" ++ (bold . intercalate ", " . map showWType) ts ++ yellow ++ ") is already defined" ++ "\n"
   VariableNotDefined (Ident i _) -> "The variable " ++ bold (show i) ++ yellow ++ " is not defined" ++ "\n"
-  FunctionNotDefined (Ident i _) rt ts -> "The function " ++ bold (show i) ++ yellow ++ " with return type " ++ bold (showWType rt) ++ yellow ++ " and parameter types (" ++ (bold . show . intercalate ", " . map showWType) ts ++ yellow ++ ") is not defined" ++ "\n"
+  FunctionNotDefined (Ident i _) rt ts -> "The function " ++ bold (show i) ++ yellow ++ " with return type " ++ bold (showWType rt) ++ yellow ++ " and parameter types (" ++ (bold . intercalate ", " . map showWType) ts ++ yellow ++ ") is not defined" ++ "\n"
   IncompatibleTypes _ expecteds actual -> "Incompatible types\n\tExpected: " ++ bold (intercalate " or " (map showWType expecteds)) ++ yellow ++ "\n\tActual:   " ++ bold (showWType actual) ++ "\n"
+  NonSubscriptable _ -> "The expression is not subscriptable\n"
   IllegalReturn _ -> "Return statements outside of functions are not allowed\n" ++ reset
   IllegalPairExchange _ -> "Illegal exchange of values between pairs of unknown types\n" ++ reset
+  Runtime IndexOutOfBounds _ -> "Index out of bounds\n" ++ reset
+  Runtime DivideByZero _ -> "Dividing by zero\n" ++ reset
+  Runtime NullDereference _ -> "Can't dereference a null pointer\n" ++ reset
+  Runtime IntegerOverflow _ -> "Integer overflow\n" ++ reset
+  Runtime IntegerUnderflow _ -> "Integer underflow\n" ++ reset
 
 showWType :: WType -> String
 showWType t = case t of
@@ -101,7 +118,7 @@ showWType t = case t of
   WChar -> "Character"
   WStr -> "String"
   (WArr WUnit _) -> "any Array"
-  (WArr wt _) -> showWType wt ++ "[]"
+  (WArr wt depth) -> showWType wt ++ concat (replicate depth "[]")
   (WPair (WPair WInt WInt) (WPair WInt WInt)) -> "any Pair"
   (WPair WUnit WUnit) -> "Pair"
   (WPair f s) -> "(" ++ showWType f ++ ", " ++ showWType s ++ ")"
@@ -112,8 +129,10 @@ getPosition (FunctionAlreadyDefined (Ident _ pos) _ _) = pos
 getPosition (VariableNotDefined (Ident _ pos)) = pos
 getPosition (FunctionNotDefined (Ident _ pos) _ _) = pos
 getPosition (IncompatibleTypes pos _ _) = pos
+getPosition (NonSubscriptable pos) = pos
 getPosition (IllegalReturn pos) = pos
 getPosition (IllegalPairExchange pos) = pos
+getPosition (Runtime _ pos) = pos
 
 semanticError :: Position -> [WType] -> WType -> WType -> SemanticError
 semanticError pos validTypes t1 t2 = IncompatibleTypes pos validTypes $ if t1 `elem` validTypes then t2 else t1
