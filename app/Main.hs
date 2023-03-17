@@ -26,6 +26,8 @@ import System.Exit
 import System.FilePath ( takeBaseName )
 import Text.Megaparsec
 
+data Option = RegOptim | PeepholeOptim
+
 main :: IO ()
 main = do 
   getArgs >>= \case
@@ -50,3 +52,33 @@ main = do
               let irProg = runReader (IR.transProg renamedAST') (symbolTable, scopeMap)
               let armProg = ARM.transProg irProg
               TIO.writeFile (takeBaseName fname ++ ".s") (showArm armProg) >> exitSuccess
+
+compile :: FilePath -> Maybe Option -> IO ()
+compile fname Nothing = do
+  contents <- TIO.readFile fname
+  case runParser (L.fully program) fname contents of
+    Left err -> do
+      putStrLn (errorBundlePretty err)
+      exitWith syntaxExit
+    Right ast -> case rename ast of
+      Left errs -> printSemanticErrors errs contents fname >> exitWith semanticExit
+      Right (scopeMap, renamedAST) -> case runExcept $ runStateT (checkProg renamedAST) M.empty of
+        Left err -> printSemanticErrors [err] contents fname >> exitWith semanticExit
+        Right (renamedAST', symbolTable) -> do
+          let irProg = runReader (IR.transProg renamedAST') (symbolTable, scopeMap)
+          let armProg = ARM.transProg irProg
+          TIO.writeFile (takeBaseName fname ++ ".s") (showArm armProg) >> exitSuccess
+compile fname (Just RegOptim) = do
+  contents <- TIO.readFile fname
+  case runParser (L.fully program) fname contents of
+    Left err -> do
+      putStrLn (errorBundlePretty err)
+      exitWith syntaxExit
+    Right ast -> case rename ast of
+      Left errs -> printSemanticErrors errs contents fname >> exitWith semanticExit
+      Right (scopeMap, renamedAST) -> case runExcept $ runStateT (checkProg renamedAST) M.empty of
+        Left err -> printSemanticErrors [err] contents fname >> exitWith semanticExit
+        Right (renamedAST', symbolTable) -> do
+          let irProg = mapBodies Optim.allocRegisters (runReader (IR.transProg renamedAST') (symbolTable, scopeMap))
+          let armProg = ARM.transProg irProg
+          TIO.writeFile (takeBaseName fname ++ ".s") (showArm armProg) >> exitSuccess
