@@ -5,6 +5,7 @@ module Main (main) where
 import qualified Lexer as L
 import CodeGeneration.ARM.PrettyPrint (showArm)
 import CodeGeneration.Utils (mapBodies)
+import CodeGeneration.ARM.Peephole (peepholeOptimise)
 import qualified CodeGeneration.ARM.Registers as ARM (transProg)
 import qualified CodeGeneration.Intermediate.Optimisation.RegisterAllocation as Optim (allocRegisters)
 import qualified CodeGeneration.Intermediate.Program as IR
@@ -26,7 +27,7 @@ import System.Exit
 import System.FilePath ( takeBaseName )
 import Text.Megaparsec
 
-data Option = RegOptim | PeepholeOptim
+data Option =  PeepholeOptim | RegOptim deriving (Eq)
 
 main :: IO ()
 main = do 
@@ -36,25 +37,16 @@ main = do
       "./compile\t\t\tUse the WACC REPL",
       "./compile -h\t\t\tUsage guide",
       "./compile -i [filename.wacc]\tExecute a WACC using an interpreter",
-      "./compile [filename.wacc]\tCompile a WACC file into assembly" ]
+      "./compile [optimisations] [filename.wacc]\tCompile a WACC file into assembly with optimisations (o1 and/or o2)" ]
     ("-i":fname:_) -> interpretFile fname
-    (fname:_) -> do
-      contents <- TIO.readFile fname
-      case runParser (L.fully program) fname contents of
-        Left err -> do
-          putStrLn (errorBundlePretty err)
-          exitWith syntaxExit
-        Right ast -> case rename ast of
-          Left errs -> printSemanticErrors errs contents fname >> exitWith semanticExit
-          Right (scopeMap, renamedAST) -> case runExcept $ runStateT (checkProg renamedAST) M.empty of
-            Left err -> printSemanticErrors [err] contents fname >> exitWith semanticExit
-            Right (renamedAST', symbolTable) -> do
-              let irProg = runReader (IR.transProg renamedAST') (symbolTable, scopeMap)
-              let armProg = ARM.transProg irProg
-              TIO.writeFile (takeBaseName fname ++ ".s") (showArm armProg) >> exitSuccess
+    ("-o1":"-o2":fname:_) -> compile fname [PeepholeOptim, RegOptim]
+    ("-o2":"-o1":fname:_) -> compile fname [PeepholeOptim, RegOptim]
+    ("-o1":fname:_) -> compile fname [PeepholeOptim]
+    ("-o2":fname:_) -> compile fname [RegOptim]
+    (fname:_) -> compile fname []
 
-compile :: FilePath -> Maybe Option -> IO ()
-compile fname Nothing = do
+compile :: FilePath -> [Option] -> IO ()
+compile fname options = do
   contents <- TIO.readFile fname
   case runParser (L.fully program) fname contents of
     Left err -> do
@@ -65,20 +57,8 @@ compile fname Nothing = do
       Right (scopeMap, renamedAST) -> case runExcept $ runStateT (checkProg renamedAST) M.empty of
         Left err -> printSemanticErrors [err] contents fname >> exitWith semanticExit
         Right (renamedAST', symbolTable) -> do
-          let irProg = runReader (IR.transProg renamedAST') (symbolTable, scopeMap)
-          let armProg = ARM.transProg irProg
-          TIO.writeFile (takeBaseName fname ++ ".s") (showArm armProg) >> exitSuccess
-compile fname (Just RegOptim) = do
-  contents <- TIO.readFile fname
-  case runParser (L.fully program) fname contents of
-    Left err -> do
-      putStrLn (errorBundlePretty err)
-      exitWith syntaxExit
-    Right ast -> case rename ast of
-      Left errs -> printSemanticErrors errs contents fname >> exitWith semanticExit
-      Right (scopeMap, renamedAST) -> case runExcept $ runStateT (checkProg renamedAST) M.empty of
-        Left err -> printSemanticErrors [err] contents fname >> exitWith semanticExit
-        Right (renamedAST', symbolTable) -> do
-          let irProg = mapBodies Optim.allocRegisters (runReader (IR.transProg renamedAST') (symbolTable, scopeMap))
-          let armProg = ARM.transProg irProg
+          let irOptimisations = if RegOptim `elem` options then mapBodies Optim.allocRegisters else id
+          let irProg = irOptimisations $ runReader (IR.transProg renamedAST') (symbolTable, scopeMap)
+          let armOptimisations = if PeepholeOptim `elem` options then peepholeOptimise else id
+          let armProg = armOptimisations $ ARM.transProg irProg
           TIO.writeFile (takeBaseName fname ++ ".s") (showArm armProg) >> exitSuccess
