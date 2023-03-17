@@ -24,8 +24,6 @@ import qualified Data.Map as M
 import qualified Data.Set as Set
 import qualified Data.Text as T
 
-import Debug.Trace
-
 type Id = Either Label Int
 
 data JmpType = CondJmp | LinearJmp 

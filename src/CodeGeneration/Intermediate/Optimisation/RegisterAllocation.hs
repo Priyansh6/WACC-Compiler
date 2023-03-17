@@ -11,8 +11,6 @@ import Data.Set (Set)
 import qualified Data.Map as M
 import qualified Data.Set as Set
 
-import Debug.Trace
-
 -- Type a denotes the source register type, type b denotes the target register type
 type RIG a b = Map a (Set (Either a b))
 
